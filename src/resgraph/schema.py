@@ -1,0 +1,63 @@
+# Message Schema as defined in D2
+#
+# TODO — open D2 gaps, undecided (record in SPEC.md before enforcing here):
+#   - duplicate relationships: is [(runs_on, host-1)] twice a producer bug
+#     (reject), a parse-time dedupe, or the store's problem?
+#   - self-edges (target_id == resource_id): reject or tolerate?
+
+from enum import StrEnum
+from typing import Literal, Self
+
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
+
+
+class Op(StrEnum):
+    DELETE = "delete"
+    UPSERT = "upsert"
+
+
+class ResourceType(StrEnum):
+    ASG = "asg"
+    CONTAINER = "container"
+    DB = "db"
+    HOST = "host"
+    LB = "lb"
+    SG = "sg"
+    VM = "vm"
+
+
+class Relationship(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    type: Literal["runs_on", "attached_to", "routes_to", "member_of"]
+    target_id: str = Field(min_length=1)
+
+
+class UpdateMessage(BaseModel):
+    # Messages are immutable events; unknown fields are producer bugs (D2:
+    # schema grows only via schema_version bumps, so strict parsing is safe).
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    # Versioning: this model IS schema v1 — never widen this Literal.
+    # A new version is a new model (schema_version: Literal[2] = 2), parsed
+    # via a discriminated union on this field. Record it in SPEC.md as a
+    # superseding decision.
+    schema_version: Literal[1] = 1
+
+    # D2: generator world-time. Aware-only — a timestamp without an offset is
+    # ambiguous, and the time-travel layer cannot afford ambiguity.
+    event_time: AwareDatetime
+
+    sequence: int = Field(ge=0)
+    op: Op
+    resource_type: ResourceType
+    resource_id: str = Field(min_length=1)
+    attrs: dict[str, str | int | float | bool] = Field(default_factory=dict)
+    relationships: list[Relationship] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _delete_carries_no_payload(self) -> Self:
+        # D2: delete is a removal statement, not an update — payload is meaningless.
+        if self.op is Op.DELETE and (self.attrs or self.relationships):
+            raise ValueError("delete must carry empty attrs and relationships (D2)")
+        return self

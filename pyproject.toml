@@ -26,6 +26,9 @@ line-length = 100
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
 
+[tool.coverage.run]
+relative_files = true
+
 [tool.pytest.ini_options]
 addopts = "-q --cov=resgraph --cov-report=term-missing"
 testpaths = ["tests"]

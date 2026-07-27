@@ -1,2 +1,2 @@
-# Local stores — grows per chapter (Redis: Ch 1/3, Memgraph: Ch 2, ...)
+# Local stores — grows with the platform (Redis Stream, Memgraph, Iceberg, ...)
 services: {}

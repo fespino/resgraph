@@ -21,4 +21,5 @@ flowchart LR
   Q2 --> A
 ```
 
-Status: Chapter 0 — spec + schema skeleton. Build guide: private companion.
+Status: phase 0 — decision log + wire schema. Each increment lands via
+issue → PR, citing the SPEC decisions (D-numbers) it implements.

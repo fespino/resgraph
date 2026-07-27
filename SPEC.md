@@ -89,7 +89,7 @@ the node we're touching anyway.
 effects* beyond the store (e.g., notifications), add an outbox — do not
 weaken the watermark.
 
-### D4 — Performance budgets (provisional until Chapter 3 baselines)
+### D4 — Performance budgets (provisional until ingest baselines exist)
 
 | Budget | Target | Measured (fill at Ch 3/2) |
 |---|---|---|
@@ -98,14 +98,14 @@ weaken the watermark.
 | Ingest memory ceiling | < 512 MB RSS | — |
 | World generator emit rate | ≥ 100k msg/s | — |
 
-Provisional targets exist to be *validated, then enforced* (CI gate,
-Chapter 19). A budget without a measurement is a wish; a measurement
+Provisional targets exist to be *validated, then enforced* (as CI
+gates, once measured). A budget without a measurement is a wish; a measurement
 without a budget is trivia.
 
 ## Phase contracts
-- Chapter 1 (generator) MUST emit D2 messages exactly and expose
-  `--seed` for reproducibility.
-- Chapter 2 (hot store) MUST implement D3 as stated.
-- Any chapter touching these contracts cites the D-number in its PR.
+- The generator MUST emit D2 messages exactly and expose `--seed`
+  for reproducibility.
+- The hot-store ingest MUST implement D3 as stated.
+- Any increment touching these contracts cites the D-number in its PR.
 
 

@@ -7,8 +7,9 @@ name: Workflow security lint
 
 on:
   push:
-    branches: [main]
+    branches: [main]     # always on main — every mainline commit re-validated
   pull_request:
+    paths: ['.github/workflows/**']   # on PRs, only when workflows change
   workflow_dispatch:
 
 permissions:

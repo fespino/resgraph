@@ -20,6 +20,7 @@ on:
 
 permissions:
   contents: read
+  issues: write   # scheduled-scan failures open a tracking issue
 
 concurrency:
   group: osv-scan-${{ github.ref }}
@@ -56,4 +57,47 @@ jobs:
           ./osv-scanner --version
 
       - name: Scan
-        run: ./osv-scanner scan source --recursive ./
+        id: scan
+        run: |
+          set -o pipefail
+          ./osv-scanner scan source --recursive ./ 2>&1 | tee osv-results.txt
+
+      # On PR/push a red check is in someone's face; a failed weekly
+      # cron is invisible unless it lands somewhere — so it opens (or
+      # updates) a tracking issue.
+      - name: Open issue on scheduled-scan failure
+        if: failure() && github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          TITLE="Security: scheduled OSV scan found dependency vulnerabilities"
+          BODY_FILE=$(mktemp)
+          {
+            echo "Weekly OSV scan failed — known vulnerabilities in locked dependencies."
+            echo
+            echo '```'
+            head -c 50000 osv-results.txt
+            echo '```'
+            echo
+            echo "**Next steps:**"
+            echo "1. Update the affected package (\`uv lock --upgrade-package <name>\`), or"
+            echo "2. Add a documented exception to \`osv-scanner.toml\` with justification"
+            echo
+            echo "[Workflow run]($RUN_URL)"
+          } > "$BODY_FILE"
+          gh label create security --color D93F0B --description "Security finding" --force
+          EXISTING=$(gh issue list --label security --state open --search "$TITLE" --json number --jq '.[0].number')
+          if [ -n "$EXISTING" ]; then
+            {
+              echo "**Re-scan on $(date -u +%Y-%m-%d)** — vulnerabilities still present."
+              echo
+              echo '```'
+              head -c 50000 osv-results.txt
+              echo '```'
+              echo
+              echo "[Workflow run]($RUN_URL)"
+            } | gh issue comment "$EXISTING" --body-file -
+          else
+            gh issue create --title "$TITLE" --label security --body-file "$BODY_FILE"
+          fi

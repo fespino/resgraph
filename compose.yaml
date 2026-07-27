@@ -1,0 +1,2 @@
+# Local stores — grows with the platform (Redis Stream, Memgraph, Iceberg, ...)
+services: {}

@@ -9,6 +9,9 @@ wheels/
 # Virtual environments
 .venv
 
+# Test artifacts
+.coverage
+
 # Environment variables
 .env
 

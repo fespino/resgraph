@@ -1,0 +1,32 @@
+name: Workflow security lint
+
+# zizmor statically audits the GitHub Actions workflows themselves —
+# unpinned actions, credential persistence, template injection,
+# excessive permissions. The CI's supply chain is part of the attack
+# surface; this keeps the checks honest about their own security.
+
+on:
+  push:
+    branches: [main]     # always on main — every mainline commit re-validated
+  pull_request:
+    paths: ['.github/workflows/**']   # on PRs, only when workflows change
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: zizmor-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  zizmor:
+    name: zizmor
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@38f3f104447c67c051c4a08e39b64a148898af3a  # v4
+      - run: uvx zizmor==1.28.0 --no-progress .github/workflows/

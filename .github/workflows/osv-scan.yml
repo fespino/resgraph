@@ -1,0 +1,103 @@
+name: OSV scan
+
+# Dependency vulnerability scan using the osv-scanner binary against
+# the OSV.dev database (scans uv.lock natively). Complements Dependabot
+# — OSV's database has broader ecosystem coverage and faster
+# CVE-disclosure-to-database time.
+#
+# Runs on every push to main, every pull request, and weekly on Monday
+# at 07:00 UTC (staggered after the TruffleHog scan at 06:00). Fails
+# the build on any finding. Documented exceptions go in
+# `osv-scanner.toml` at the repo root.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: '0 7 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write   # scheduled-scan failures open a tracking issue
+
+concurrency:
+  group: osv-scan-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  OSV_VERSION: v2.3.8
+  # SHA256 of osv-scanner_linux_amd64 from the release's SHA256SUMS
+  # file. Verified before execution.
+  OSV_SHA256: bc98e15319ed0d515e3f9235287ba53cdc5535d576d24fd573978ecfe9ab92dc
+
+jobs:
+  osv-scanner:
+    name: OSV-Scanner
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Install osv-scanner
+        run: |
+          set -euo pipefail
+          curl -sSL --fail -o osv-scanner \
+            "https://github.com/google/osv-scanner/releases/download/${OSV_VERSION}/osv-scanner_linux_amd64"
+          actual=$(sha256sum osv-scanner | awk '{print $1}')
+          if [ "$actual" != "$OSV_SHA256" ]; then
+            echo "::error::osv-scanner binary checksum mismatch (expected $OSV_SHA256, got $actual)"
+            exit 1
+          fi
+          chmod +x osv-scanner
+          ./osv-scanner --version
+
+      - name: Scan
+        id: scan
+        run: |
+          set -o pipefail
+          ./osv-scanner scan source --recursive ./ 2>&1 | tee osv-results.txt
+
+      # On PR/push a red check is in someone's face; a failed weekly
+      # cron is invisible unless it lands somewhere — so it opens (or
+      # updates) a tracking issue.
+      - name: Open issue on scheduled-scan failure
+        if: failure() && github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          TITLE="Security: scheduled OSV scan found dependency vulnerabilities"
+          BODY_FILE=$(mktemp)
+          {
+            echo "Weekly OSV scan failed — known vulnerabilities in locked dependencies."
+            echo
+            echo '```'
+            head -c 50000 osv-results.txt
+            echo '```'
+            echo
+            echo "**Next steps:**"
+            echo "1. Update the affected package (\`uv lock --upgrade-package <name>\`), or"
+            echo "2. Add a documented exception to \`osv-scanner.toml\` with justification"
+            echo
+            echo "[Workflow run]($RUN_URL)"
+          } > "$BODY_FILE"
+          gh label create security --color D93F0B --description "Security finding" --force
+          EXISTING=$(gh issue list --label security --state open --search "$TITLE" --json number --jq '.[0].number')
+          if [ -n "$EXISTING" ]; then
+            {
+              echo "**Re-scan on $(date -u +%Y-%m-%d)** — vulnerabilities still present."
+              echo
+              echo '```'
+              head -c 50000 osv-results.txt
+              echo '```'
+              echo
+              echo "[Workflow run]($RUN_URL)"
+            } | gh issue comment "$EXISTING" --body-file -
+          else
+            gh issue create --title "$TITLE" --label security --body-file "$BODY_FILE"
+          fi

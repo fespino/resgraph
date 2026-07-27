@@ -74,6 +74,38 @@ The two alarms are deliberately asymmetric:
 - **Vulnerability alerts + automated security fixes** — Dependabot's
   security half, distinct from its weekly version bumps.
 
+## The change lifecycle
+
+Every change — maintainer or bot — reaches `main` the same way,
+and the platform enforces it rather than trusting discipline:
+
+```
+main is unpushable (branch protection, enforce_admins on)
+        │
+  issue opened first ──── records intent, self-contained
+        │
+  branch + PR ─────────── "Closes #N"; commits cite the SPEC
+        │                  decisions (D-numbers) they touch
+        │
+  automated checks ────── required: test, TruffleHog, OSV-Scanner
+  + code review            advisory: CodeQL, zizmor; the sticky CI
+        │                  summary + coverage comments show the
+        │                  reviewer the state without leaving the PR
+        │
+  merge into main ─────── triggers the main-only jobs: Scorecard
+                           publishes, the coverage baseline updates,
+                           zizmor re-validates all workflows
+```
+
+Two properties matter more than the individual steps. First, there is
+no privileged path: `enforce_admins` means the maintainer's own
+changes go through the same issue → PR → gates sequence as a
+Dependabot bump — the lifecycle is a mechanical fact, not a
+convention that holds until someone is in a hurry. Second, the issue
+comes *before* the PR: the issue records what and why in
+self-contained form, the PR records how; a reader can audit intent
+and implementation separately.
+
 ## Measurement
 
 The [OpenSSF Scorecard](https://scorecard.dev/viewer/?uri=github.com/fespino/resgraph)

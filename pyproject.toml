@@ -26,6 +26,9 @@ line-length = 100
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
 
+[tool.bandit]
+exclude_dirs = ["tests", ".venv"]
+
 [tool.coverage.run]
 relative_files = true
 
@@ -35,6 +38,7 @@ testpaths = ["tests"]
 
 [dependency-groups]
 dev = [
+    "bandit[toml]>=1.9.4",
     "hypothesis>=6.156.6",
     "pytest>=9.1.1",
     "pytest-cov>=7.1.0",

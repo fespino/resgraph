@@ -1,0 +1,59 @@
+name: OSV scan
+
+# Dependency vulnerability scan using the osv-scanner binary against
+# the OSV.dev database (scans uv.lock natively). Complements Dependabot
+# — OSV's database has broader ecosystem coverage and faster
+# CVE-disclosure-to-database time.
+#
+# Runs on every push to main, every pull request, and weekly on Monday
+# at 07:00 UTC (staggered after the TruffleHog scan at 06:00). Fails
+# the build on any finding. Documented exceptions go in
+# `osv-scanner.toml` at the repo root.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: '0 7 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: osv-scan-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  OSV_VERSION: v2.3.8
+  # SHA256 of osv-scanner_linux_amd64 from the release's SHA256SUMS
+  # file. Verified before execution.
+  OSV_SHA256: bc98e15319ed0d515e3f9235287ba53cdc5535d576d24fd573978ecfe9ab92dc
+
+jobs:
+  osv-scanner:
+    name: OSV-Scanner
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Install osv-scanner
+        run: |
+          set -euo pipefail
+          curl -sSL --fail -o osv-scanner \
+            "https://github.com/google/osv-scanner/releases/download/${OSV_VERSION}/osv-scanner_linux_amd64"
+          actual=$(sha256sum osv-scanner | awk '{print $1}')
+          if [ "$actual" != "$OSV_SHA256" ]; then
+            echo "::error::osv-scanner binary checksum mismatch (expected $OSV_SHA256, got $actual)"
+            exit 1
+          fi
+          chmod +x osv-scanner
+          ./osv-scanner --version
+
+      - name: Scan
+        run: ./osv-scanner scan source --recursive ./

@@ -39,7 +39,7 @@ testpaths = ["tests"]
 [dependency-groups]
 dev = [
     "bandit[toml]>=1.9.4",
-    "hypothesis>=6.161.6",
+    "hypothesis>=6.161.8",
     "pytest>=9.1.1",
     "pytest-cov>=7.1.0",
     "ruff>=0.16.0",

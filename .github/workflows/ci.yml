@@ -15,7 +15,12 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
         with:
-          persist-credentials: false
+          # Documented exception (zizmor artipacked, see .github/zizmor.yml):
+          # py-cov-action pushes its coverage-data branch via git on main
+          # pushes and needs the persisted token — which this job already
+          # holds as contents:write. Every subsequent step is a pinned,
+          # audited action.
+          persist-credentials: true
       - uses: astral-sh/setup-uv@38f3f104447c67c051c4a08e39b64a148898af3a  # v4
       - run: uv sync --dev
       - id: lint

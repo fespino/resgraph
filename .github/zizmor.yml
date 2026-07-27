@@ -1,0 +1,9 @@
+# zizmor configuration — documented exceptions only.
+rules:
+  artipacked:
+    # ci.yml's checkout persists credentials deliberately: py-cov-action
+    # pushes the coverage-data branch via git on main pushes and fails
+    # without them (issue #12). The persisted token is the job's own
+    # GITHUB_TOKEN, already contents:write scoped for that branch.
+    ignore:
+      - ci.yml

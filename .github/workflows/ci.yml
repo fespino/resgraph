@@ -6,23 +6,49 @@ jobs:
   test:
     runs-on: ubuntu-latest
     permissions:
-      contents: write        # coverage badge/data branch
-      pull-requests: write   # coverage comment on PRs
+      contents: read
+      pull-requests: write   # CI summary comment on PRs
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v4
       - run: uv sync --dev
-      - run: uv run ruff check .
-      - run: uv run ruff format --check .
-      - run: uv run pytest
-      - name: Coverage comment
-        id: coverage_comment
-        uses: py-cov-action/python-coverage-comment-action@v3
+      - id: lint
+        name: ruff check
+        run: uv run ruff check .
+        continue-on-error: true
+      - id: format
+        name: ruff format
+        run: uv run ruff format --check .
+        continue-on-error: true
+      - id: tests
+        name: pytest
+        run: uv run pytest 2>&1 | tee pytest.out
+        continue-on-error: true
+      - name: Build CI summary
+        if: always()
+        run: |
+          s() { [ "$1" = "success" ] && echo "✅ pass" || echo "❌ fail"; }
+          {
+            echo "## CI summary"
+            echo ""
+            echo "| Check | Result |"
+            echo "|---|---|"
+            echo "| ruff check | $(s "${{ steps.lint.outcome }}") |"
+            echo "| ruff format | $(s "${{ steps.format.outcome }}") |"
+            echo "| pytest | $(s "${{ steps.tests.outcome }}") — $(tail -1 pytest.out) |"
+            echo ""
+            echo "<details><summary>Coverage</summary>"
+            echo ""
+            uv run coverage report --format=markdown 2>/dev/null || echo "_no coverage data_"
+            echo ""
+            echo "</details>"
+          } > ci-summary.md
+          cat ci-summary.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Comment CI summary on PR
+        if: always() && github.event_name == 'pull_request'
+        uses: marocchino/sticky-pull-request-comment@v2
         with:
-          GITHUB_TOKEN: ${{ github.token }}
-      - name: Store comment artifact (fork PRs)
-        if: steps.coverage_comment.outputs.COMMENT_FILE_WRITTEN == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: python-coverage-comment-action
-          path: python-coverage-comment-action.txt
+          path: ci-summary.md
+      - name: Gate
+        if: steps.lint.outcome == 'failure' || steps.format.outcome == 'failure' || steps.tests.outcome == 'failure'
+        run: exit 1

@@ -20,4 +20,9 @@ Every push and PR is gated by secret scanning (TruffleHog,
 verified-only), dependency vulnerability scanning (osv-scanner against
 uv.lock), Python static analysis (bandit), and a workflow-security
 audit (zizmor) — with actions pinned by commit SHA. Documented
-exceptions live in `.trufflehogignore` / `osv-scanner.toml`.
+exceptions live in `.trufflehogignore` / `osv-scanner.toml` /
+`.github/zizmor.yml`.
+
+The full picture — every control, its rationale, the deliberate
+asymmetries, and the honest limitations — is in
+[docs/security-posture.md](docs/security-posture.md).

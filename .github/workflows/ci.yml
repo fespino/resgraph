@@ -6,8 +6,8 @@ jobs:
   test:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
-      pull-requests: write   # CI summary comment on PRs
+      contents: write        # coverage badge/data branch (py-cov-action)
+      pull-requests: write   # CI summary + coverage comments on PRs
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v4
@@ -36,12 +36,6 @@ jobs:
             echo "| ruff check | $(s "${{ steps.lint.outcome }}") |"
             echo "| ruff format | $(s "${{ steps.format.outcome }}") |"
             echo "| pytest | $(s "${{ steps.tests.outcome }}") — $(tail -1 pytest.out) |"
-            echo ""
-            echo "<details><summary>Coverage</summary>"
-            echo ""
-            uv run coverage report --format=markdown 2>/dev/null || echo "_no coverage data_"
-            echo ""
-            echo "</details>"
           } > ci-summary.md
           cat ci-summary.md >> "$GITHUB_STEP_SUMMARY"
       - name: Comment CI summary on PR
@@ -49,6 +43,18 @@ jobs:
         uses: marocchino/sticky-pull-request-comment@v2
         with:
           path: ci-summary.md
+      - name: Coverage comment
+        id: coverage_comment
+        if: always()
+        uses: py-cov-action/python-coverage-comment-action@v3
+        with:
+          GITHUB_TOKEN: ${{ github.token }}
+      - name: Store comment artifact (fork PRs)
+        if: steps.coverage_comment.outputs.COMMENT_FILE_WRITTEN == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-coverage-comment-action
+          path: python-coverage-comment-action.txt
       - name: Gate
         if: steps.lint.outcome == 'failure' || steps.format.outcome == 'failure' || steps.tests.outcome == 'failure'
         run: exit 1

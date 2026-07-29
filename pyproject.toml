@@ -11,10 +11,13 @@ authors = [
 requires-python = ">=3.13"
 dependencies = [
     "pydantic>=2.13.4",
+    "redis>=8.0.1",
+    "typer>=0.27.0",
 ]
 
 [project.scripts]
 resgraph = "resgraph:main"
+resgraph-gen = "resgraph.gen.cli:app"
 
 [build-system]
 requires = ["uv_build>=0.11.32,<0.12.0"]
@@ -28,6 +31,9 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 
 [tool.bandit]
 exclude_dirs = ["tests", ".venv"]
+# B311: random.Random is the point — the generator's determinism
+# contract (D6) requires a seeded PRNG; nothing here is cryptographic.
+skips = ["B311"]
 
 [tool.coverage.run]
 relative_files = true

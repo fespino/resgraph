@@ -1,2 +1,8 @@
 # Local stores — grows with the platform (Redis Stream, Memgraph, Iceberg, ...)
-services: {}
+services:
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+    # AOF off: the stream is regenerable by seed (D6); durability is not
+    # this layer's budget.
+    command: ["redis-server", "--appendonly", "no"]

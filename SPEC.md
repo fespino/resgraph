@@ -102,6 +102,70 @@ Provisional targets exist to be *validated, then enforced* (as CI
 gates, once measured). A budget without a measurement is a wish; a measurement
 without a budget is trivia.
 
+**D4 amendment (phase 1, by supersession):** the generator emit
+budget (≥100k msg/s) was measured and missed: ~88k msg/s kernel,
+~36k msg/s sustained end-to-end on an M3/8GB laptop (BENCHMARKS.md
+has methods and the profile trail). Amended to **≥30k msg/s sustained
+end-to-end** on laptop hardware. Reasons, recorded: pure Python with
+message validation kept ON (deliberate — the generator provably emits
+valid D2), and world growth during long runs raises per-message cost.
+The two algorithmic bottlenecks found en route (O(world) dangling-edge
+repair, O(hot-set) target picking) are fixed and documented; disabling
+validation was considered and rejected. The 100k figure is retired,
+not edited away.
+
+## Phase 1 — the world generator
+
+### D5 — World topology (allowed edges)
+
+| Source | Relationship | Target | Cardinality |
+|---|---|---|---|
+| vm | runs_on | host | exactly 1 |
+| vm | member_of | asg | 0..1 |
+| vm | attached_to | sg | 1..3 |
+| container | runs_on | vm | exactly 1 |
+| db | runs_on | host | exactly 1 |
+| db | attached_to | sg | 1..2 |
+| lb | routes_to | vm \| container | 1..4 |
+
+Default type mix for `--resources N`: hosts 5%, vms 30%, containers
+40%, dbs 5%, lbs 5%, sgs 5%, asgs 10%.
+**Rejected:** free-form random edges — traversals become meaningless;
+blast-radius queries need real directionality.
+
+### D6 — Determinism contract
+
+Given identical (seed, flags, message count), the generator emits a
+byte-identical stream. Consequences:
+- One `random.Random(seed)` owns ALL randomness (no module-level
+  random, no set/dict-ordering dependence — iterate sorted).
+- `event_time` is **simulated world time**: starts at a fixed epoch
+  (2026-01-01T00:00:00Z) and advances deterministically per event
+  (exponential inter-arrival times drawn from the seeded RNG).
+  Wall-clock never appears in messages; `--rate` throttling is
+  operational only and cannot change stream content.
+**Rejected:** wall-clock event_time — kills reproducible benchmarks
+and byte-identical test fixtures.
+
+### D7 — Churn model
+
+- **Pareto skew:** 5% of resources ("hot set", chosen at seed time)
+  receive 80% of updates. Real inventories are skewed; uniform churn
+  is a lie that flatters caches.
+- **Op mix (defaults):** attr-update 0.80, relationship-change 0.12,
+  create 0.05, delete 0.03. Deletes tombstone; a deleted resource may
+  be re-created (the D3 revival path gets exercised for free).
+- **Burst mode:** `--burst-every 30 --burst-len 5 --burst-x 10` —
+  rate-multiplier windows, deterministic in world time.
+- On delete, dependents' dangling edges are repaired in world state
+  (replacement target re-rolled per D5) and surface in each
+  dependent's next emitted message — the world and the stream never
+  disagree at emit time.
+**Rejected:** letting dangling edges persist in world state — the
+generator's own invariant (targets alive at emit) would be false,
+and ground-truth reconciliation against world state would be
+impossible.
+
 ## Phase contracts
 - The generator MUST emit D2 messages exactly and expose `--seed`
   for reproducibility.

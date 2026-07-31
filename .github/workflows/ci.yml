@@ -23,19 +23,21 @@ jobs:
           persist-credentials: true
       - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9  # v9.0.0
       - run: uv sync --dev
-      - name: Start memgraph (integration tests)
-        # Readiness = a real Bolt handshake, not a TCP connect: docker-proxy
-        # accepts on the published port as soon as the container exists, so
-        # `nc -z` reports ready while memgraph is still starting (observed:
-        # every store test failing with ConnectionResetError at handshake).
+      - name: Start stores (integration tests)
+        # Readiness = a real protocol handshake, not a TCP connect:
+        # docker-proxy accepts on the published port as soon as the
+        # container exists, so `nc -z` reports ready while the server is
+        # still starting (observed: every store test failing with
+        # ConnectionResetError at the Bolt handshake).
         run: |
-          docker compose up -d memgraph
-          probe="import neo4j; d = neo4j.GraphDatabase.driver('bolt://localhost:7687'); d.verify_connectivity(); d.close()"
+          docker compose up -d memgraph redis
+          bolt="import neo4j; d = neo4j.GraphDatabase.driver('bolt://localhost:7687'); d.verify_connectivity(); d.close()"
+          ping="import redis; redis.Redis.from_url('redis://localhost:6379').ping()"
           for i in $(seq 1 60); do
-            uv run python -c "$probe" 2>/dev/null && exit 0
+            uv run python -c "$bolt" 2>/dev/null && uv run python -c "$ping" 2>/dev/null && exit 0
             sleep 1
           done
-          echo "memgraph did not become ready in 60s" >&2
+          echo "stores did not become ready in 60s" >&2
           exit 1
       - id: lint
         name: ruff check

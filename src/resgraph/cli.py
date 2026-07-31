@@ -7,6 +7,7 @@ import typer
 
 from resgraph.graph import queries
 from resgraph.graph.client import get_driver
+from resgraph.graph.consumer import DEFAULT_STREAM, Consumer
 from resgraph.graph.loader import load_snapshot
 from resgraph.graph.schema import init_schema
 from resgraph.schema import UpdateMessage
@@ -38,6 +39,27 @@ def load_snapshot_cmd() -> None:
         init_schema(s)
         counts = load_snapshot(s, msgs)
     typer.echo(json.dumps(counts))
+
+
+@app.command("ingest")
+def ingest_cmd(
+    redis_url: str = typer.Option("redis://localhost:6379"),
+    stream: str = typer.Option(DEFAULT_STREAM),
+    group: str = typer.Option("resgraph-ingest"),
+    name: str = typer.Option("c1"),
+    max_messages: int = typer.Option(0, help="Stop after N messages (0 = no limit)."),
+    exit_on_idle: bool = typer.Option(False, "--exit-on-idle"),
+) -> None:
+    """Consume the update stream into the hot store (at-least-once,
+    idempotent apply). Resumes from unacknowledged entries after a crash."""
+    with _session() as s:
+        init_schema(s)
+        consumer = Consumer(redis_url, s, stream=stream, group=group, name=name)
+        try:
+            counters = consumer.run(max_messages=max_messages or None, exit_on_idle=exit_on_idle)
+        finally:
+            consumer.close()
+    typer.echo(json.dumps(counters))
 
 
 @query_app.command("blast-radius")

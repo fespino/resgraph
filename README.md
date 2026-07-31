@@ -2,16 +2,22 @@
 
 [Full report](https://htmlpreview.github.io/?https://github.com/fespino/resgraph/blob/python-coverage-comment-action-data/htmlcov/index.html)
 
-| Name                             |    Stmts |     Miss |   Cover |   Missing |
-|--------------------------------- | -------: | -------: | ------: | --------: |
-| src/resgraph/\_\_init\_\_.py     |        2 |        1 |     50% |         2 |
-| src/resgraph/gen/\_\_init\_\_.py |        0 |        0 |    100% |           |
-| src/resgraph/gen/churn.py        |       65 |        6 |     91% |47-49, 62-63, 108 |
-| src/resgraph/gen/cli.py          |       43 |       43 |      0% |      3-78 |
-| src/resgraph/gen/sinks.py        |       20 |       20 |      0% |      3-45 |
-| src/resgraph/gen/world.py        |      115 |        1 |     99% |       124 |
-| src/resgraph/schema.py           |       29 |        0 |    100% |           |
-| **TOTAL**                        |  **274** |   **71** | **74%** |           |
+| Name                               |    Stmts |     Miss |   Cover |   Missing |
+|----------------------------------- | -------: | -------: | ------: | --------: |
+| src/resgraph/\_\_init\_\_.py       |        0 |        0 |    100% |           |
+| src/resgraph/cli.py                |       43 |       19 |     56% |20, 26-28, 36-40, 49-51, 56-58, 63-64, 69-70 |
+| src/resgraph/gen/\_\_init\_\_.py   |        0 |        0 |    100% |           |
+| src/resgraph/gen/churn.py          |       65 |        4 |     94% |47-49, 108 |
+| src/resgraph/gen/cli.py            |       43 |        6 |     86% | 17, 72-76 |
+| src/resgraph/gen/sinks.py          |       20 |        0 |    100% |           |
+| src/resgraph/gen/world.py          |      115 |        0 |    100% |           |
+| src/resgraph/graph/\_\_init\_\_.py |        0 |        0 |    100% |           |
+| src/resgraph/graph/client.py       |       14 |        4 |     71% |     26-29 |
+| src/resgraph/graph/loader.py       |       30 |       21 |     30% | 23, 27-74 |
+| src/resgraph/graph/queries.py      |       41 |       24 |     41% |28-31, 50-53, 62-74, 79-91, 97, 107-120, 124-138 |
+| src/resgraph/graph/schema.py       |       10 |        4 |     60% | 20-23, 27 |
+| src/resgraph/schema.py             |       29 |        0 |    100% |           |
+| **TOTAL**                          |  **410** |   **82** | **80%** |           |
 
 
 ## Setup coverage badge

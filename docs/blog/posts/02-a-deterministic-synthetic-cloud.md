@@ -97,6 +97,44 @@ from *world time*, so the spike lands at the identical spot in every
 run. Deterministic load spikes, for stress-testing consumers
 reproducibly.
 
+!!! note "Why exponential gaps? A short theory detour"
+    A **Poisson process** is the standard model for events that arrive
+    independently at some average rate λ — radioactive decays, calls
+    hitting a switchboard, updates hitting an inventory. It's
+    characterized by one property: **memorylessness**. The chance of an
+    event in the next microsecond doesn't depend on how long you've
+    already waited; the process carries no state between events.
+
+    That property forces the shape of the gaps. If arrivals are
+    memoryless, the waiting time between consecutive events *must*
+    follow the exponential distribution — it's the only continuous
+    distribution with no memory. Which yields the implementation: you
+    don't simulate a rate, you **draw the next gap** from
+    `Exponential(λ)` (mean gap = 1/λ) and add it to the clock. One
+    random draw per event, no ticking, no discretization error.
+
+    Two consequences the generator leans on:
+
+    - **Realistic clumping for free.** Exponential gaps are mostly
+      short with occasional long ones, so events arrive in ragged
+      clusters separated by lulls — what production traffic looks like
+      — rather than the metronome tick a fixed interval would produce.
+      A uniform gap is exactly as unrealistic as uniform churn.
+    - **Bursts are just a time-varying λ.** Making the rate a function
+      of world time (10× inside a window, 1× outside) turns the model
+      into an *inhomogeneous* Poisson process — the textbook way to
+      model rush hour on top of baseline traffic. The implementation
+      barely changes: check which window `now` falls in, draw the gap
+      from that window's rate.
+
+    The model has known limits: real infrastructure events aren't
+    perfectly independent (an autoscaler reacting to a host failure is
+    a *cascade*, which Poisson won't produce). For a load generator
+    that's acceptable — the goal is realistic arrival texture at a
+    controlled rate, not a causal model of incidents. If a later phase
+    needs cascades, that's a self-exciting (Hawkes) process, and it
+    would earn its own decision entry.
+
 **Deletions revive.** When the engine creates a resource, 30% of the
 time it resurrects a previously deleted id instead of minting a fresh
 one. That exists for one reason: delete-then-recreate is the awkward

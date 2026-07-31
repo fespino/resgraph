@@ -2,11 +2,16 @@
 
 [Full report](https://htmlpreview.github.io/?https://github.com/fespino/resgraph/blob/python-coverage-comment-action-data/htmlcov/index.html)
 
-| Name                         |    Stmts |     Miss |   Cover |   Missing |
-|----------------------------- | -------: | -------: | ------: | --------: |
-| src/resgraph/\_\_init\_\_.py |        2 |        1 |     50% |         2 |
-| src/resgraph/schema.py       |       29 |        0 |    100% |           |
-| **TOTAL**                    |   **31** |    **1** | **97%** |           |
+| Name                             |    Stmts |     Miss |   Cover |   Missing |
+|--------------------------------- | -------: | -------: | ------: | --------: |
+| src/resgraph/\_\_init\_\_.py     |        2 |        1 |     50% |         2 |
+| src/resgraph/gen/\_\_init\_\_.py |        0 |        0 |    100% |           |
+| src/resgraph/gen/churn.py        |       65 |        6 |     91% |47-49, 62-63, 108 |
+| src/resgraph/gen/cli.py          |       43 |       43 |      0% |      3-78 |
+| src/resgraph/gen/sinks.py        |       20 |       20 |      0% |      3-45 |
+| src/resgraph/gen/world.py        |      115 |        1 |     99% |       124 |
+| src/resgraph/schema.py           |       29 |        0 |    100% |           |
+| **TOTAL**                        |  **274** |   **71** | **74%** |           |
 
 
 ## Setup coverage badge

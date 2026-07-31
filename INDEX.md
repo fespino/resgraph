@@ -9,5 +9,6 @@
 - compose.yaml — local stores (grows with the platform)
 - .github/workflows/ — CI + security gates (see docs/security-posture.md)
 - docs/security-posture.md — every security control and why it exists
-- src/resgraph/graph/ — hot store client, DDL, snapshot loader, traversal queries (D8–D9)
+- src/resgraph/graph/ — hot store client, DDL, snapshot loader, traversal queries (D8–D9),
+  idempotent ingest apply + stream consumer (D3/D10)
 - benchmarks/ — measurement scripts (methods in BENCHMARKS.md)

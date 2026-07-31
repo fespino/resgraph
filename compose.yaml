@@ -1,7 +1,12 @@
 # Local stores — grows with the platform (Redis Stream, Memgraph, Iceberg, ...)
+#
+# Images are pinned by DIGEST, same policy as the SHA-pinned GitHub
+# Actions: a floating tag means CI and laptops can silently run
+# different servers (a `latest` drift was a suspect in a flaky golden
+# test before pinning). Dependabot keeps the digests current.
 services:
   redis:
-    image: redis:7-alpine
+    image: redis:7-alpine@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2
     ports: ["6379:6379"]
     # AOF off: the stream is regenerable by seed (D6); durability is not
     # this layer's budget.
@@ -10,7 +15,7 @@ services:
     # -mage variant: the algorithm library costs nothing locally and
     # later statistical queries may want it. Memory-limited — the store
     # gets a budget like everything else.
-    image: memgraph/memgraph-mage:latest
+    image: memgraph/memgraph-mage@sha256:f252561ba38f4c5f530f9d0c7d916f47a37ed20fdfdcfd9b596ca149bd9a5fd8
     ports: ["7687:7687"]
     command: ["--log-level=WARNING", "--memory-limit=2048"]
   postgres:
@@ -20,7 +25,7 @@ services:
     # this comparison). Not started by default:
     #   docker compose --profile bench up -d postgres
     profiles: ["bench"]
-    image: postgres:17-alpine
+    image: postgres:17-alpine@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193
     environment: {POSTGRES_PASSWORD: resgraph}
     # 5433 on the host: developer machines often run their own postgres
     # on 5432, which wins the localhost race against the container.

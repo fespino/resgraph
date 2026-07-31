@@ -19,3 +19,13 @@ updates:
     open-pull-requests-limit: 5
     labels:
       - "dependencies"
+
+  # Store images pinned by digest in compose.yaml
+  - package-ecosystem: "docker-compose"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"

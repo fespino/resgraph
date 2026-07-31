@@ -13,8 +13,8 @@
 | src/resgraph/gen/world.py          |      115 |        0 |    100% |           |
 | src/resgraph/graph/\_\_init\_\_.py |        0 |        0 |    100% |           |
 | src/resgraph/graph/client.py       |       14 |        0 |    100% |           |
-| src/resgraph/graph/consumer.py     |       64 |        6 |     91% |71, 84, 87, 102, 104-105 |
-| src/resgraph/graph/ingest.py       |       89 |        4 |     96% |95, 146, 240, 277 |
+| src/resgraph/graph/consumer.py     |       64 |        6 |     91% |76, 89, 92, 107, 109-110 |
+| src/resgraph/graph/ingest.py       |       89 |        4 |     96% |100, 151, 245, 282 |
 | src/resgraph/graph/loader.py       |       28 |        0 |    100% |           |
 | src/resgraph/graph/queries.py      |       35 |        0 |    100% |           |
 | src/resgraph/graph/schema.py       |       16 |        0 |    100% |           |

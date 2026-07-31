@@ -203,10 +203,43 @@ Phantom count is a health metric: a rising phantom rate means the
 stream is delivering topology faster than existence — or the ingest
 has a bug.
 
+## Phase 3 — the streaming ingest
+
+### D10 — Apply-time state semantics
+
+The D3 watermark makes ordering not matter only if the final state is a
+pure function of the highest-sequence message per resource. That requires
+two rules D2 left unstated:
+
+- **Attrs are a full statement.** An upsert *replaces* the node's attr
+  bag, it does not merge — the message states the resource's whole attr
+  set (as it already does for relationships, D2). The snapshot loader's
+  `SET n += attrs` merge is fine there (a clean load never shrinks an
+  attr set) but wrong for the ingest: a merge would let a stale key from
+  an earlier-applied upsert survive under a different arrival order,
+  breaking convergence.
+- **A tombstone carries no payload.** A `delete` clears the node's attrs
+  and drops its outbound edges (mirrors D2: a delete message carries
+  empty attrs/relationships). If a delete instead left attrs in place,
+  the surviving attrs would depend on *which* earlier upsert landed
+  before the delete — order-dependent, so non-convergent. Clearing makes
+  a highest-sequence delete land on one state regardless of order.
+
+Consequence: applying a resource's messages in any permutation — and any
+number of replays — converges on the state implied by its
+highest-sequence message. Pinned by `test_ingest_properties.py`.
+**Rejected:** attr-merge on upsert — cheaper writes, but forfeits
+convergence, which is the whole reason the watermark exists.
+**Reversal condition:** if a producer is ever allowed to send partial
+attr updates (a diff, not a statement), this decision is superseded and
+the watermark alone no longer guarantees convergence — a per-field
+version would be needed.
+
 ## Phase contracts
 - The generator MUST emit D2 messages exactly and expose `--seed`
   for reproducibility.
-- The hot-store ingest MUST implement D3 as stated.
+- The hot-store ingest MUST implement D3 as stated, with D10 apply
+  semantics.
 - Any increment touching these contracts cites the D-number in its PR.
 
 

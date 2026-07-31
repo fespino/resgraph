@@ -1,2 +1,1 @@
-def main() -> None:
-    print("Hello from resgraph!")
+"""resgraph — a mini referential data platform."""

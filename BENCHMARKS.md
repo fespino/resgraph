@@ -153,10 +153,14 @@ The first number was 760 updates/s — 26× under the D4 budget. The
 suspicion (flagged on PR #29 before measuring) was per-message
 chattiness; the profile confirmed it with precision: **23,445
 `tx.run` calls for 5,000 messages** (watermark read + property write +
-edge clear + one round trip per relationship), plus a BEGIN/COMMIT pair
-per message ≈ 6.7 sequential round trips per message, with 80% of wall
-time in `socket.recv_into` — the process was waiting, not working, and
-Memgraph was idle between statements.
+edge clear + one round trip per relationship), plus transaction
+begin/commit overhead per message ≈ six to seven sequential round
+trips per message, with **~80% of wall time in the driver's receive
+path — over a third of it raw socket wait in `socket.recv_into`**, the
+rest the driver buffering and parsing the responses it waited for. The
+process was waiting, not working; Memgraph was most likely idle
+between statements (inferred from the client-side profile — the server
+side was not measured).
 
 The fix: batch messages per transaction and group every write into
 per-label `UNWIND` statements (the snapshot loader's shape). Intra-batch
@@ -180,7 +184,8 @@ bottleneck (round trips) is found and fixed; what remains is store-side
 write execution on a laptop running both stores, with validation
 deliberately ON (same call as the generator: provably-valid input is a
 feature). Consumer-group parallelism is the designed scale-out lever
-and stays out of scope for a single-consumer budget row.
+and stays out of scope for a single-consumer budget row — its safety
+under concurrent watermark writes is untested and tracked in #32.
 **D4 ingest memory ceiling (<512 MB RSS): validated with ~6× headroom**
 — peak 82 MB, flat across run lengths (the consumer holds one batch,
 never the stream).

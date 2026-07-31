@@ -27,6 +27,11 @@ CONVERGENCE is the property all of the above serve: applying a resource's
 messages in ANY order yields the same final node state — the state
 implied by the single highest-sequence message. The watermark exists to
 buy exactly that; everything else is a corollary.
+
+TODO(#31): all of this assumes a SINGLE producer assigns each resource's
+sequences monotonically (true for the generator). With multiple writers
+per resource the watermark can't arbitrate — sequence assignment needs
+epochs/fencing. Second iteration, tracked in issue #31.
 """
 
 from resgraph.schema import RESERVED_ATTR_KEYS, Op, UpdateMessage

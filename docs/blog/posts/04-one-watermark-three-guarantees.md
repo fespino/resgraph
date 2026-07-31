@@ -14,15 +14,14 @@ tags:
 
 Every streaming pipeline faces the same three demons: messages arrive
 more than once, messages arrive out of order, and consumers crash
-mid-batch. The industry reflex is to fight them in the transport —
-deduplication tables, ordering buffers, exactly-once delivery machinery
-that is expensive, fragile, and famously hard to get right. resgraph's
-ingest takes the other route: **make the store immune instead of making
-the delivery careful.** One integer per resource — a watermark — buys
-all three guarantees, and this post shows the property tests that prove
-it, the crash test that demonstrates it, and the benchmark that went
-from 760 to 12,500 updates per second because a profile disagreed with
-the code I'd written.
+mid-batch. The standard advice is old and correct: don't chase
+exactly-once delivery — **make the consumer idempotent and let the
+store own the guarantee.** This post is about how little machinery
+that takes when you commit to it fully: one integer per resource, two
+message-shape rules that integer turns out to force, the property
+tests that prove the combination, the crash test that demonstrates it,
+and a benchmark that went from 760 to 12,500 updates per second
+because a profile disagreed with the code I'd written.
 
 <!-- more -->
 
@@ -43,8 +42,10 @@ reliability claim stops being design prose and becomes a test suite.
 ## The rule, and what it buys
 
 Each resource node in the store carries `applied_seq` — the sequence
-number of the last message applied to it. The whole ingest reduces to
-one rule, enforced in the same transaction as the write:
+number of the last message applied to it, a high-water mark in the
+replication-log sense (no relation to the event-time watermarks of
+stream processors). The whole ingest reduces to one rule, enforced in
+the same transaction as the write:
 
 > Apply the message **iff** its sequence is greater than the node's
 > `applied_seq`.
@@ -65,6 +66,17 @@ The compact way to say all three: the final state of a resource is a
 pure function of its **single highest-sequence message**. Arrival
 order stops mattering. That property has a name in the test suite —
 convergence — and it's the anchor for everything else in this post.
+
+One precondition carries all of it, and it deserves to be said out
+loud: **a single producer assigns each resource's sequences,
+monotonically.** That's free here — one deterministic generator owns
+the stream — but it is not a small assumption. In multi-writer
+systems, sequence assignment is where the hard coordination lives
+(producer epochs, fencing tokens), and a watermark alone can't
+arbitrate between two writers that each believe their numbering.
+Multi-writer sequencing is out of scope for this phase and tracked as
+its own iteration
+([#31](https://github.com/fespino/resgraph/issues/31)).
 
 ## Tests first, and what the oracle forced
 
@@ -106,8 +118,13 @@ property test.
 
 The consumer reads the stream through a consumer group and follows one
 ordering discipline: **acknowledge strictly after the apply transaction
-commits.** Crash between apply and ack, and the batch is redelivered on
-restart — where the watermark skips everything already applied. On
+commits.** This is the store-your-progress-with-your-data pattern: the
+marker that matters — the watermark — lives in the same store as the
+data and commits in the same transaction, so there is no window where
+the data and the progress disagree. The stream-side acknowledgment is
+just cleanup; losing it costs a redelivery, never a corruption. Crash
+between apply and ack, and the batch is redelivered on restart — where
+the watermark skips everything already applied. On
 startup, the consumer drains its own unacknowledged entries before
 asking for new ones, so resuming from a crash is the same code path as
 running normally. No recovery mode, no repair script.
@@ -132,11 +149,15 @@ an explicit "measure first" note attached.
 
 First measurement: **760 updates per second**, 26× under the budget.
 The profile confirmed the suspicion with numbers the guess could never
-have produced: 23,445 driver statements for 5,000 messages — about 6.7
-sequential round trips per message once BEGIN/COMMIT pairs are counted
-— and **80% of wall time inside `socket.recv_into`**. The database was
-idle most of the time. The *conversation* was the bottleneck, not the
-work.
+have produced: 23,445 driver statements for 5,000 messages — six to
+seven sequential round trips per message once transaction begin/commit
+overhead is counted — and **~80% of wall time inside the driver's
+receive path, over a third of it raw socket wait** in
+`socket.recv_into`. The rest of that 80% is the driver buffering and
+parsing responses it had to wait for. Nothing here measured the server
+side, but the client-side split is damning enough: the database was
+most likely idle between statements. The *conversation* was the
+bottleneck, not the work.
 
 The fix stayed inside the proven semantics: batch messages into one
 transaction, group every write into per-label bulk statements, and
@@ -179,7 +200,11 @@ of this existed. They closed in opposite ways:
   reads ≥10k sustained single-consumer on laptop hardware, with the
   reasons recorded and the 20k figure retired, not edited away.
   Consumer-group parallelism is the recorded scale-out lever if a
-  future phase needs more.
+  future phase needs more — recorded, not proven. Concurrent consumers
+  race on the watermark's read-then-write; the conflict-abort-and-retry
+  story that should make that safe has no test yet, and an untested
+  argument is a claim in waiting
+  ([#32](https://github.com/fespino/resgraph/issues/32)).
 
 ## A side-scar: an open port is not a ready server
 

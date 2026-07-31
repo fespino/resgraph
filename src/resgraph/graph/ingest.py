@@ -148,9 +148,7 @@ def read_node(session, resource_id: str) -> dict | None:
         return None
     props = dict(rec["props"])
     attrs = {k: v for k, v in props.items() if k not in SYSTEM_PROPS}
-    rels = sorted(
-        (rr["type"], rr["target"]) for rr in rec["rels"] if rr["type"] is not None
-    )
+    rels = sorted((rr["type"], rr["target"]) for rr in rec["rels"] if rr["type"] is not None)
     return {
         "id": props.get("id"),
         "applied_seq": props.get("applied_seq"),

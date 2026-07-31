@@ -65,6 +65,7 @@ def _reset(session) -> None:
 
 # --- message builders --------------------------------------------------
 
+
 def _upsert(seq: int, attrs: dict, rels: list[tuple[str, str]]) -> UpdateMessage:
     return UpdateMessage(
         sequence=seq,
@@ -89,6 +90,7 @@ def _delete(seq: int) -> UpdateMessage:
 
 # --- oracle: the final state implied by the highest-sequence message ---
 
+
 def _expected(final: UpdateMessage) -> dict:
     """The whole point of the watermark: state is a pure function of the
     single highest-sequence message, so the oracle ignores everything
@@ -96,11 +98,20 @@ def _expected(final: UpdateMessage) -> dict:
     if final.op is Op.DELETE:
         # tombstone carries no payload — attrs cleared, edges dropped —
         # which is exactly what makes a max-seq delete order-independent.
-        return {"applied_seq": final.sequence, "deleted": True,
-                "deleted_seq": final.sequence, "attrs": {}, "rels": []}
+        return {
+            "applied_seq": final.sequence,
+            "deleted": True,
+            "deleted_seq": final.sequence,
+            "attrs": {},
+            "rels": [],
+        }
     rels = sorted({(r.type.upper(), r.target_id) for r in final.relationships})
-    return {"applied_seq": final.sequence, "deleted": False,
-            "attrs": dict(final.attrs), "rels": rels}
+    return {
+        "applied_seq": final.sequence,
+        "deleted": False,
+        "attrs": dict(final.attrs),
+        "rels": rels,
+    }
 
 
 def _assert_state(session, expected: dict) -> None:
@@ -117,6 +128,7 @@ def _assert_state(session, expected: dict) -> None:
 
 
 # --- explicit corollaries ---------------------------------------------
+
 
 def test_replay_is_a_noop(session):
     _reset(session)
@@ -183,22 +195,18 @@ _attr_values = st.one_of(
     st.booleans(),
 )
 _attrs = st.dictionaries(st.sampled_from(ATTR_KEYS), _attr_values, max_size=4)
-_rels = st.lists(
-    st.tuples(st.sampled_from(REL_TYPES), st.sampled_from(TARGETS)), max_size=4
-)
+_rels = st.lists(st.tuples(st.sampled_from(REL_TYPES), st.sampled_from(TARGETS)), max_size=4)
 
 
 @st.composite
 def _events_and_order(draw):
     """A resource's message history (canonical sequence = list index + 1)
     plus an arbitrary arrival permutation of it."""
-    kinds = draw(st.lists(st.sampled_from(["upsert", "delete"]),
-                          min_size=1, max_size=8))
+    kinds = draw(st.lists(st.sampled_from(["upsert", "delete"]), min_size=1, max_size=8))
     events = []
     for i, kind in enumerate(kinds):
         seq = i + 1
-        events.append(_delete(seq) if kind == "delete"
-                      else _upsert(seq, draw(_attrs), draw(_rels)))
+        events.append(_delete(seq) if kind == "delete" else _upsert(seq, draw(_attrs), draw(_rels)))
     order = draw(st.permutations(range(len(events))))
     return events, order
 

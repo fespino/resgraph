@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from resgraph.schema import Op, UpdateMessage
+from resgraph.schema import RESERVED_ATTR_KEYS, Op, UpdateMessage
 
 
 def test_spec_example_parses():
@@ -160,3 +160,19 @@ def test_upsert_carries_attrs_and_relationships():
         relationships=[{"type": "runs_on", "target_id": "host-1"}],
     )
     assert msg.attrs == {"cpu": 4} and len(msg.relationships) == 1
+
+
+def test_reserved_attr_keys_rejected():
+    # attrs share the node property namespace with store-managed fields;
+    # a colliding key would be silently overwritten and stripped on read,
+    # so it is a producer bug caught at parse time.
+    for key in sorted(RESERVED_ATTR_KEYS):
+        with pytest.raises(ValidationError, match="reserved"):
+            UpdateMessage(
+                sequence=1,
+                event_time="2026-01-01T00:00:00Z",
+                op="upsert",
+                resource_type="vm",
+                resource_id="vm-x",
+                attrs={key: "boom"},
+            )

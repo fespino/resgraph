@@ -29,17 +29,18 @@ implied by the single highest-sequence message. The watermark exists to
 buy exactly that; everything else is a corollary.
 """
 
-from resgraph.schema import Op, UpdateMessage
+from resgraph.schema import RESERVED_ATTR_KEYS, Op, UpdateMessage
 
-from .queries import _label
+from .schema import label_for
 
 # Outbound edge types the ingest owns; an upsert replaces exactly these —
 # the message states the resource's full edge set, not a diff.
 DEP_REL_TYPES = ("RUNS_ON", "ATTACHED_TO", "ROUTES_TO", "MEMBER_OF")
 
 # Node properties the store manages; everything else on a node is a
-# user-supplied attr. Kept in one place so read_node and the apply path agree.
-SYSTEM_PROPS = frozenset({"id", "applied_seq", "deleted", "deleted_seq", "phantom"})
+# user-supplied attr. The schema rejects attrs under these keys at parse
+# time, so the store never has to disambiguate — one constant, shared.
+SYSTEM_PROPS = RESERVED_ATTR_KEYS
 
 
 def apply_message(session, msg: UpdateMessage) -> bool:
@@ -49,7 +50,7 @@ def apply_message(session, msg: UpdateMessage) -> bool:
     The watermark check and the write happen in one transaction, so the
     result is the same under replay and under any arrival order.
     """
-    label = _label(msg.resource_id)
+    label = label_for(msg.resource_id)
     return session.execute_write(_apply, msg, label)
 
 
@@ -95,7 +96,7 @@ def _write_upsert(tx, msg: UpdateMessage, label: str) -> None:
         tx.run(
             f"""
             MATCH (s:{label} {{id: $sid}})
-            MERGE (t:{_label(rel.target_id)} {{id: $tid}})
+            MERGE (t:{label_for(rel.target_id)} {{id: $tid}})
               ON CREATE SET t.phantom = true
             MERGE (s)-[:{rel_type}]->(t)
             """,
@@ -133,7 +134,7 @@ def read_node(session, resource_id: str) -> dict | None:
     ``phantom``, ``attrs`` (user attrs only, system props stripped), and
     ``rels`` (sorted ``(TYPE, target_id)`` tuples for outbound edges).
     """
-    label = _label(resource_id)
+    label = label_for(resource_id)
     rec = session.run(
         f"""
         MATCH (n:{label} {{id: $id}})

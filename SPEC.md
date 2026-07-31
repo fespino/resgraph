@@ -94,7 +94,7 @@ weaken the watermark.
 | Budget | Target | Measured |
 |---|---|---|
 | Ingest throughput, single consumer | ≥ 20k updates/s | — |
-| Traversal p95, depth ≤ 3, 100k-resource world | < 50 ms | — |
+| Traversal p95, depth ≤ 3, 100k-resource world | < 50 ms | **0.4 ms** (BENCHMARKS.md) |
 | Ingest memory ceiling | < 512 MB RSS | — |
 | World generator emit rate | ≥ 100k msg/s | — |
 

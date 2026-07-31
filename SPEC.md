@@ -91,10 +91,10 @@ weaken the watermark.
 
 ### D4 — Performance budgets (provisional until ingest baselines exist)
 
-| Budget | Target | Measured (fill at Ch 3/2) |
+| Budget | Target | Measured |
 |---|---|---|
 | Ingest throughput, single consumer | ≥ 20k updates/s | — |
-| Traversal p95, depth ≤ 3, 100k-resource world | < 50 ms | — |
+| Traversal p95, depth ≤ 3, 100k-resource world | < 50 ms | **0.4 ms** (BENCHMARKS.md) |
 | Ingest memory ceiling | < 512 MB RSS | — |
 | World generator emit rate | ≥ 100k msg/s | — |
 
@@ -165,6 +165,43 @@ and byte-identical test fixtures.
 generator's own invariant (targets alive at emit) would be false,
 and ground-truth reconciliation against world state would be
 impossible.
+
+## Phase 2 — the graph hot store
+
+### D8 — Graph modeling
+
+- **One label per resource type** (`:vm`, `:host`, …) — enables
+  per-type indexes and readable queries. **Rejected:** generic
+  `:Resource` with a `type` property — one index, but every query pays
+  a filter and the planner loses selectivity.
+- **Attrs flattened to node properties** (`state`, `cpu`, `zone`, …).
+  **Rejected:** a single `attrs` map property — opaque to indexes and
+  to per-field Cypher predicates.
+- **Edges are typed, UPPERCASE** (`RUNS_ON`, `ATTACHED_TO`,
+  `ROUTES_TO`, `MEMBER_OF`), direction **dependent → dependency**
+  (vm RUNS_ON host). Blast radius of X = everything with a directed
+  path TO X. Getting the direction convention wrong is unfixable later
+  without rewriting every query — written down now.
+- Per D3: every node carries `applied_seq`; tombstones are
+  `deleted=true, deleted_seq` — **queries filter out deleted nodes by
+  default**; the CLI exposes `--include-deleted` for forensics.
+- Indexes: per-label index + uniqueness constraint on `id`. Nothing
+  else until a measured query needs it — indexes are write-cost
+  budgets, not decorations.
+
+### D9 — Dangling edges: phantom nodes
+
+When a message references a target that doesn't exist yet (D2 permits
+this after transport), create the target as a **phantom**:
+`(:host {id: "host-9", phantom: true})` — no attrs, no applied_seq.
+A later create/upsert fills it in and clears the flag.
+**Rejected:** dropping the edge — silently loses topology and makes
+ingest order-sensitive, which D3 exists to prevent.
+**Rejected:** buffering edges until targets arrive — unbounded memory
+and a reimplementation of what the graph already is.
+Phantom count is a health metric: a rising phantom rate means the
+stream is delivering topology faster than existence — or the ingest
+has a bug.
 
 ## Phase contracts
 - The generator MUST emit D2 messages exactly and expose `--seed`

@@ -73,7 +73,17 @@ def dependency_path(session, from_id: str, to_id: str) -> PathResult | None:
         a=from_id,
         b=to_id,
     )
-    return PathResult(**rows[0]) if rows else None
+    if not rows:
+        return None
+    p = PathResult(**rows[0])
+    # A legal match starts at `a` and ends at `b`; anything else is
+    # malformed store output — raise with the full path (issue #36).
+    if p.path[:1] != [from_id] or p.path[-1:] != [to_id] or len(p.rels) != len(p.path) - 1:
+        raise RuntimeError(
+            f"store returned a malformed path for {from_id!r} -> {to_id!r}: "
+            f"path={p.path} rels={p.rels} (issue #36)"
+        )
+    return p
 
 
 def _required_edges() -> list[tuple[str, str, str]]:

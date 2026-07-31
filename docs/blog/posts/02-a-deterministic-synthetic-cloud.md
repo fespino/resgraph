@@ -41,10 +41,14 @@ leans on it, which is exactly why it had to earn its numbers.
 Two properties are in tension, and both are non-negotiable.
 
 **Reproducible.** Given the same seed and the same flags, the generator
-must emit a *byte-identical* stream — forever. This is what makes
-benchmarks comparable across runs and machines, and what makes
-agent evaluations possible (plant a known fault, check the agent finds
-it). Achieving it means a single seeded random source owns *all*
+must emit a *byte-identical* stream — on the interpreter version the
+repo pins. The boundary matters: Python only guarantees cross-version
+stability for some of `random`'s methods, so the pinned
+`.python-version` is part of the determinism contract, not a
+convenience. Within that boundary, reproducibility is what makes
+benchmarks comparable across runs and machines, and what makes agent
+evaluations possible (plant a known fault, check the agent finds it).
+Achieving it means a single seeded random source owns *all*
 randomness, iteration is always sorted (never dependent on dictionary
 insertion order), and — the subtle one — time is *simulated*, not
 wall-clock. The generator's clock starts at a fixed epoch and advances by
@@ -102,7 +106,7 @@ was in an innocuous-looking helper I hadn't given a second thought.
 Two fixes, both structural rather than clever:
 
 1. A **reverse-dependency index** (target → the resources pointing at it),
-   so repair touches only the actual dependents instead of the whole
+   so repair touches only the dependents instead of the whole
    world. This alone took the kernel from 2,200 to roughly 80,000
    messages per second.
 2. A second index so picking a hot-set target no longer rebuilt a list on

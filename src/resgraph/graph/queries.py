@@ -7,28 +7,13 @@ blast radius of X is everything with a directed path TO X.
 from pydantic import BaseModel
 
 from resgraph.gen.world import TOPOLOGY
-from resgraph.schema import ResourceType
 
 from .client import cypher
+from .schema import label_for
 
 DEP_EDGES = ":RUNS_ON | :ATTACHED_TO | :ROUTES_TO | :MEMBER_OF"
 
 MAX_DEPTH = 6
-
-_LABELS = {t.value for t in ResourceType}
-
-
-def _label(resource_id: str) -> str:
-    """The anchor label, derived from the id prefix (ids are
-    ``<type>-<counter>``). This is load-bearing, not cosmetic: per D8 the
-    id index is per-label (``:host(id)``), so a label-less anchor match
-    forces a full node scan — measured at 9.4ms vs 0.31ms indexed on a
-    100k world (BENCHMARKS.md). Validating against the known type set is
-    also the injection guard, since the label lands in the query string."""
-    prefix = resource_id.split("-", 1)[0]
-    if prefix not in _LABELS:
-        raise ValueError(f"cannot derive resource type from id: {resource_id!r}")
-    return prefix
 
 
 class Affected(BaseModel):
@@ -60,7 +45,7 @@ def blast_radius(
     shortest path per reachable node — variable-length expansion would
     enumerate paths (exponential on hubs; measured in BENCHMARKS.md)."""
     depth = _check_depth(depth)
-    anchor = _label(resource_id)
+    anchor = label_for(resource_id)
     where = "" if include_deleted else "WHERE NOT coalesce(dep.deleted, false)"
     rows = cypher(
         session,
@@ -76,7 +61,7 @@ def blast_radius(
 
 def dependency_path(session, from_id: str, to_id: str) -> PathResult | None:
     """Why does A depend on B — one shortest dependency path."""
-    la, lb = _label(from_id), _label(to_id)
+    la, lb = label_for(from_id), label_for(to_id)
     rows = cypher(
         session,
         f"""

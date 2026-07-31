@@ -33,6 +33,13 @@ class Relationship(BaseModel):
     target_id: str = Field(min_length=1)
 
 
+# Node properties the hot store manages. Attrs live in the same property
+# namespace, so an attr under one of these keys would be silently
+# overwritten by the store and stripped on read — rejected at parse time
+# instead (a producer bug, same posture as extra="forbid").
+RESERVED_ATTR_KEYS = frozenset({"id", "applied_seq", "deleted", "deleted_seq", "phantom"})
+
+
 class UpdateMessage(BaseModel):
     # Messages are immutable events; unknown fields are producer bugs (D2:
     # schema grows only via schema_version bumps, so strict parsing is safe).
@@ -60,4 +67,11 @@ class UpdateMessage(BaseModel):
         # D2: delete is a removal statement, not an update — payload is meaningless.
         if self.op is Op.DELETE and (self.attrs or self.relationships):
             raise ValueError("delete must carry empty attrs and relationships (D2)")
+        return self
+
+    @model_validator(mode="after")
+    def _attrs_avoid_reserved_keys(self) -> Self:
+        bad = RESERVED_ATTR_KEYS & self.attrs.keys()
+        if bad:
+            raise ValueError(f"attrs use store-reserved keys: {sorted(bad)}")
         return self

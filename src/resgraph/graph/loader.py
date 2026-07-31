@@ -10,17 +10,13 @@ from collections.abc import Iterable
 
 from resgraph.schema import UpdateMessage
 
-from .schema import node_count
+from .schema import label_for, node_count
 
 BATCH = 1000
 
 
 class StoreNotEmptyError(RuntimeError):
     pass
-
-
-def _target_type(target_id: str) -> str:
-    return target_id.split("-", 1)[0]
 
 
 def load_snapshot(session, messages: Iterable[UpdateMessage]) -> dict[str, int]:
@@ -54,7 +50,7 @@ def load_snapshot(session, messages: Iterable[UpdateMessage]) -> dict[str, int]:
     edges: dict[tuple[str, str, str], list[dict]] = defaultdict(list)
     for m in msgs:
         for rel in m.relationships:
-            key = (m.resource_type.value, rel.type.upper(), _target_type(rel.target_id))
+            key = (m.resource_type.value, rel.type.upper(), label_for(rel.target_id))
             edges[key].append({"src": m.resource_id, "dst": rel.target_id})
     n_edges = 0
     for (src_label, rel_type, dst_label), rows in sorted(edges.items()):

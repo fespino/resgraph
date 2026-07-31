@@ -224,6 +224,14 @@ two rules D2 left unstated:
   the surviving attrs would depend on *which* earlier upsert landed
   before the delete — order-dependent, so non-convergent. Clearing makes
   a highest-sequence delete land on one state regardless of order.
+- **Attr keys must not collide with store-managed properties.** Attrs
+  flatten onto the node (D8), sharing the property namespace with `id`,
+  `applied_seq`, `deleted`, `deleted_seq`, `phantom`. A colliding attr
+  would be silently overwritten by the store and stripped on read —
+  so it's rejected at parse time as a producer bug (same posture as
+  D2's strict parsing). **Rejected:** namespacing the store's props
+  (`_rg_*`) — every query, index, and DDL statement pays a rename to
+  protect a producer that's already violating the contract.
 
 Consequence: applying a resource's messages in any permutation — and any
 number of replays — converges on the state implied by its

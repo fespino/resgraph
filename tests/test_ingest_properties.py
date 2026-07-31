@@ -29,7 +29,7 @@ from hypothesis import strategies as st
 from resgraph.gen.churn import WORLD_EPOCH
 from resgraph.graph import ingest
 from resgraph.graph.client import get_driver
-from resgraph.graph.schema import init_schema, node_count
+from resgraph.graph.schema import init_schema
 from resgraph.schema import Op, Relationship, UpdateMessage
 
 pytestmark = pytest.mark.integration
@@ -110,6 +110,8 @@ def _assert_state(session, expected: dict) -> None:
     assert got["deleted"] == expected["deleted"]
     assert got["attrs"] == expected["attrs"]
     assert got["rels"] == expected["rels"]
+    # a resource that has applied its own message is never a phantom
+    assert got["phantom"] is False
     if expected["deleted"]:
         assert got["deleted_seq"] == expected["deleted_seq"]
 
@@ -229,5 +231,4 @@ def test_a_tombstone_is_never_a_removal(session, spec):
     _reset(session)
     for i in order:
         ingest.apply_message(session, events[i])
-    assert node_count(session) >= 1
     assert ingest.read_node(session, SOURCE) is not None

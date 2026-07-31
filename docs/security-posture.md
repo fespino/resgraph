@@ -133,8 +133,15 @@ exception is a control you'll eventually disable entirely:
   lint-clean and reviewed but unexercised — a control that has never
   fired is a hypothesis. First real test: a Monday cron with a real
   finding.
-- **Deferred, with trigger conditions**: container scanning (when
-  `compose.yaml` gains real images), SBOM + artifact signing +
-  provenance (when there are releases), fuzzing beyond unit tests
-  (when property-based tests land with the ingest path), CodeQL as a
-  required check (after run history accumulates).
+- **Deferred, with trigger conditions**: container scanning — e.g.
+  Trivy — when the repo builds and publishes an image of its *own*
+  (today `compose.yaml` runs only third-party dev/CI images, pinned by
+  digest and updated by Dependabot; scanning upstream base layers we
+  cannot patch produces findings whose only remediation is the digest
+  bump already automated). SBOM + artifact signing + provenance arrive
+  with the same trigger (when there are releases). Fuzzing beyond
+  property-based tests (hypothesis suites landed with the generator
+  and ingest paths).
+- ~~CodeQL as a required check (after run history accumulates)~~ —
+  done 2026-08-01: `CodeQL (python)` is a required status check on
+  `main`.

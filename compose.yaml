@@ -6,3 +6,20 @@ services:
     # AOF off: the stream is regenerable by seed (D6); durability is not
     # this layer's budget.
     command: ["redis-server", "--appendonly", "no"]
+  memgraph:
+    # -mage variant: the algorithm library costs nothing locally and
+    # later statistical queries may want it. Memory-limited — the store
+    # gets a budget like everything else.
+    image: memgraph/memgraph-mage:latest
+    ports: ["7687:7687"]
+    command: ["--log-level=WARNING", "--memory-limit=2048"]
+  postgres:
+    # Benchmark-only (profile: bench): the recursive-CTE null hypothesis
+    # for the traversal benchmark — "graph beats recursive SQL" is a
+    # claim, and claims get measured (D1's reversal condition depends on
+    # this comparison). Not started by default:
+    #   docker compose --profile bench up -d postgres
+    profiles: ["bench"]
+    image: postgres:17-alpine
+    environment: {POSTGRES_PASSWORD: resgraph}
+    ports: ["5432:5432"]

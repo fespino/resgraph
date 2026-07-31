@@ -120,14 +120,15 @@ budget (≥20k updates/s, single consumer) was measured and missed:
 M3/8GB laptop running both stores (BENCHMARKS.md has the method and
 both profiles). Amended to **≥10k updates/s sustained, single
 consumer** on laptop hardware. Reasons, recorded: the algorithmic
-bottleneck (6.7 sequential Bolt round trips per message, 80% of wall
-time in socket wait) was found by profile and fixed with per-batch
-transactions and per-label UNWIND writes (760 → 12.5k, 16×); the
-remaining cost is Memgraph write execution itself, with message
-validation kept ON (same call as phase 1) and single-consumer
-sequencing by the budget's own definition. Consumer-group parallelism
-is the recorded scale-out lever if a future phase needs more than the
-amended figure. The 20k figure is retired, not edited away.
+bottleneck (six to seven sequential Bolt round trips per message,
+~80% of wall time in the driver's receive path) was found by profile
+and fixed with per-batch transactions and per-label UNWIND writes
+(760 → 12.5k, 16×); the remaining cost is Memgraph write execution
+itself, with message validation kept ON (same call as phase 1) and
+single-consumer sequencing by the budget's own definition.
+Consumer-group parallelism is the recorded scale-out lever if a
+future phase needs more than the amended figure (untested —
+validation is #32). The 20k figure is retired, not edited away.
 
 ## Phase 1 — the world generator
 

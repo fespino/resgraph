@@ -17,6 +17,11 @@ forever and wedge the stream. A dead-letter stream is the production
 evolution if the count is ever nonzero — the generator provably emits
 valid messages, so nonzero means transport corruption or a foreign
 producer.
+
+TODO(#32): single consumer only, today. Multiple consumers in the group
+race on the watermark's read-then-write; conflict-abort + managed-retry
+should make that converge, but it is untested — validate before trusting
+the scale-out lever. Tracked in issue #32.
 """
 
 import logging

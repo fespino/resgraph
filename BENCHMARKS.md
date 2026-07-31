@@ -125,3 +125,62 @@ D1 stands on its *other* rationales — in-memory footprint, instant
 startup, Cypher/Bolt transferability — not on traversal supremacy. That
 is a more honest basis for the decision than the benchmark we expected
 to run.
+
+## Ingest — stream → consumer → hot store (D3, D4, D10)
+
+**Hardware:** Apple M3, 8 GB RAM, macOS 15.2 (laptop; Redis AND Memgraph
+in Docker alongside — both stores share the machine with the consumer).
+**Date / PR:** 2026-07-31 / #29.
+**Method:** `benchmarks/ingest_bench.py` — publish a seeded 10k-world
+snapshot + churn to a Redis stream, then time the real `resgraph ingest`
+CLI in a child process (`--max-messages N`); updates/s = N / wall time,
+peak RSS from `getrusage(RUSAGE_CHILDREN)` so the publisher's footprint
+never pollutes the consumer's number. Single consumer, message
+validation ON, one transaction per batch.
+
+| Path | N | Batch | updates/s | Peak RSS |
+|---|---|---|---|---|
+| per-message apply (first implementation) | 5k | — | **760** | 79 MB |
+| per-label UNWIND batching | 100k | 256 | **9,600** | 76 MB |
+| per-label UNWIND batching | 100k | 512 | **12,400** | 76 MB |
+| per-label UNWIND batching (median of 3) | 100k | 1024 | **12,500** | 78–80 MB |
+| per-label UNWIND batching | 100k | 2048 | **11,000** | 82 MB |
+| sustained, longer run | 200k | 1024 | **10,500** | 80 MB |
+
+### Bottleneck notes (the finding is the point)
+
+The first number was 760 updates/s — 26× under the D4 budget. The
+suspicion (flagged on PR #29 before measuring) was per-message
+chattiness; the profile confirmed it with precision: **23,445
+`tx.run` calls for 5,000 messages** (watermark read + property write +
+edge clear + one round trip per relationship), plus a BEGIN/COMMIT pair
+per message ≈ 6.7 sequential round trips per message, with 80% of wall
+time in `socket.recv_into` — the process was waiting, not working, and
+Memgraph was idle between statements.
+
+The fix: batch messages per transaction and group every write into
+per-label `UNWIND` statements (the snapshot loader's shape). Intra-batch
+siblings dedupe to the highest sequence in Python first — the
+convergence property makes that verdict identical to the store
+watermark's, and a property test pins batched ≡ one-by-one for any
+arrival order and any batch boundaries. ~27 statements per 256-message
+batch instead of ~1,700. Result: 760 → 12,500 updates/s (16×).
+
+The second profile shows where the remaining time goes: statement
+execution inside Memgraph and Bolt parameter packing (~15%) — the
+conversation is no longer the bottleneck; the writes are. Batch 1024 is
+the sweet spot; 2048 *regresses* despite doing fewer writes (bigger
+UNWIND payloads per statement cost more than they save). The 200k run
+degrades ~16% vs 100k as the store grows — same mechanism as the
+generator's long-run drift, now on the write side.
+
+**D4 ingest throughput (≥20k updates/s, single consumer): MISSED at
+~12.5k** — amended by supersession in SPEC.md. The algorithmic
+bottleneck (round trips) is found and fixed; what remains is store-side
+write execution on a laptop running both stores, with validation
+deliberately ON (same call as the generator: provably-valid input is a
+feature). Consumer-group parallelism is the designed scale-out lever
+and stays out of scope for a single-consumer budget row.
+**D4 ingest memory ceiling (<512 MB RSS): validated with ~6× headroom**
+— peak 82 MB, flat across run lengths (the consumer holds one batch,
+never the stream).

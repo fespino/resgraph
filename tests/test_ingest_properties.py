@@ -240,3 +240,40 @@ def test_a_tombstone_is_never_a_removal(session, spec):
     for i in order:
         ingest.apply_message(session, events[i])
     assert ingest.read_node(session, SOURCE) is not None
+
+
+@st.composite
+def _events_order_and_batching(draw):
+    """The permuted history plus arbitrary batch boundaries over it."""
+    events, order = draw(_events_and_order())
+    cuts = draw(st.lists(st.integers(min_value=1, max_value=len(order)), unique=True, max_size=3))
+    bounds = sorted({*cuts, len(order)})
+    batches, start = [], 0
+    for end in bounds:
+        batches.append([events[i] for i in order[start:end]])
+        start = end
+    return events, batches
+
+
+@settings(max_examples=40, deadline=None)
+@given(spec=_events_order_and_batching())
+def test_apply_batch_is_equivalent_to_one_by_one(session, spec):
+    """The batched path (what the consumer runs) must land exactly where
+    the single-message path lands — for any arrival order and any batch
+    boundaries — and account for every message as applied or skipped."""
+    events, batches = spec
+    _reset(session)
+    expected = _expected(events[-1])
+
+    applied = skipped = 0
+    for batch in batches:
+        a, s = ingest.apply_batch(session, batch)
+        applied += a
+        skipped += s
+    assert applied + skipped == len(events)
+    _assert_state(session, expected)
+
+    # a full batched replay must be all-skipped and change nothing
+    a, s = ingest.apply_batch(session, events)
+    assert (a, s) == (0, len(events))
+    _assert_state(session, expected)

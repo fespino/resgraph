@@ -25,7 +25,7 @@ from pydantic import ValidationError
 
 from resgraph.schema import UpdateMessage
 
-from .ingest import apply_message
+from .ingest import apply_batch
 
 log = logging.getLogger("resgraph.consumer")
 
@@ -40,7 +40,9 @@ class Consumer:
         stream: str = DEFAULT_STREAM,
         group: str = "resgraph-ingest",
         name: str = "c1",
-        batch: int = 256,
+        # 1024 measured as the throughput sweet spot; 2048 regresses
+        # (BENCHMARKS.md, ingest section)
+        batch: int = 1024,
         block_ms: int = 1000,
     ) -> None:
         import redis
@@ -105,21 +107,19 @@ class Consumer:
 
     def _apply_batch(self, entries, counters: dict[str, int]) -> None:
         to_ack = []
+        msgs = []
         for entry_id, fields in entries:
             counters["read"] += 1
             try:
-                msg = UpdateMessage.model_validate_json(fields[b"data"])
+                msgs.append(UpdateMessage.model_validate_json(fields[b"data"]))
             except (ValidationError, KeyError) as e:
                 counters["invalid"] += 1
                 log.warning("poison entry %s acked and dropped: %s", entry_id, e)
-                to_ack.append(entry_id)
-                continue
-            if apply_message(self.session, msg):
-                counters["applied"] += 1
-            else:
-                counters["skipped"] += 1
             to_ack.append(entry_id)
-        # ack strictly after the applies committed: crash before this line
+        applied, skipped = apply_batch(self.session, msgs)
+        counters["applied"] += applied
+        counters["skipped"] += skipped
+        # ack strictly after the batch committed: crash before this line
         # redelivers the batch, and the watermark skips it — at-least-once
         # delivery, exactly-once state.
         self.r.xack(self.stream, self.group, *to_ack)

@@ -49,12 +49,13 @@ def ingest_cmd(
     name: str = typer.Option("c1"),
     max_messages: int = typer.Option(0, help="Stop after N messages (0 = no limit)."),
     exit_on_idle: bool = typer.Option(False, "--exit-on-idle"),
+    batch: int = typer.Option(1024, help="Messages per read/apply transaction."),
 ) -> None:
     """Consume the update stream into the hot store (at-least-once,
     idempotent apply). Resumes from unacknowledged entries after a crash."""
     with _session() as s:
         init_schema(s)
-        consumer = Consumer(redis_url, s, stream=stream, group=group, name=name)
+        consumer = Consumer(redis_url, s, stream=stream, group=group, name=name, batch=batch)
         try:
             counters = consumer.run(max_messages=max_messages or None, exit_on_idle=exit_on_idle)
         finally:

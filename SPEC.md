@@ -93,9 +93,9 @@ weaken the watermark.
 
 | Budget | Target | Measured |
 |---|---|---|
-| Ingest throughput, single consumer | ≥ 20k updates/s | — |
+| Ingest throughput, single consumer | ≥ 20k updates/s | **~12.5k** (BENCHMARKS.md; amended below) |
 | Traversal p95, depth ≤ 3, 100k-resource world | < 50 ms | **0.4 ms** (BENCHMARKS.md) |
-| Ingest memory ceiling | < 512 MB RSS | — |
+| Ingest memory ceiling | < 512 MB RSS | **82 MB peak** (BENCHMARKS.md) |
 | World generator emit rate | ≥ 100k msg/s | — |
 
 Provisional targets exist to be *validated, then enforced* (as CI
@@ -113,6 +113,21 @@ The two algorithmic bottlenecks found en route (O(world) dangling-edge
 repair, O(hot-set) target picking) are fixed and documented; disabling
 validation was considered and rejected. The 100k figure is retired,
 not edited away.
+
+**D4 amendment (phase 3, by supersession):** the ingest throughput
+budget (≥20k updates/s, single consumer) was measured and missed:
+~12.5k updates/s at 100k messages, ~10.5k sustained at 200k, on an
+M3/8GB laptop running both stores (BENCHMARKS.md has the method and
+both profiles). Amended to **≥10k updates/s sustained, single
+consumer** on laptop hardware. Reasons, recorded: the algorithmic
+bottleneck (6.7 sequential Bolt round trips per message, 80% of wall
+time in socket wait) was found by profile and fixed with per-batch
+transactions and per-label UNWIND writes (760 → 12.5k, 16×); the
+remaining cost is Memgraph write execution itself, with message
+validation kept ON (same call as phase 1) and single-consumer
+sequencing by the budget's own definition. Consumer-group parallelism
+is the recorded scale-out lever if a future phase needs more than the
+amended figure. The 20k figure is retired, not edited away.
 
 ## Phase 1 — the world generator
 

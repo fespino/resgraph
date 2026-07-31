@@ -6,7 +6,12 @@ CDK: none. Python 3.13, uv, src layout. ALWAYS `uv run` for python/pytest.
   changing behavior; never contradict a locked decision silently.
 - The D2 json block in SPEC.md is a test fixture (test_spec_example_parses)
   — change schema.py and SPEC.md together.
-- Tests: `uv run pytest`. Lint: `uv run ruff check .`
+- Tests: `uv run pytest` (all). Unit-only, no stores needed:
+  `uv run pytest -m "not integration"`. Tests hitting docker compose
+  stores (memgraph, ...) MUST carry `@pytest.mark.integration`;
+  `--strict-markers` rejects unregistered markers. In CI, stores are up
+  and `RESGRAPH_REQUIRE_STORES=1` makes integration tests fail (not skip)
+  if a store is unreachable. Lint: `uv run ruff check .`
 - Stores run via `docker compose up -d` (any OCI runtime).
 - Benchmarks: methodology + hardware noted in BENCHMARKS.md; never report
   a number without both. No scale inflation — laptop numbers labeled as such.

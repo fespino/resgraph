@@ -40,8 +40,10 @@ skips = ["B311"]
 relative_files = true
 
 [tool.pytest.ini_options]
-addopts = "-q --cov=resgraph --cov-report=term-missing"
+addopts = "-q --strict-markers --cov=resgraph --cov-report=term-missing"
 testpaths = ["tests"]
+# --strict-markers: an unregistered/typo'd marker fails, so an external
+# test can't silently ship unmarked. Unit-only run: pytest -m "not integration"
 markers = ["integration: requires docker compose stores (memgraph)"]
 
 [dependency-groups]

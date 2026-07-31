@@ -74,6 +74,60 @@ with property-based tests that run across random seeds: byte-identical
 streams, strictly increasing sequence numbers, every relationship target
 alive at emit time, and the topology bounds respected.
 
+## Inside the churn engine
+
+The component that turns the static world into a live stream is a
+single class, and its design fits in five decisions worth stealing.
+
+**One dice roll decides the operation.** Every event starts with one
+uniform draw, partitioned into bands: 3% delete, 5% create, 12%
+relationship rewiring, 80% attribute updates. The proportions mirror a
+real inventory — most events are boring attribute flaps; rewiring is
+rarer; create and delete are rare. And create (5%) deliberately
+outweighs delete (3%), so the world *grows* over a long run — which is
+not an accident, it's the mechanism behind a benchmark finding later in
+this post.
+
+**Time advances by drawing gaps, not by looking at a clock.** The
+simulated clock steps forward by exponentially distributed
+inter-arrival times from the seeded source — a Poisson-style event
+process. Bursts work the same way: configure a window ("first 5
+seconds of every simulated minute, 10× the rate") and it's computed
+from *world time*, so the spike lands at the identical spot in every
+run. Deterministic load spikes, for stress-testing consumers
+reproducibly.
+
+**Deletions revive.** When the engine creates a resource, 30% of the
+time it resurrects a previously deleted id instead of minting a fresh
+one. That exists for one reason: delete-then-recreate is the awkward
+case the ingest's tombstone logic has to survive, so the generator
+*manufactures* it constantly instead of hoping it shows up. If a
+downstream component mishandles revival, the stream finds out within
+seconds, not in production.
+
+**Floors protect the topology.** Types that other types depend on —
+hosts, VMs, security groups — are never deleted below a minimum count.
+Without the floor, an unlucky run could delete the last host and leave
+resource creation with no valid target, violating the topology's own
+cardinality bounds. The invariants aren't just tested; the engine is
+built so it *can't* emit a world that breaks them.
+
+**Searches are bounded, then degrade.** Picking a deletable resource
+(or one that owns edges to rewire) tries at most eight skewed draws,
+then falls back to an attribute update. An unbounded retry loop would
+consume a data-dependent number of random draws — and any
+data-dependent draw count makes the stream's determinism fragile.
+Capping the search keeps the random stream's structure stable and the
+engine total: it always returns *a* message.
+
+One subtlety worth knowing before the later phases: when a resource is
+deleted, the world silently repairs its dependents' dangling edges —
+but emits **no repair messages**. The stream therefore legitimately
+contains edges pointing at deleted resources. That's a contract, not a
+bug: consumers must tolerate dangling references, and the graph
+store's phantom-node mechanics exist precisely because the generator
+refuses to pretend the stream is referentially clean.
+
 ## The benchmark that said "45× too slow"
 
 The performance budget for the generator was ambitious on purpose: at

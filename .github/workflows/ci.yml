@@ -23,6 +23,11 @@ jobs:
           persist-credentials: true
       - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9  # v9.0.0
       - run: uv sync --dev
+      - name: Start memgraph (integration tests)
+        run: |
+          docker compose up -d memgraph
+          for i in $(seq 1 30); do nc -z localhost 7687 && break; sleep 1; done
+          sleep 2
       - id: lint
         name: ruff check
         run: uv run ruff check .
@@ -38,6 +43,8 @@ jobs:
       - id: tests
         name: pytest
         run: uv run pytest 2>&1 | tee pytest.out
+        env:
+          RESGRAPH_REQUIRE_STORES: "1"   # integration tests must run, not skip
         continue-on-error: true
       - name: Build CI summary
         if: always()

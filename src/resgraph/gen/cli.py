@@ -73,6 +73,6 @@ def run(
                 if ahead > 0:
                     time.sleep(ahead)
     except (BrokenPipeError, KeyboardInterrupt):
-        pass
+        return
     finally:
         out.close()

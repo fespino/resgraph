@@ -118,7 +118,11 @@ def test_end_to_end_stream_to_store(redis_client, clean_store, stream):
     counters = consumer.run(exit_on_idle=True)
     consumer.close()
     assert counters["read"] == len(msgs)
-    assert counters["applied"] == len(msgs)  # fresh store, in-order stream
+    # every message is accounted for; the applied/skipped split depends on
+    # batch boundaries (intra-batch siblings dedupe to one write — the
+    # equivalence property test pins that this changes nothing observable)
+    assert counters["applied"] + counters["skipped"] == len(msgs)
+    assert counters["applied"] >= len({m.resource_id for m in msgs})
     assert counters["invalid"] == 0
     _assert_store_matches(clean_store, _oracle(msgs))
     # nothing left unacknowledged
@@ -147,8 +151,11 @@ def test_crash_between_apply_and_ack_no_gap_no_double_apply(redis_client, clean_
     consumer.close()
 
     assert counters["read"] == len(msgs)  # everything redelivered
-    assert counters["skipped"] == 30  # the watermark's scoreboard
-    assert counters["applied"] == len(msgs) - 30
+    # the pre-applied 30 are watermark-skipped on redelivery; further skips
+    # come from intra-batch dedupe. What "no gap, no double-apply" actually
+    # means is the pair below: all accounted for, state exactly the oracle's.
+    assert counters["applied"] + counters["skipped"] == len(msgs)
+    assert counters["skipped"] >= 30
     assert redis_client.xpending(stream, group)["pending"] == 0
     _assert_store_matches(clean_store, _oracle(msgs))
 
@@ -186,7 +193,7 @@ def test_cli_ingest_end_to_end(redis_client, clean_store, stream):
     assert result.exit_code == 0, result.output
     counters = json.loads(result.output)
     assert counters["read"] == len(msgs)
-    assert counters["applied"] == len(msgs)
+    assert counters["applied"] + counters["skipped"] == len(msgs)
     assert redis_client.xpending(stream, "g-cli")["pending"] == 0
 
 

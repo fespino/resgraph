@@ -22,4 +22,6 @@ services:
     profiles: ["bench"]
     image: postgres:17-alpine
     environment: {POSTGRES_PASSWORD: resgraph}
-    ports: ["5432:5432"]
+    # 5433 on the host: developer machines often run their own postgres
+    # on 5432, which wins the localhost race against the container.
+    ports: ["5433:5432"]

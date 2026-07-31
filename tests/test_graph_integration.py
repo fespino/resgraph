@@ -73,29 +73,31 @@ def test_blast_radius_is_node_set_not_path_count(session, world):
     to two vms on one host = two paths, one dependent) because at this
     seed no fixture lb happens to multi-path — found that out by
     measuring, which is the point of the test."""
+    # Real type prefixes (the anchor label is derived from them, D8), with
+    # a -zz suffix that no generated id uses.
     session.run(
         """
-        CREATE (h:host {id: 'test-h', deleted: false})
-        CREATE (v1:vm {id: 'test-v1', deleted: false})-[:RUNS_ON]->(h)
-        CREATE (v2:vm {id: 'test-v2', deleted: false})-[:RUNS_ON]->(h)
-        CREATE (l:lb {id: 'test-l', deleted: false})
+        CREATE (h:host {id: 'host-zz0', deleted: false})
+        CREATE (v1:vm {id: 'vm-zz1', deleted: false})-[:RUNS_ON]->(h)
+        CREATE (v2:vm {id: 'vm-zz2', deleted: false})-[:RUNS_ON]->(h)
+        CREATE (l:lb {id: 'lb-zz3', deleted: false})
         CREATE (l)-[:ROUTES_TO]->(v1)
         CREATE (l)-[:ROUTES_TO]->(v2)
         """
     ).consume()
     try:
-        ids = [a.id for a in queries.blast_radius(session, "test-h", depth=3)]
-        assert ids == ["test-l", "test-v1", "test-v2"]  # a set: lb once
+        ids = [a.id for a in queries.blast_radius(session, "host-zz0", depth=3)]
+        assert ids == ["lb-zz3", "vm-zz1", "vm-zz2"]  # a set: lb once
         path_rows = cypher(
             session,
             f"""
-            MATCH (x {{id: 'test-h'}})<-[{queries.DEP_EDGES} *1..3]-(dep)
+            MATCH (x:host {{id: 'host-zz0'}})<-[{queries.DEP_EDGES} *1..3]-(dep)
             RETURN dep.id AS id
             """,
         )
         assert len(path_rows) == 4  # v1, v2, and the lb TWICE — a path count
     finally:
-        session.run("MATCH (n) WHERE n.id STARTS WITH 'test-' DETACH DELETE n").consume()
+        session.run("MATCH (n) WHERE n.id CONTAINS '-zz' DETACH DELETE n").consume()
 
 
 def test_depth_cap_is_the_injection_guard(session, world):
@@ -104,6 +106,14 @@ def test_depth_cap_is_the_injection_guard(session, world):
             queries.blast_radius(session, GOLDEN_HOST, depth=bad)
     with pytest.raises((ValueError, TypeError)):
         queries.blast_radius(session, GOLDEN_HOST, depth="3}]-() MATCH (n) DETACH DELETE n //")
+
+
+def test_anchor_label_derivation_guards_injection(session, world):
+    # the label lands in the query string; an unknown/crafted prefix is
+    # rejected before it gets there (D8 index requires the label anyway)
+    for bad in ("evil-1", "vm`) DETACH DELETE (n)-1", "-000001"):
+        with pytest.raises(ValueError):
+            queries.blast_radius(session, bad, depth=2)
 
 
 def test_dependency_path_golden(session, world):

@@ -79,8 +79,9 @@ So the specification's example message is written in a fenced JSON block,
 and a test **parses that exact block out of the spec file** and validates
 it against the code's schema model. The spec's example *is* a test
 fixture. If the schema code and the spec's example ever disagree, the
-build goes red. The documentation can't drift, because drift is a
-failing test.
+build goes red. That one block of documentation cannot drift, because
+its drift is a failing test — the prose around it can still rot like
+any prose, but the contract itself can't.
 
 This did its job on the very first run — and not in the way I expected.
 The test failed immediately, but not because the schema was wrong:
@@ -116,12 +117,15 @@ One small decision that looks wrong until you see it: the schema version
 is typed as `Literal[1]`, a single allowed value, not a general integer.
 That feels needlessly rigid until you realize it's the *versioning hook*.
 When a version 2 arrives, it's a new model with `Literal[2]`, and a
-discriminated union routes messages to the right one — the type system
-does the dispatch. A plain `int` would silently accept a v2 message and
-parse it with v1 assumptions, which is the exact corruption the strict
-schema exists to prevent. The tempting "single source of truth" constant
-for the version number was actually a *false* one (you can't put a
-constant inside a `Literal`), so I dropped it.
+discriminated union routes messages to the right one — the schema does
+the dispatch. A plain `int` wouldn't fail as loudly as you'd hope:
+strict parsing already rejects a v2 that *adds* fields, so the Literal
+guards the subtler case — a version that changes what fields *mean*
+without changing the shape, which is exactly the kind of message that
+parses cleanly under v1 assumptions and corrupts quietly. The tempting
+"single source of truth" constant for the version number was actually a
+*false* one (you can't put a constant inside a `Literal`), so I dropped
+it.
 
 ## Leaving decisions unmade, on purpose
 

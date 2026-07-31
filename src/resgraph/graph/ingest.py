@@ -137,7 +137,8 @@ def apply_batch(session, msgs: list[UpdateMessage]) -> tuple[int, int]:
     ``apply_message`` per message — pinned by a property test — but
     ~40x fewer round trips: the per-message path costs 6+ sequential
     round trips (BEGIN, watermark read, writes, COMMIT), which the
-    profile showed as 80%+ socket wait (BENCHMARKS.md).
+    profile showed as ~80% driver receive path — over a third of it
+    raw socket wait (BENCHMARKS.md).
 
     Counter note: a message superseded by a higher-sequence sibling in
     the SAME batch counts as skipped — the Python pre-pass hands down

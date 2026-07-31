@@ -58,10 +58,14 @@ Four gates run on every push and PR, and block the merge if they fail:
 - **Tests** with coverage.
 
 On top of those, **branch protection** on `main` makes the gates
-non-optional in the strongest sense: no direct pushes, force-pushes, or
-deletions — and `enforce_admins` is on, so *I* can't bypass them either.
-The process is a control, not etiquette. Every change — mine or a bot's —
-goes through issue → branch → pull request → green gates → merge.
+non-optional: no direct pushes, force-pushes, or deletions — and
+`enforce_admins` is on, so the rules bind the repository owner too. An
+owner can always dismantle the protection in the settings first, so
+"can't bypass" would be overclaiming; what the control actually buys is
+that bypass stops being a slip and becomes a deliberate, visible act.
+The process is a control, not etiquette. Every change — mine or a
+bot's — goes through issue → branch → pull request → green gates →
+merge.
 
 ### Alarmed on a schedule
 
@@ -79,7 +83,12 @@ CVE in a public package is public information — the issue is a work item.
 The TruffleHog issue carries **no scan output at all**, because a verified
 finding locates a *live credential in a public repo*. That issue is an
 alarm, not a report: rotate first, identify from the run logs second.
-Same mechanism, opposite disclosure, because the threat models differ.
+To be precise about what that buys: the run logs are public too, so
+suppressing the issue body doesn't hide the finding — it keeps it off
+the most indexed, most permanent surface (issues are searchable
+forever; logs expire). Narrowed exposure, not secrecy — and rotation
+is what actually closes the hole. Same mechanism, different
+disclosure, because the threat models differ.
 
 ### Measured, and published
 
@@ -107,6 +116,14 @@ persisted credentials it didn't need. I fixed all six before they ever
 ran on `main`. "The CI passes its own security audit" stopped being a
 slogan and became a literal, demonstrable fact — because the audit had
 just failed and I'd watched it do so.
+
+One of the six later came back — deliberately. The coverage tooling
+turned out to need that persisted credential to push its data branch,
+so the finding returned as a **documented waiver** in zizmor's config,
+with the justification written next to it. If you audit the repo today
+you'll find the exception, and you'll find the argument for it. That's
+the control working in both directions: it blocks silent drift, and it
+forces the exceptions to be made in writing.
 
 That's the difference between measuring and assuming. I *assumed* my
 workflows were fine. The measurement disagreed, and it was right.

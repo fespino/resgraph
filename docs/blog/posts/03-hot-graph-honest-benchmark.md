@@ -55,7 +55,11 @@ taking on a second database, it's a *claim* that owes evidence, not an
 axiom you get to assume. The sober position is that a graph database
 shouldn't be there at all unless it clearly pulls its weight, so the
 burden of proof is on the graph store, and the fair comparison is the
-thing you'd otherwise reach for: Postgres with a decent index. So I loaded
+thing you'd otherwise reach for: Postgres with an index on the edge
+table's target column and fresh statistics (`ANALYZE` runs in the
+benchmark script) — "was the SQL side even indexed?" is the first
+question a comparison like this gets asked, so the answer is in the
+repo, not the comments. So I loaded
 the *same* seeded world into both stores — identical graphs, because the
 generator is deterministic — and benchmarked the same blast-radius query
 at depth 3 and depth 5, across a mix of hub and leaf targets, on worlds of
@@ -124,19 +128,32 @@ into the query string. One-line idea, dramatic effect:
 | Anchor lookup | 9.4 ms | 0.31 ms |
 | Whole blast-radius query | 17.5 ms | **0.2 ms** |
 
+One loose end, accounted for rather than glossed: the anchor probe
+explains 9.4 of the 17.5 milliseconds directly, yet naming the label
+removed all of it. The plan evidently paid the label-less scan more
+than once per query; I didn't chase down exactly where the second
+payment lived, because the fix eliminated the whole constant and the
+probes had already identified its kind. If the two numbers had *not*
+reconciled after the fix, that gap would have been the next thing to
+measure.
+
 ## The result: it's a tie
 
-With the query actually using the index, here's the real comparison:
+With the query actually using the index, here's the comparison
+(matching the table of record in BENCHMARKS.md):
 
 | World | Store | Depth | p50 |
 |---|---|---|---|
 | 100k | Memgraph | 3 | 0.2 ms |
-| 100k | Postgres CTE | 3 | 0.4 ms |
+| 100k | Postgres CTE | 3 | 0.2 ms |
 | 100k | Memgraph | 5 | 0.2 ms |
-| 100k | Postgres CTE | 5 | 0.4 ms |
+| 100k | Postgres CTE | 5 | 0.2 ms |
 
-Both sub-millisecond. Not a 40× graph loss, not the comfortable graph win
-I originally expected — a **tie**. The story the data actually tells is:
+The CTE's 0.4 in the first table against 0.2 here is run-to-run jitter
+— at these magnitudes the difference between runs is bigger than the
+difference between stores, which is itself the finding. Both
+sub-millisecond. Not a 40× graph loss, not the comfortable graph win I
+originally expected — a **tie**. The story the data actually tells is:
 at laptop scale, with worlds that fit in memory and blast radii of a few
 dozen nodes, neither the graph's pointer-chasing nor the relational
 engine's join-per-level is stressed. The expected divergence — where graph

@@ -322,6 +322,37 @@
      "legendFormat": "invalid"
     }
    ]
+  },
+  {
+   "id": 10,
+   "type": "timeseries",
+   "title": "Phantoms created (rate + run total)",
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 0,
+    "y": 32
+   },
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "fieldConfig": {
+    "defaults": {},
+    "overrides": []
+   },
+   "targets": [
+    {
+     "expr": "sum(rate(graph_phantoms_created_total[1m]))",
+     "refId": "A",
+     "legendFormat": "created /s"
+    },
+    {
+     "expr": "sum(graph_phantoms_created_total)",
+     "refId": "B",
+     "legendFormat": "total (run)"
+    }
+   ]
   }
  ],
  "templating": {

@@ -52,6 +52,9 @@ APPLIED = _meter.create_counter("ingest_applied", description="messages applied"
 SKIPPED = _meter.create_counter("ingest_skipped", description="stale messages skipped (D3)")
 INVALID = _meter.create_counter("ingest_invalid", description="parse-poison entries dropped")
 DLQ = _meter.create_counter("ingest_dlq", description="entries dead-lettered (D14)")
+PHANTOMS_CREATED = _meter.create_counter(
+    "graph_phantoms_created", description="phantom placeholder nodes created (D17 addendum)"
+)
 BATCH_SECONDS = _meter.create_histogram(
     "ingest_batch_apply_seconds", description="one apply transaction"
 )
@@ -136,13 +139,17 @@ def _refresh_instruments() -> None:
     meter; module globals are swapped so callers holding
     ``obs.APPLIED`` style references keep working.
     """
-    global _meter, READ, APPLIED, SKIPPED, INVALID, DLQ, BATCH_SECONDS, API_SECONDS
+    global _meter, READ, APPLIED, SKIPPED, INVALID, DLQ, PHANTOMS_CREATED
+    global BATCH_SECONDS, API_SECONDS
     _meter = otel_metrics.get_meter("resgraph")
     READ = _meter.create_counter("ingest_read", description="entries read from the stream")
     APPLIED = _meter.create_counter("ingest_applied", description="messages applied")
     SKIPPED = _meter.create_counter("ingest_skipped", description="stale messages skipped (D3)")
     INVALID = _meter.create_counter("ingest_invalid", description="parse-poison entries dropped")
     DLQ = _meter.create_counter("ingest_dlq", description="entries dead-lettered (D14)")
+    PHANTOMS_CREATED = _meter.create_counter(
+        "graph_phantoms_created", description="phantom placeholder nodes created (D17 addendum)"
+    )
     BATCH_SECONDS = _meter.create_histogram(
         "ingest_batch_apply_seconds", description="one apply transaction"
     )

@@ -168,11 +168,25 @@ def test_stale_upsert_cannot_resurrect_a_tombstone(session):
     assert ingest.read_node(session, SOURCE)["deleted"] is True
 
 
+def _phantoms_counter() -> float:
+    from prometheus_client import REGISTRY, generate_latest
+
+    for ln in generate_latest(REGISTRY).decode().splitlines():
+        if ln.startswith("graph_phantoms_created_total"):
+            return float(ln.rsplit(" ", 1)[1])
+    return 0.0
+
+
 def test_dangling_target_becomes_phantom_then_resolves(session):
+    from resgraph import obs
+
+    obs.init_metrics()
     _reset(session)
+    before = _phantoms_counter()
     ingest.apply_message(session, _upsert(1, {}, [("runs_on", TARGETS[0])]))
     tgt = ingest.read_node(session, TARGETS[0])
     assert tgt is not None and tgt["phantom"] is True  # created, not dropped
+    assert _phantoms_counter() - before == 1
     # the target's own upsert clears the phantom flag; the edge survives
     host_upsert = UpdateMessage(
         sequence=2,

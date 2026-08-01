@@ -34,6 +34,7 @@ per resource the watermark can't arbitrate — sequence assignment needs
 epochs/fencing. Second iteration, tracked in issue #31.
 """
 
+from resgraph import obs
 from resgraph.schema import RESERVED_ATTR_KEYS, Op, UpdateMessage
 
 from .schema import label_for
@@ -93,12 +94,13 @@ def _write_upsert(tx, msg: UpdateMessage, label: str) -> None:
         id=msg.resource_id,
         deps=list(DEP_REL_TYPES),
     ).consume()
+    phantoms = 0
     for rel in msg.relationships:
         rel_type = rel.type.upper()
         # unreachable given the schema, but the type lands in the query string
         if rel_type not in DEP_REL_TYPES:
             raise ValueError(f"unknown relationship type: {rel.type!r}")
-        tx.run(
+        summary = tx.run(
             f"""
             MATCH (s:{label} {{id: $sid}})
             MERGE (t:{label_for(rel.target_id)} {{id: $tid}})
@@ -108,6 +110,10 @@ def _write_upsert(tx, msg: UpdateMessage, label: str) -> None:
             sid=msg.resource_id,
             tid=rel.target_id,
         ).consume()
+        # sources are MATCHed, so anything this query created is a phantom
+        phantoms += summary.counters.nodes_created
+    if phantoms:
+        obs.PHANTOMS_CREATED.add(phantoms)
 
 
 def _write_tombstone(tx, msg: UpdateMessage, label: str) -> None:
@@ -246,8 +252,9 @@ def _apply_batch_tx(tx, msgs: list[UpdateMessage]) -> tuple[int, int]:
                 raise ValueError(f"unknown relationship type: {rel.type!r}")
             key = (src_label, rel_type, label_for(rel.target_id))
             edges.setdefault(key, []).append({"src": m.resource_id, "dst": rel.target_id})
+    phantoms = 0
     for (src_label, rel_type, dst_label), rows in sorted(edges.items()):
-        tx.run(
+        summary = tx.run(
             f"""
             UNWIND $rows AS e
             MATCH (s:{src_label} {{id: e.src}})
@@ -257,6 +264,10 @@ def _apply_batch_tx(tx, msgs: list[UpdateMessage]) -> tuple[int, int]:
             """,
             rows=rows,
         ).consume()
+        # sources are MATCHed, so anything this query created is a phantom
+        phantoms += summary.counters.nodes_created
+    if phantoms:
+        obs.PHANTOMS_CREATED.add(phantoms)
 
     return (len(apply), skipped)
 

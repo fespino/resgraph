@@ -20,6 +20,7 @@ class Affected(BaseModel):
     id: str
     type: str
     phantom: bool | None = None
+    attrs: dict | None = None
 
 
 class PathResult(BaseModel):
@@ -39,22 +40,37 @@ def _check_depth(depth) -> int:
 
 
 def blast_radius(
-    session, resource_id: str, depth: int = 3, include_deleted: bool = False
+    session,
+    resource_id: str,
+    depth: int = 3,
+    include_deleted: bool = False,
+    extra_where: str = "",
+    params: dict | None = None,
+    with_attrs: bool = False,
 ) -> list[Affected]:
     """Everything affected if resource_id dies. BFS expansion: one
     shortest path per reachable node — variable-length expansion would
-    enumerate paths (exponential on hubs; measured in BENCHMARKS.md)."""
+    enumerate paths (exponential on hubs; measured in BENCHMARKS.md).
+
+    `extra_where` is a D16-planner-compiled predicate on `dep`; values
+    arrive through `params`. `with_attrs` returns node properties so a
+    residual filter has something to evaluate against."""
     depth = _check_depth(depth)
     anchor = label_for(resource_id)
-    where = "" if include_deleted else "WHERE NOT coalesce(dep.deleted, false)"
+    clauses = [] if include_deleted else ["NOT coalesce(dep.deleted, false)"]
+    if extra_where:
+        clauses.append(extra_where)
+    where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+    attrs_col = ", properties(dep) AS attrs" if with_attrs else ""
     rows = cypher(
         session,
         f"""
         MATCH (x:{anchor} {{id: $id}})<-[{DEP_EDGES} *BFS 1..{depth}]-(dep)
         {where}
-        RETURN DISTINCT dep.id AS id, labels(dep)[0] AS type, dep.phantom AS phantom
+        RETURN DISTINCT dep.id AS id, labels(dep)[0] AS type, dep.phantom AS phantom{attrs_col}
         """,
         id=resource_id,
+        **(params or {}),
     )
     return sorted((Affected(**r) for r in rows), key=lambda a: a.id)
 

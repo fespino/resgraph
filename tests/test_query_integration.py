@@ -67,8 +67,10 @@ def test_composite_at_now_equals_live_blast_radius(ctx):
     for root in _roots(msgs):
         live = plan(Query("blast_radius", root=root)).execute(qctx)
         cold = plan(Query("blast_radius", root=root, at=t)).execute(qctx)
-        if {r["id"] for r in live} != {r["id"] for r in cold}:
-            disagreements.append((root, sorted(r["id"] for r in live), sorted(r["id"] for r in cold)))
+        live_ids = sorted(r["id"] for r in live)
+        cold_ids = sorted(r["id"] for r in cold)
+        if live_ids != cold_ids:
+            disagreements.append((root, live_ids, cold_ids))
     assert not disagreements, disagreements
 
 

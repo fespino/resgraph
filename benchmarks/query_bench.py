@@ -47,6 +47,10 @@ def _p50(samples: list[float]) -> float:
     return statistics.median(samples)
 
 
+def _p95(samples: list[float]) -> float:
+    return statistics.quantiles(samples, n=20)[-1]
+
+
 def _build(resources: int, churn_n: int, batch: int = 8192):
     d = BENCH_DIR / f"{resources}-{churn_n}"
     shutil.rmtree(d, ignore_errors=True)
@@ -155,6 +159,7 @@ def _hot_bench(resources: int = 5_000, churn_n: int = 20_000) -> dict:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--sizes", default="small,medium,large")
+    ap.add_argument("--reps", type=int, default=REPS)
     ap.add_argument("--hot", action="store_true", help="also bench live endpoints (needs memgraph)")
     args = ap.parse_args()
 
@@ -170,12 +175,17 @@ def main() -> None:
         root = next(r["resource_id"] for r in state if r["resource_id"].startswith("host"))
 
         preds = parse_filter("type=vm")
-        splits = [_composite_split(cat, t_end, root, preds) for _ in range(REPS)]
+        splits = [_composite_split(cat, t_end, root, preds) for _ in range(args.reps)]
         full = [_composite_split(cat, t_end, root, preds, project=False) for _ in range(REPS)]
         result = {
             "composite_p50_s": round(
                 _p50([s["reconstruct_s"] + s["traverse_s"] + s["filter_s"] for s in splits]), 4
             ),
+            "composite_p95_s": round(
+                _p95([s["reconstruct_s"] + s["traverse_s"] + s["filter_s"] for s in splits]), 4
+            )
+            if args.reps >= 20
+            else None,
             "reconstruct_p50_s": round(_p50([s["reconstruct_s"] for s in splits]), 4),
             "reconstruct_unprojected_p50_s": round(_p50([s["reconstruct_s"] for s in full]), 4),
             "traverse_p50_s": round(_p50([s["traverse_s"] for s in splits]), 4),

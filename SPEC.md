@@ -259,11 +259,95 @@ attr updates (a diff, not a statement), this decision is superseded and
 the watermark alone no longer guarantees convergence — a per-field
 version would be needed.
 
+## Phase 4 — the cold store
+
+### D11 — Cold store engine: Iceberg via pyiceberg, queried through DuckDB
+
+Apache Iceberg tables on the local filesystem (SQLite-backed SQL
+catalog), written with pyiceberg batch appends, read by scanning to
+Arrow and querying in DuckDB. Zero new containers.
+
+**Decision drivers:** a real table format buys atomic commits, schema
+evolution, and snapshot isolation — the things a directory of Parquet
+files reinvents badly — while pyiceberg + DuckDB keep the whole cold
+path in-process at laptop scale. The skills (Iceberg semantics, Arrow,
+DuckDB) transfer to any lakehouse stack.
+**Rejected:** plain Parquet directories — no atomic visibility, no
+manifest pruning; every consumer reimplements a catalog.
+**Rejected:** Delta Lake — write path outside Spark is thinner than
+pyiceberg's, and Iceberg's catalog story fits the later REST-catalog
+exit better.
+**Rejected:** Spark — a JVM cluster framework to write files a laptop
+process can write.
+**Reversal condition:** if pyiceberg's write path can't hold the D4
+cold-append budget after profiling, swap the writer (e.g. append via
+DuckDB's Iceberg support or a Rust writer) — the table format and
+layout (D12) survive; only the writer changes.
+
+### D12 — Cold layout: an append-only event log plus derived snapshots
+
+Two tables:
+
+- **`events`** — every D2 message, append-only, one row per message:
+  the D2 fields flattened, `attrs` and `relationships` as JSON strings
+  (arbitrary keys stay schema-stable), partitioned by `day(event_time)`.
+- **`state_snapshots`** — periodic full world state (one row per
+  alive resource) tagged with `as_of_time` + the max `sequence`
+  included. Derived **from the events table**, never from the hot
+  store: the cold store must be able to answer alone, and deriving
+  from Memgraph would silently couple the two stores' bugs.
+
+At-least-once delivery means duplicate appends are allowed; readers
+dedupe on `(resource_id, sequence)` — duplicate rows are identical by
+D2, so any survivor is correct. The writer stays dumb and fast.
+**Rejected:** merge-on-write current-state table — destroys history,
+which is the entire point of the cold half.
+**Rejected:** dedupe-at-write (equality deletes) — write amplification
+and thin pyiceberg support, to save readers a `DISTINCT` they can do
+in one window function.
+**Reversal condition:** if the benchmark shows read-side dedupe
+dominating as-of latency at target scale, add a compaction job that
+rewrites deduped partitions — the read semantics stay identical.
+
+### D13 — Time travel is event time, not commit time
+
+`state_at(T)`: for each resource, the highest-sequence event with
+`event_time <= T`; upsert rows become state, delete rows mean absent
+(tombstone semantics per D10). Implementation: nearest snapshot with
+`as_of_time <= T`, then replay events in `(snapshot.max_seq, T]` —
+the same checkpoint-plus-log shape the hot store's bootstrap uses.
+
+Iceberg has native time travel (query a table as of a past commit),
+and it is deliberately **not** the user-facing mechanism: commit time
+is when the *ingest* ran, event time is when the *world* changed, and
+the two drift apart under backfill, replay, or consumer lag. Iceberg
+snapshots remain what they are — physical isolation and rollback —
+while `AS OF` questions are answered from the data.
+**Rejected:** exposing Iceberg snapshot time travel as the as-of API —
+correct only while ingestion is perfectly live; silently wrong the
+first time history is replayed.
+**Reversal condition:** none foreseen for the semantics; if the
+checkpoint-plus-log implementation misses the D4 as-of budget, tune
+snapshot cadence or add partition pruning before touching semantics.
+
+### D4 addendum — provisional cold budgets
+
+| Budget | Target | Measured |
+|---|---|---|
+| Cold append throughput, batched | ≥ 10k events/s | — |
+| `state_at(T)` p50, 1M-event history, snapshots on | < 2 s | — |
+| Storage, 1M events | < 500 MB | — |
+
+Provisional until the phase-4 benchmark lands (same rule as ever: a
+budget without a measurement is a wish).
+
 ## Phase contracts
 - The generator MUST emit D2 messages exactly and expose `--seed`
   for reproducibility.
 - The hot-store ingest MUST implement D3 as stated, with D10 apply
   semantics.
+- The cold store MUST answer `state_at(T)` from its own tables alone
+  (D12), with event-time semantics (D13).
 - Any increment touching these contracts cites the D-number in its PR.
 
 

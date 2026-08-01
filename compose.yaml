@@ -28,7 +28,7 @@ services:
     # this comparison). Not started by default:
     #   docker compose --profile bench up -d postgres
     profiles: ["bench"]
-    image: postgres:17-alpine@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193
+    image: postgres:18-alpine@sha256:9a8afca54e7861fd90fab5fdf4c42477a6b1cb7d293595148e674e0a3181de15
     environment: {POSTGRES_PASSWORD: resgraph}
     # 5433 on the host: developer machines often run their own postgres
     # on 5432, which wins the localhost race against the container.

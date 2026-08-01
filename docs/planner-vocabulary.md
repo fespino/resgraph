@@ -4,8 +4,9 @@ The D16 planner is ~200 lines, but every move it makes has an industry
 name. This doc maps each one to the term you'd meet in Trino,
 DataFusion, or Spark — partly so the code reads as a deliberate small
 version of a real thing, partly because the names are how you find the
-literature. Andy Grove's *How Query Engines Work* covers the full-size
-versions of everything below.
+literature. Andy Grove's
+[*How Query Engines Work*](https://howqueryengineswork.com/) covers
+the full-size versions of everything below.
 
 | This repo | The industry name | Where the big engines do it |
 |---|---|---|

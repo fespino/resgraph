@@ -71,7 +71,13 @@ The whole stack runs in-process: pyiceberg with a SQLite-backed
 catalog, a filesystem warehouse, DuckDB reading Arrow scans. Zero new
 containers — the laptop shape of what would be S3 plus a REST catalog
 in production, with the table format and its semantics carrying over
-unchanged.
+unchanged. Full candour about the format choice: at this scale, a
+plain directory of parquet files would serve every query in this post.
+Iceberg is here as the exit path — catalog and engine interop,
+rollback when it's needed — and as a deliberate exercise, not a
+present technical need; the spec says so in those words, with a
+reversal condition that evicts the format if it never earns more than
+the costs measured below.
 
 ## Two clocks
 

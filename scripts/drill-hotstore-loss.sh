@@ -7,7 +7,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-SEED=42 RESOURCES=5000 CHURN=2000000 RATE=8000
+SEED=42 RESOURCES=5000 CHURN=900000 RATE=2500
 COLD_DIR="${RESGRAPH_COLD_DIR:-data/cold-drill}"
 TL=/tmp/drill-timeline.txt
 PROM=http://localhost:9090
@@ -15,14 +15,24 @@ PROM=http://localhost:9090
 note() { echo "$(date -u +%H:%M:%S) $*" | tee -a "$TL"; }
 prom() { curl -sf "$PROM/api/v1/query" --data-urlencode "query=$1" | python3 -c 'import json,sys; r=json.load(sys.stdin)["data"]["result"]; print(r[0]["value"][1] if r else "")' || echo ""; }
 pending() { docker exec resgraph-redis-1 redis-cli XPENDING resgraph:updates "$1" 2>/dev/null | head -1 || echo "?"; }
+bolt_wait() {
+  # readiness is a protocol handshake, not an open port (phase-3 lesson)
+  for _ in $(seq 1 90); do
+    if uv run python -c "from resgraph.graph.client import get_driver; d=get_driver(); d.verify_connectivity(); d.close()" >/dev/null 2>&1; then return 0; fi
+    sleep 2
+  done
+  echo "memgraph never became Bolt-ready" >&2; return 1
+}
 
 rm -f "$TL"; rm -rf "$COLD_DIR"
 export RESGRAPH_COLD_DIR="$COLD_DIR"
 
-note "0. stores + obs profile up"
+note "0. stores + obs profile up (memgraph RECREATED — the drill must start empty)"
+docker compose kill memgraph >/dev/null 2>&1 || true
+docker compose rm -f memgraph >/dev/null 2>&1 || true
 docker compose --profile obs up -d redis memgraph prometheus grafana
-sleep 5
-docker exec resgraph-redis-1 redis-cli DEL resgraph:updates >/dev/null || true
+bolt_wait
+docker exec resgraph-redis-1 redis-cli DEL resgraph:updates resgraph:updates:dlq >/dev/null || true
 
 note "1. cold store init + workers up (hot :9101, cold :9102)"
 uv run resgraph cold init
@@ -57,9 +67,15 @@ print("published", resources + emitted)
 PY
 PUB_PID=$!
 
-note "3. steady state: waiting 120s with lag under threshold"
-sleep 120
-note "   lag=$(prom 'max(ingest_lag)') freshness_ratio_5m=$(prom 'slo:ingest_freshness:ratio_5m')"
+note "3. steady state: waiting 150s, then gating on the SLO itself"
+sleep 150
+RATIO0=$(prom 'slo:ingest_freshness:ratio_5m')
+note "   lag=$(prom 'max(ingest_lag)') freshness_ratio_5m=${RATIO0}"
+if ! python3 -c "import sys; sys.exit(0 if float('${RATIO0:-0}') >= 0.99 else 1)"; then
+  note "   DRILL INVALID: steady state not reached (publish rate exceeds the CONTENDED capacity of the co-located stack — lower RATE)"
+  kill "$HOT_PID" "$COLD_PID" "$PUB_PID" 2>/dev/null || true
+  exit 2
+fi
 
 note "4. KILL: memgraph down, container removed (its data goes with it)"
 T_KILL=$(date -u +%s)
@@ -80,7 +96,7 @@ else
 note "6. recover: stop hot worker FIRST (it would apply its held batch into an empty store before rebuild), fresh memgraph, rebuild from cold"
 kill -9 "$HOT_PID" 2>/dev/null || true
 docker compose up -d memgraph
-sleep 8
+bolt_wait
 T_REBUILD=$(date -u +%s)
 uv run resgraph rebuild | tee -a "$TL"
 note "   rebuild done in $(( $(date -u +%s) - T_REBUILD ))s; resuming a fresh worker (same group: pending entries replay, watermarks skip them)"

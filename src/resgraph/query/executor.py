@@ -15,7 +15,14 @@ from resgraph.graph import queries as hot_queries
 from resgraph.graph.ingest import SYSTEM_PROPS
 
 from .dsl import Predicate
-from .planner import Plan, _cypher_where, _duckdb_where, bind_params
+from .planner import (
+    Plan,
+    _cypher_where,
+    _duckdb_where,
+    bind_params,
+    composite_projection,
+    where_cols,
+)
 
 
 @dataclass
@@ -139,10 +146,12 @@ def execute_plan(plan: Plan, ctx: QueryContext) -> list[dict]:
         where=_duckdb_where(claimable) or None,
         params=bind_params(claimable),
         annotate=True,
+        projection=composite_projection(bool(plan.residual)),
+        where_cols=where_cols(claimable),
     )
     affected_ids = _blast_bfs(state, q.root, q.depth)
     rows = [
-        {"id": r["resource_id"], "type": r["resource_type"], "attrs": r["attrs"]}
+        {"id": r["resource_id"], "type": r["resource_type"], "attrs": r.get("attrs", {})}
         for r in state
         if r["resource_id"] in affected_ids and r["matched"]
     ]

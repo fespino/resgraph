@@ -270,7 +270,7 @@ suite. Live rows: p50 of 200 requests through the full API path
 
 | Measure | World | Result |
 |---|---|---|
-| composite as-of blast radius, p50 | 10k res / 1M events | **0.371 s** (reconstruct 0.27, traverse 0.010) |
+| composite as-of blast radius, p50 | 10k res / 1M events | **0.250 s** with projection push-down (reconstruct 0.24, traverse 0.009); **0.371 s** without |
 | composite as-of blast radius, p50 | 10k res / 500k events | 0.185 s |
 | composite as-of blast radius, p50 | 5k res / 100k events | 0.074 s |
 | `/world` pushed vs residual, p50 | 10k res / 1M events | **0.145 s vs 0.367 s (2.5×)** |
@@ -298,8 +298,21 @@ with world size while the pushed filter's cost scales with matches.
 Push-down is less about where the comparison runs than about how much
 data crosses the engine boundary.
 
+**Projection push-down arrived by book review, and the benchmark had
+already argued for it.** Reading Grove's *How Query Engines Work*
+after the phase shipped exposed the gap: the scan contract there is
+`scan(projection)` — columns first, predicates second — while this
+planner pushed predicates and then JSON-parsed `attrs` for every one
+of 30k reconstructed rows to return four. Pruning columns at the
+Iceberg scan (`projection` + `where_cols` through `state_at`) cut the
+composite from 0.371 s to **0.250 s** at 1M events (−33%): the win
+splits between the narrower scan (0.275 → 0.238 s reconstruct) and no
+longer materializing attrs through the Arrow→Python boundary in the
+result step. The finding above said the boundary tax was the cost;
+this is the same finding acted on for columns, not just rows.
+
 **D4 query budgets: all validated, no supersession** — live p50
-2.5 ms vs < 100 ms (40×), composite 0.371 s at 1M vs < 2 s (5×),
+2.5 ms vs < 100 ms (40×), composite 0.250 s at 1M vs < 2 s (8×),
 explain 0.012 ms vs < 50 ms with zero store contact (asserted by
 test, not just timed). Second consecutive phase with every budget
 holding; the margins stay large, which now reads less like timidity

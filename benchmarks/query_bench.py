@@ -23,7 +23,14 @@ from resgraph.gen.churn import Churn
 from resgraph.gen.world import World
 from resgraph.query.dsl import parse_filter
 from resgraph.query.executor import QueryContext, _blast_bfs, _residual_filter
-from resgraph.query.planner import Query, _duckdb_where, bind_params, plan
+from resgraph.query.planner import (
+    Query,
+    _duckdb_where,
+    bind_params,
+    composite_projection,
+    plan,
+    where_cols,
+)
 
 SEED = 42
 BENCH_DIR = Path("/tmp/resgraph-query-bench")
@@ -65,18 +72,24 @@ def _build(resources: int, churn_n: int, batch: int = 8192):
     return cat, t_end
 
 
-def _composite_split(cat, t, root, preds):
+def _composite_split(cat, t, root, preds, project=True):
     claimable = [p for p in preds]
     where = _duckdb_where(claimable) or None
     t0 = time.perf_counter()
     state = cold_queries.state_at(
-        cat, t, where=where, params=bind_params(claimable), annotate=True
+        cat,
+        t,
+        where=where,
+        params=bind_params(claimable),
+        annotate=True,
+        projection=composite_projection(False) if project else None,
+        where_cols=where_cols(claimable),
     )
     t1 = time.perf_counter()
     affected = _blast_bfs(state, root, 3)
     t2 = time.perf_counter()
     rows = [
-        {"id": r["resource_id"], "type": r["resource_type"], "attrs": r["attrs"]}
+        {"id": r["resource_id"], "type": r["resource_type"]}
         for r in state
         if r["resource_id"] in affected and r["matched"]
     ]
@@ -158,11 +171,13 @@ def main() -> None:
 
         preds = parse_filter("type=vm")
         splits = [_composite_split(cat, t_end, root, preds) for _ in range(REPS)]
+        full = [_composite_split(cat, t_end, root, preds, project=False) for _ in range(REPS)]
         result = {
             "composite_p50_s": round(
                 _p50([s["reconstruct_s"] + s["traverse_s"] + s["filter_s"] for s in splits]), 4
             ),
             "reconstruct_p50_s": round(_p50([s["reconstruct_s"] for s in splits]), 4),
+            "reconstruct_unprojected_p50_s": round(_p50([s["reconstruct_s"] for s in full]), 4),
             "traverse_p50_s": round(_p50([s["traverse_s"] for s in splits]), 4),
             "world_rows": splits[0]["world_rows"],
             "affected": splits[0]["affected"],

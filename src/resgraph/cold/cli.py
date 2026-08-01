@@ -92,3 +92,10 @@ def diff_cmd(
 ) -> None:
     """Created / deleted / changed resources between two event times."""
     typer.echo(json.dumps(queries.diff(store.get_catalog(), _t(from_t), _t(to_t))))
+
+
+@app.command("maintain")
+def maintain_cmd() -> None:
+    """Expire old Iceberg snapshots (prunes the metadata log; disk
+    reclamation is engine territory — see the JSON it prints)."""
+    typer.echo(json.dumps(store.maintain(store.get_catalog())))

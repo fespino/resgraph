@@ -42,13 +42,16 @@ EVENTS_PARTITION = PartitionSpec(
     PartitionField(source_id=2, field_id=1000, transform=DayTransform(), name="event_day")
 )
 
+# watermark = the global max sequence the snapshot reflects (replay
+# resumes above it); sequence = the resource's own last-applied event.
 SNAPSHOTS_SCHEMA = Schema(
     NestedField(1, "as_of_time", TimestamptzType(), required=True),
-    NestedField(2, "max_sequence", LongType(), required=True),
+    NestedField(2, "watermark", LongType(), required=True),
     NestedField(3, "resource_type", StringType(), required=True),
     NestedField(4, "resource_id", StringType(), required=True),
     NestedField(5, "attrs", StringType(), required=True),
     NestedField(6, "relationships", StringType(), required=True),
+    NestedField(7, "sequence", LongType(), required=True),
 )
 
 _EVENTS_ARROW = pa.schema(

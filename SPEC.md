@@ -687,6 +687,118 @@ The composite budget rides on the D4 cold budget (`state_at` 0.39 s
 at the 95% mark): reconstruction dominates, traverse and serialization
 must fit in the remainder.
 
+## Phase 6 — observability
+
+### D17 — Telemetry: wide events are the log, metrics are a view
+
+The repo's thesis applied to its own telemetry: a pre-aggregated
+counter is state *without* a log — once incremented, the event that
+incremented it is gone, along with every question not asked in
+advance. So telemetry gets the D12 shape, one level up:
+
+- **Wide structured events are the primary telemetry.** One JSON
+  event per API request and per consumed batch — everything known
+  about the unit of work, not just the numbers pre-chosen for charts.
+  Sunk as appended NDJSON files under `data/telemetry/`,
+  DuckDB-queryable like everything else this platform calls truth.
+  Deliberately **not** shipped through the Redis stream: telemetry
+  must never share fate with the transport it watches.
+- **Prometheus metrics are the derived alerting view** — bounded
+  labels, short retention, disposable by design. It fills the slot
+  Memgraph fills for data: a hot serving-and-evaluation layer over a
+  log we own. Adopted rather than built for two reasons: continuous
+  rule evaluation the platform does not have, and failure-domain
+  separation — the phase-6 drill kills stores on purpose and the
+  alert must still fire; an observer hosted on the observed dies
+  with it.
+- **The dependency direction is a test, not a stance:** both D18 SLIs
+  recomputed from the raw events in SQL must agree with the
+  Prometheus-computed ratios within scrape tolerance (the parity
+  test). If they disagree, one layer is lying.
+- **Instrumentation via the OpenTelemetry metrics API + SDK**,
+  Prometheus pull exporter, no collector — the D1 transferability
+  argument applied to telemetry: the standard API is the durable
+  skill, the backend a detail. Metric names stay ours where OTel
+  semantic conventions would fight dashboard clarity.
+- **Stack as code:** Prometheus + Grafana under the compose `obs`
+  profile (opt-in — the observer must not distort the benchmarks it
+  observes), images digest-pinned, scrape config + datasource +
+  dashboard provisioned from committed files.
+
+**Rejected:** metrics-only (the standard recipe; aggregation-first
+destroys the raw events — inconsistent with the log-first thesis, and
+the coming agent phases consume events, not counters — an agent
+cannot drill into a counter). **Rejected:** events-only (alerting
+over event queries means hand-rolling an always-on evaluator; two
+SLOs do not justify replacing burn-rate machinery that is cheap,
+bounded, and explainable). **Rejected:** `prometheus_client` directly
+(tool-specific API where a standard exists). **Rejected:** the OTel
+Collector (a translation daemon between one process and one
+Prometheus on one host is decoration; adopt-triggers: OTLP push, a
+second backend, or traces). **Rejected:** per-entity metric labels,
+permanently — cardinality discipline starts on day one.
+**Reversal condition:** the roadmap's reactive-trigger phase builds
+the always-on evaluator this design borrows from Prometheus; when it
+lands, re-evaluate migrating SLO evaluation onto the platform itself.
+
+### D18 — Two per-run SLOs, ratio SLIs, thresholds derived not invented
+
+Method per the SRE Workbook's SLO-implementation chapter. SLO
+document fields: author F. Espino (solo — the gates are the
+stakeholders); adopted 2026-08-01; derivation from observational
+baselines (BENCHMARKS.md), flagged as such; reviewed at every phase
+closeout via the met/missed × toil decision matrix.
+
+**SLO 1 — ingest freshness (pipeline).**
+- *SLI specification:* the proportion of time the ingest is no more
+  than ~3 s behind the producer.
+- *SLI implementation:* proportion of scrape intervals where
+  `ingest_lag` ≤ **31,500 messages** (= 3 s × 10,500 sustained
+  updates/s, BENCHMARKS.md ingest table, the longer-run number not
+  the sweep peak). Blind spot: lag reads the broker's view
+  (`XINFO GROUPS`); producer-side delay before `XADD` is invisible
+  to it.
+- *Objective:* **99%** of scrape intervals, per run (a load session
+  ≥ 30 min).
+
+**SLO 2 — composite query latency (request-driven).**
+- *SLI specification:* the proportion of composite blast-radius
+  requests answered fast enough not to matter (< 1 s perceived).
+- *SLI implementation:* `api_request_seconds` histogram bucket
+  `le="0.6"` over total composite requests — the bucket boundary
+  sits AT the threshold, so good events are counted exactly, never
+  interpolated from a quantile. Threshold derivation: 1.5 × measured
+  composite p95 0.393 s (BENCHMARKS.md) = 0.59, rounded to 0.6 s.
+  Blind spot: server-side; network and client rendering excluded.
+- *Objective:* **95%** of requests, per run.
+
+**Window honesty:** per-run windows, stated loudly — the canonical
+4-week rolling window (and its weekend-parity argument) cannot apply
+to a laptop that sleeps at night. Consequence: only the fast-burn
+alert tier exists; with per-run windows the slow-burn tier has
+nothing to measure.
+
+**Error budget policy (the teeth):** budget = 100% − objective,
+per run. A load run that exhausts either budget fails its run
+report and opens an issue; the chaos drill does not pass unless the
+freshness fast-burn alert actually fired; nonzero `dead_lettered`
+in any run report means read the DLQ before trusting the run.
+Incidents are quantified as the % of the run's budget they consumed
+(INC-001 carries the first such number).
+
+**Rejected:** quantile-threshold SLIs (`p99(lag) < X`) — the ratio
+form (good events ÷ valid events) is what makes the budget
+arithmetic and incident costs comparable; the Workbook's counting
+preference over histogram approximation is implemented literally via
+the bucket-at-threshold trick. **Rejected:** SLO-as-code generators
+(OpenSLO/Sloth/Pyrra — the current industry default): two hand-rolled
+rules with visible derivations teach more than a generator hides;
+adopt-trigger: a third SLO or multiwindow multi-burn alerting.
+**Reversal condition:** the closeout decision matrix — an SLO met
+with margin and zero toil tightens; an SLO missed by an honest
+system loosens; either change is a new D18 revision, never a silent
+edit.
+
 ## Phase contracts
 - The generator MUST emit D2 messages exactly and expose `--seed`
   for reproducibility.

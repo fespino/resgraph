@@ -28,6 +28,8 @@ rm -f "$TL"; rm -rf "$COLD_DIR"
 export RESGRAPH_COLD_DIR="$COLD_DIR"
 
 note "0. stores + obs profile up (memgraph RECREATED — the drill must start empty)"
+pkill -9 -f "resgraph ingest" 2>/dev/null || true
+pkill -9 -f "resgraph cold ingest" 2>/dev/null || true
 docker compose kill memgraph >/dev/null 2>&1 || true
 docker compose rm -f memgraph >/dev/null 2>&1 || true
 docker compose --profile obs up -d redis memgraph prometheus grafana
@@ -94,7 +96,10 @@ else
   note "   ALERT DID NOT FIRE within 10m — drill FAILS its gate"; fi
 
 note "6. recover: stop hot worker FIRST (it would apply its held batch into an empty store before rebuild), fresh memgraph, rebuild from cold"
-kill -9 "$HOT_PID" 2>/dev/null || true
+# kill the WORKER, not the uv wrapper: kill -9 $HOT_PID orphans the
+# python child, which then applies its held batch into the empty store
+# before rebuild (v3 failed exactly there)
+pkill -9 -f "resgraph ingest" 2>/dev/null || true
 docker compose up -d memgraph
 bolt_wait
 T_REBUILD=$(date -u +%s)
@@ -116,7 +121,8 @@ note "   drained: lag=$(prom 'max(ingest_lag)')  dlq_total=$(prom 'sum(ingest_dl
 
 note "8. reconcile against the generator oracle (exact or the drill fails)"
 uv run resgraph-gen final-state --seed "$SEED" --resources "$RESOURCES" --count "$CHURN" > /tmp/drill-oracle.jsonl
-kill "$HOT_PID" "$COLD_PID" 2>/dev/null || true
+pkill -f "resgraph ingest" 2>/dev/null || true
+pkill -f "resgraph cold ingest" 2>/dev/null || true
 sleep 2
 if uv run resgraph reconcile --oracle /tmp/drill-oracle.jsonl | tee -a "$TL"; then
   note "   RECONCILE: exact"

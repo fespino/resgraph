@@ -271,6 +271,7 @@ suite. Live rows: p50 of 200 requests through the full API path
 | Measure | World | Result |
 |---|---|---|
 | composite as-of blast radius, p50 | 10k res / 1M events | **0.250 s** with projection push-down (reconstruct 0.24, traverse 0.009); **0.371 s** without |
+| composite as-of blast radius, **p95** (n=40) | 10k res / 1M events | **0.393 s** — measured for D18: SLO threshold = 1.5×p95 → 0.6 s |
 | composite as-of blast radius, p50 | 10k res / 500k events | 0.185 s |
 | composite as-of blast radius, p50 | 5k res / 100k events | 0.074 s |
 | `/world` pushed vs residual, p50 | 10k res / 1M events | **0.145 s vs 0.367 s (2.5×)** |

@@ -157,6 +157,7 @@ class StreamConsumer:
             stream=self.stream,
             entries=len(entries),
             ms=round((time.perf_counter() - t0) * 1e3, 2),
+            lag=self._read_lag(),
             **{k: counters[k] - before[k] for k in counters},
         )
 

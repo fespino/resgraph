@@ -89,3 +89,25 @@ def test_metrics_endpoint_is_mounted():
     r = client.get("/metrics")
     assert r.status_code == 200
     assert "api_request_seconds" in r.text
+
+
+def test_event_content_policy_no_payloads_no_unbounded_fields(tmp_path, monkeypatch):
+    """D17 content policy: identifiers, dimensions, timings, counts —
+    never payload bodies. Fields are size-bounded so an event can never
+    smuggle a message body into the forever-log."""
+    import json as _json
+
+    monkeypatch.setenv("RESGRAPH_TELEMETRY_DIR", str(tmp_path))
+    from resgraph.api import app as api_app
+
+    client = TestClient(api_app.app)
+    client.get(
+        "/blast-radius/vm-000001",
+        params={"at": "2026-01-03T00:00:00+00:00", "explain": "true", "filter": "attrs.zone=z1"},
+    )
+    events = [_json.loads(ln) for ln in (tmp_path / "api.ndjson").read_text().splitlines()]
+    assert events
+    for e in events:
+        assert "attrs" not in e and "payload" not in e and "data" not in e
+        for key, value in e.items():
+            assert len(str(value)) <= 600, (key, value)

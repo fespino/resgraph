@@ -743,6 +743,14 @@ advance. So telemetry gets the D12 shape, one level up:
   observes), images digest-pinned, scrape config + datasource +
   dashboard provisioned from committed files.
 
+- **Event content policy:** events carry identifiers, dimensions,
+  timings, and counts — never payload bodies (no message attrs, no
+  free-text beyond the already-bounded query string). What an event
+  references, the platform's stores can look up; what an event
+  *contains* is forever, greppable, and — once the agent phases tail
+  these files — part of a prompt. Guard test: no event field value
+  exceeds 600 characters.
+
 **Rejected:** metrics-only (the standard recipe; aggregation-first
 destroys the raw events — inconsistent with the log-first thesis, and
 the coming agent phases consume events, not counters — an agent

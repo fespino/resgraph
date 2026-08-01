@@ -361,6 +361,15 @@ evolution via a `schema_version` bump — the format is decoration:
 either exercise one deliberately or swap to plain parquet and record
 the simplification.
 
+**Resolution (phase 5, on deadline):** the serving-layer phase
+exercised the first Iceberg-exclusive capability — a **second engine
+reading the table**: DuckDB's iceberg extension (its own Iceberg
+implementation, no pyiceberg) reads the events table from the metadata
+file alone, and with `sql/cold_semantics.sql` loaded reproduces
+`state_at(T)` exactly (test_second_engine.py). The exit-path claim is
+now a passing test, not prose; the format stays. The remaining
+candidates below stand for their own phases.
+
 **Likely resolutions, identified in advance** (so the serving-layer
 phase inherits a checklist, not a threat): (1) snapshot-pinned
 pagination cursors in the API phase — a frozen view across pages of a
@@ -526,6 +535,35 @@ the budget.
 table cannot express, extend the filter DSL or add an endpoint —
 never a passthrough. If endpoint count outgrows a screen, that is the
 moment to revisit the surface design, not before.
+
+**D15 addendum — challenged: why not a database wire protocol as the
+go-to surface?** The alternative: speak Postgres wire / ODBC so
+SQL-native tooling (BI, notebooks, psql) connects with zero client
+work. Recorded answer:
+
+- The platform **already has** a zero-integration surface per store,
+  at the layer below: the hot store speaks Bolt (any Neo4j client
+  connects today), and the cold tables are open-format Iceberg on
+  disk — any engine reads them without permission (proven by the
+  second-engine interop test). What no wire protocol carries is the
+  *semantics*: dedupe on `(resource_id, sequence)`, tombstones,
+  event-time as-of (D13). A raw SQL surface hands every consumer the
+  obligation to re-implement D13 — the silent-wrongness class it
+  exists to prevent.
+- So the split is by persona, not by protocol: **agents and
+  programmatic consumers** get the governed HTTP surface (budgets,
+  caps, labeled sources — the passthrough rejection above is about
+  them); **SQL-native tooling** gets the open format, with the
+  semantics shipped alongside as SQL (`sql/cold_semantics.sql`, a
+  `state_at(t)` macro any DuckDB-dialect engine can load) instead of
+  locked behind endpoints.
+- **Rejected for now:** running a Postgres-wire front (pgwire proxy,
+  pg_duckdb/pg_lake, Flight SQL server) — a third surface to operate,
+  with no SQL-native consumer in the platform today.
+- **Trigger:** the first real BI/ODBC consumer. Then front the *cold
+  half* with a SQL-serving engine (pg_duckdb/pg_lake, or Trino if
+  D16's adopt-line has fired by then) and load the shipped semantic
+  views into it. Do not teach the HTTP API to speak SQL.
 
 ### D16 — Mini planner: predicate push-down across two stores
 

@@ -7,7 +7,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-SEED=42 RESOURCES=5000 CHURN=900000 RATE=2500
+SEED=42 RESOURCES=5000 CHURN=1800000 RATE=2500
 COLD_DIR="${RESGRAPH_COLD_DIR:-data/cold-drill}"
 TL=/tmp/drill-timeline.txt
 PROM=http://localhost:9090
@@ -67,8 +67,8 @@ print("published", resources + emitted)
 PY
 PUB_PID=$!
 
-note "3. steady state: waiting 150s, then gating on the SLO itself"
-sleep 150
+note "3. steady state: warmup 330s (longer than the 5m SLO window — a window larger than the elapsed run judges the startup transient), then gating"
+sleep 330
 RATIO0=$(prom 'slo:ingest_freshness:ratio_5m')
 note "   lag=$(prom 'max(ingest_lag)') freshness_ratio_5m=${RATIO0}"
 if ! python3 -c "import sys; sys.exit(0 if float('${RATIO0:-0}') >= 0.99 else 1)"; then

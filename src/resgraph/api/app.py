@@ -13,8 +13,10 @@ from datetime import UTC, datetime
 from typing import Annotated, Literal
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
+from prometheus_client import make_asgi_app
 from pydantic import BaseModel
 
+from resgraph import obs
 from resgraph.cold import queries as cold_queries
 from resgraph.cold import store as cold_store
 from resgraph.graph import client as hot_client
@@ -86,20 +88,28 @@ def create_app() -> FastAPI:
     app = FastAPI(title="resgraph", version="0.1.0")
     app.state.driver = None
     app.state.catalog = None
+    obs.init_metrics()
+    app.mount("/metrics", make_asgi_app())
 
     @app.middleware("http")
-    async def request_log(request: Request, call_next):
+    async def telemetry(request: Request, call_next):
         t = time.monotonic()
         response = await call_next(request)
-        log.info(
-            json.dumps(
-                {
-                    "route": request.url.path,
-                    "query": str(request.url.query),
-                    "status": response.status_code,
-                    "ms": round((time.monotonic() - t) * 1e3, 1),
-                }
-            )
+        if request.url.path.startswith("/metrics"):
+            return response
+        dur = time.monotonic() - t
+        route = request.scope.get("route")
+        route_path = route.path if route else "unmatched"
+        source = getattr(request.state, "source", "other")
+        obs.API_SECONDS.record(dur, {"route": route_path, "source": source})
+        obs.get_sink("api").emit(
+            "api_request",
+            route=route_path,
+            query=str(request.url.query),
+            status=response.status_code,
+            ms=round(dur * 1e3, 2),
+            source=source,
+            **getattr(request.state, "telemetry", {}),
         )
         return response
 
@@ -153,7 +163,8 @@ def _cap(rows: list) -> tuple[list, bool, int]:
 
 
 @app.get("/resources/{resource_id}", response_model=ResourceOut)
-def resource(resource_id: str, explain: bool = False, ctx: Ctx = None):
+def resource(request: Request, resource_id: str, explain: bool = False, ctx: Ctx = None):
+    request.state.source = "plan" if explain else "hot"
     if explain:
         return _explain_response(
             [{"store": "hot", "op": "cypher", "detail": f"read_node({resource_id!r})"}]
@@ -177,6 +188,7 @@ def resource(resource_id: str, explain: bool = False, ctx: Ctx = None):
 
 @app.get("/blast-radius/{resource_id}")
 def blast_radius(
+    request: Request,
     resource_id: str,
     depth: Annotated[int, Query(ge=1)] = 3,
     filter: str | None = None,
@@ -185,6 +197,8 @@ def blast_radius(
     ctx: Ctx = None,
 ):
     preds, at_t = _parse(filter, at)
+    request.state.source = "plan" if explain else ("hot" if at_t is None else "composite")
+    request.state.telemetry = {"root": resource_id, "depth": depth, "at": at}
     try:
         p = make_plan(
             PlannerQuery("blast_radius", root=resource_id, depth=depth, at=at_t, predicates=preds)
@@ -199,6 +213,7 @@ def blast_radius(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     rows, truncated, total = _cap(rows)
+    request.state.telemetry.update(total=total, truncated=truncated)
     return BlastRadiusOut(
         fetched_at=_now(),
         source="hot" if at_t is None else "composite",
@@ -213,12 +228,15 @@ def blast_radius(
 
 @app.get("/world")
 def world(
+    request: Request,
     at: str,
     filter: str | None = None,
     explain: bool = False,
     ctx: Ctx = None,
 ):
     preds, at_t = _parse(filter, at)
+    request.state.source = "plan" if explain else "cold"
+    request.state.telemetry = {"at": at}
     try:
         p = make_plan(PlannerQuery("world", at=at_t, predicates=preds))
     except ValueError as e:
@@ -238,7 +256,8 @@ def world(
 
 
 @app.get("/history/{resource_id}")
-def history(resource_id: str, explain: bool = False, ctx: Ctx = None):
+def history(request: Request, resource_id: str, explain: bool = False, ctx: Ctx = None):
+    request.state.source = "plan" if explain else "cold"
     if explain:
         return _explain_response(
             [{"store": "cold", "op": "duckdb", "detail": f"history({resource_id!r})"}]
@@ -257,6 +276,7 @@ def history(resource_id: str, explain: bool = False, ctx: Ctx = None):
 
 @app.get("/diff")
 def diff(
+    request: Request,
     from_t: Annotated[str, Query(alias="from")],
     to_t: Annotated[str, Query(alias="to")],
     explain: bool = False,
@@ -264,6 +284,7 @@ def diff(
 ):
     _, t1 = _parse(None, from_t)
     _, t2 = _parse(None, to_t)
+    request.state.source = "plan" if explain else "cold"
     if explain:
         return _explain_response(
             [

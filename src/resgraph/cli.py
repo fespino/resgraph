@@ -71,9 +71,14 @@ def ingest_cmd(
     max_messages: int = typer.Option(0, help="Stop after N messages (0 = no limit)."),
     exit_on_idle: bool = typer.Option(False, "--exit-on-idle"),
     batch: int = typer.Option(1024, help="Messages per read/apply transaction."),
+    metrics_port: int = typer.Option(0, help="Serve OTel->Prometheus metrics (0 = off)."),
 ) -> None:
     """Consume the update stream into the hot store (at-least-once,
     idempotent apply). Resumes from unacknowledged entries after a crash."""
+    if metrics_port:
+        from resgraph import obs
+
+        obs.init_metrics(metrics_port)
     with _session() as s:
         init_schema(s)
         consumer = Consumer(redis_url, s, stream=stream, group=group, name=name, batch=batch)

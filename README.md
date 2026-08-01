@@ -13,7 +13,7 @@
 | src/resgraph/cold/queries.py       |       92 |        9 |     90% |137, 217-219, 231-233, 235, 240 |
 | src/resgraph/cold/rebuild.py       |       20 |        3 |     85% |     46-48 |
 | src/resgraph/cold/store.py         |       57 |        2 |     96% |   72, 120 |
-| src/resgraph/consumer.py           |       65 |        6 |     91% |67, 79, 82, 97, 99-100 |
+| src/resgraph/consumer.py           |      114 |        6 |     95% |77, 89, 92, 107, 109-110 |
 | src/resgraph/gen/\_\_init\_\_.py   |        0 |        0 |    100% |           |
 | src/resgraph/gen/churn.py          |       65 |        4 |     94% |47-49, 108 |
 | src/resgraph/gen/cli.py            |       43 |        6 |     86% | 17, 72-76 |
@@ -31,7 +31,7 @@
 | src/resgraph/query/executor.py     |       77 |        7 |     91% |41, 46, 48, 56, 60, 70-71 |
 | src/resgraph/query/planner.py      |       83 |        2 |     98% |   74, 101 |
 | src/resgraph/schema.py             |       49 |        0 |    100% |           |
-| **TOTAL**                          | **1169** |  **103** | **91%** |           |
+| **TOTAL**                          | **1218** |  **103** | **92%** |           |
 
 
 ## Setup coverage badge

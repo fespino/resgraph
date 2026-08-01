@@ -21,6 +21,7 @@ from collections.abc import Callable
 
 from pydantic import ValidationError
 
+from resgraph import obs
 from resgraph.schema import UpdateMessage
 
 log = logging.getLogger("resgraph.consumer")
@@ -60,6 +61,18 @@ class StreamConsumer:
         self.max_retries = max_retries
         self.backoff_s = backoff_s
         self.dlq = f"{stream}:dlq"
+        self._attrs = {"worker": name}
+        obs.register_lag_reader(name, self._read_lag)
+
+    def _read_lag(self) -> int | None:
+        try:
+            for g in self.r.xinfo_groups(self.stream):
+                gname = g.get("name")
+                if gname in (self.group, self.group.encode()):
+                    return g.get("lag")
+        except Exception:
+            return None
+        return None
 
     def ensure_group(self) -> None:
         """Create the consumer group at the stream's beginning (idempotent).
@@ -111,6 +124,8 @@ class StreamConsumer:
         return counters
 
     def _apply_batch(self, entries, counters: dict[str, int], pending: bool = False) -> None:
+        before = dict(counters)
+        t0 = time.perf_counter()
         pairs = []  # (entry_id, raw payload, parsed message)
         invalid = []
         for entry_id, fields in entries:
@@ -123,6 +138,7 @@ class StreamConsumer:
                 log.warning("poison entry %s acked and dropped: %s", entry_id, e)
                 invalid.append(entry_id)
         if invalid:
+            obs.INVALID.add(len(invalid), self._attrs)
             self.r.xack(self.stream, self.group, *invalid)
         if pending and pairs:
             # In-process retries never bump the delivery counter, so the
@@ -130,6 +146,14 @@ class StreamConsumer:
             # drain after repeated crashes is quarantined, not retried.
             pairs = self._quarantine_over_delivered(pairs, counters)
         self._apply_entries(pairs, counters, self.max_retries)
+        obs.get_sink(f"consumer-{self.name}").emit(
+            "consume_batch",
+            worker=self.name,
+            stream=self.stream,
+            entries=len(entries),
+            ms=round((time.perf_counter() - t0) * 1e3, 2),
+            **{k: counters[k] - before[k] for k in counters},
+        )
 
     def _apply_entries(self, pairs, counters: dict[str, int], retries: int) -> None:
         if not pairs:
@@ -140,7 +164,9 @@ class StreamConsumer:
             if attempt:
                 time.sleep(self.backoff_s * 2 ** (attempt - 1))
             try:
+                t0 = time.perf_counter()
                 applied, skipped = self.apply_fn(msgs)
+                obs.BATCH_SECONDS.record(time.perf_counter() - t0, self._attrs)
             except Exception as e:
                 err = e
                 log.warning(
@@ -153,6 +179,8 @@ class StreamConsumer:
                 continue
             counters["applied"] += applied
             counters["skipped"] += skipped
+            obs.APPLIED.add(applied, self._attrs)
+            obs.SKIPPED.add(skipped, self._attrs)
             # ack strictly after the apply committed: crash before this line
             # redelivers the batch, and idempotent apply absorbs it.
             self.r.xack(self.stream, self.group, *[eid for eid, _, _ in pairs])
@@ -198,7 +226,9 @@ class StreamConsumer:
         )
         self.r.xack(self.stream, self.group, entry_id)
         counters["dead_lettered"] += 1
+        obs.DLQ.add(1, self._attrs)
         log.error("entry %s dead-lettered to %s: %s", entry_id, self.dlq, error)
 
     def close(self) -> None:
+        obs.unregister_lag_reader(self.name)
         self.r.close()

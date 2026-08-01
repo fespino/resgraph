@@ -33,9 +33,14 @@ def ingest_cmd(
     max_messages: int = typer.Option(0, help="Stop after N messages (0 = no limit)."),
     exit_on_idle: bool = typer.Option(False, "--exit-on-idle"),
     batch: int = typer.Option(1024, help="Messages per read/append commit."),
+    metrics_port: int = typer.Option(0, help="Serve OTel->Prometheus metrics (0 = off)."),
 ) -> None:
     """Consume the update stream into the events table (at-least-once
     appends; readers dedupe). Resumes unacknowledged entries after a crash."""
+    if metrics_port:
+        from resgraph import obs
+
+        obs.init_metrics(metrics_port)
     catalog = store.get_catalog()
     store.ensure_tables(catalog)
 

@@ -96,7 +96,7 @@ weaken the watermark.
 | Ingest throughput, single consumer | ≥ 20k updates/s | **~12.5k** (BENCHMARKS.md; amended below) |
 | Traversal p95, depth ≤ 3, 100k-resource world | < 50 ms | **0.4 ms** (BENCHMARKS.md) |
 | Ingest memory ceiling | < 512 MB RSS | **82 MB peak** (BENCHMARKS.md) |
-| World generator emit rate | ≥ 100k msg/s | — |
+| World generator emit rate | ≥ 100k msg/s | **~36k sustained** (missed; amended below) |
 
 Provisional targets exist to be *validated, then enforced* (as CI
 gates, once measured). A budget without a measurement is a wish; a measurement
@@ -259,6 +259,35 @@ attr updates (a diff, not a statement), this decision is superseded and
 the watermark alone no longer guarantees convergence — a per-field
 version would be needed.
 
+### D14 — Stream consumption model (recorded retroactively)
+
+Made during phase 3, written down during phase 4 — the gap between
+doing and recording is itself a lesson; the choices were in docstrings
+and BENCHMARKS.md but not in the log this repo claims to keep.
+
+- **One consumer group per store, `XREADGROUP` → apply → `XACK`,
+  ack strictly after the apply commits.** At-least-once delivery,
+  absorbed by an idempotent (hot) or dedupe-at-read (cold) apply.
+- **Pending-first recovery:** on start, a consumer drains its own
+  unacknowledged entries before reading new ones — restart and cold
+  start are one code path. **Deferred:** `XAUTOCLAIM` of a *dead
+  sibling's* pending entries — meaningless while groups are
+  single-consumer; lands with #32.
+- **One transaction per batch; batch size is a per-sink measured
+  knob** — hot sweet spot 1024 (2048 regresses), cold wants the
+  largest batch buffered (8192+: Iceberg commit overhead inverts the
+  curve). BENCHMARKS.md carries both sweeps.
+- **SIGTERM is not handled beyond process death, deliberately:** batch
+  atomicity plus redelivery makes a hard kill safe (the crash tests
+  prove it); a graceful-drain handler would add code to protect
+  against nothing.
+**Rejected:** fan-out topology (one group per *instance*, broadcast) —
+these consumers partition work; broadcast is for cache-warmers and
+notifiers, a different tool.
+**Reversal condition:** a consumer whose apply is NOT
+idempotent-or-dedupable may not use this model — it would need the
+outbox D3 already points to.
+
 ## Phase 4 — the cold store
 
 ### D11 — Cold store engine: Iceberg via pyiceberg, queried through DuckDB
@@ -305,6 +334,23 @@ which is the entire point of the cold half.
 **Rejected:** dedupe-at-write (equality deletes) — write amplification
 and thin pyiceberg support, to save readers a `DISTINCT` they can do
 in one window function.
+**Rejected:** teeing to Iceberg from inside the hot ingest worker
+(buffered background writer, backpressure on the hot path) — couples
+the stores' failure modes and progress; a second consumer group gives
+each store independent position, replay, and crash recovery for free.
+The trade accepted with that choice: the stream is bounded
+(`maxlen~`), so a cold consumer lagging behind eviction loses history
+**silently** — where the tee would have slowed the hot path instead.
+Recorded limitation; gap detection (group position vs stream head) is
+the mitigation if lag is ever plausible.
+**Rejected:** an `ingested_at` lineage column — commit-time lineage
+already lives in Iceberg snapshot metadata, and a per-row wall-clock
+would make duplicate rows non-identical, breaking the cheap
+DISTINCT dedupe.
+**Rejected:** partitioning by `resource_id` — high cardinality means a
+file explosion per partition; hidden partitioning does not save a bad
+spec. (`resource_type` as a second partition dimension is deferred
+until a measured query wants the pruning.)
 **Reversal condition:** if the benchmark shows read-side dedupe
 dominating as-of latency at target scale, add a compaction job that
 rewrites deduped partitions — the read semantics stay identical.

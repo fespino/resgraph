@@ -330,16 +330,15 @@ first time history is replayed.
 checkpoint-plus-log implementation misses the D4 as-of budget, tune
 snapshot cadence or add partition pruning before touching semantics.
 
-### D4 addendum — provisional cold budgets
+### D4 addendum — cold budgets
 
 | Budget | Target | Measured |
 |---|---|---|
-| Cold append throughput, batched | ≥ 10k events/s | — |
-| `state_at(T)` p50, 1M-event history, snapshots on | < 2 s | — |
-| Storage, 1M events | < 500 MB | — |
+| Cold append throughput, batched | ≥ 10k events/s | **136.5k** @ batch 8192 (BENCHMARKS.md) |
+| `state_at(T)` p50, 1M-event history, snapshots on | < 2 s | **0.39 s** (95% mark, BENCHMARKS.md) |
+| Storage, 1M events | < 500 MB | **25 MB** @ batch 8192 (366 MB at batch 1024 — commit granularity is a storage decision; BENCHMARKS.md) |
 
-Provisional until the phase-4 benchmark lands (same rule as ever: a
-budget without a measurement is a wish).
+All three validated with margin; no supersession needed.
 
 ## Phase contracts
 - The generator MUST emit D2 messages exactly and expose `--seed`

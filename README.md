@@ -16,10 +16,10 @@
 | src/resgraph/graph/consumer.py     |       64 |        6 |     91% |76, 89, 92, 107, 109-110 |
 | src/resgraph/graph/ingest.py       |       89 |        4 |     96% |100, 152, 246, 283 |
 | src/resgraph/graph/loader.py       |       28 |        0 |    100% |           |
-| src/resgraph/graph/queries.py      |       35 |        0 |    100% |           |
-| src/resgraph/graph/schema.py       |       16 |        0 |    100% |           |
+| src/resgraph/graph/queries.py      |       40 |        0 |    100% |           |
+| src/resgraph/graph/schema.py       |       19 |        0 |    100% |           |
 | src/resgraph/schema.py             |       36 |        0 |    100% |           |
-| **TOTAL**                          |  **578** |   **23** | **96%** |           |
+| **TOTAL**                          |  **586** |   **23** | **96%** |           |
 
 
 ## Setup coverage badge

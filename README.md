@@ -24,9 +24,85 @@ flowchart LR
   Q2 --> A
 ```
 
-Status: phases 0–4 complete — foundations + security posture, the
-deterministic generator, the graph hot store, the streaming ingest, and
-the Iceberg cold store with event-time travel (phase 4 in review).
+## Status
+
+Part I — the data foundation — is complete, phases 0–6, each tagged at
+its end state:
+
+| Phase | What landed | Tag |
+|---|---|---|
+| 0 | Foundations: SPEC-driven decisions, CI + security posture | `phase-0-foundations` |
+| 1 | Deterministic synthetic world generator (`--seed`) | `phase-1-generator` |
+| 2 | Hot graph store (Memgraph) + traversal queries | `phase-2-graph-store` |
+| 3 | Streaming ingest: one watermark, idempotent batch apply | `phase-3-ingest` |
+| 4 | Iceberg cold store, event-time travel, DR rebuild | `phase-4-cold-store` |
+| 5 | Query layer: mini planner, push-down, one API over both stores | `phase-5-query-layer` |
+| 6 | Observability: wide events, SLOs, the chaos drill (INC-001) | `phase-6-observability` |
+
 Each increment lands via issue → PR, citing the SPEC decisions
-(D-numbers) it implements; every phase's end state is tagged
-(`phase-N-*`) and benchmarked (BENCHMARKS.md).
+(D-numbers) it implements. Next: Part II — an MCP server and an agent
+over these endpoints.
+
+## Quickstart: to a live dashboard
+
+```bash
+docker compose --profile obs up -d   # redis, memgraph, prometheus, grafana
+uv sync
+
+# terminal 1 — hot consumer (metrics on :9101)
+uv run resgraph ingest --metrics-port 9101
+
+# terminal 2 — cold consumer (metrics on :9102)
+uv run resgraph cold init
+uv run resgraph cold ingest --metrics-port 9102
+
+# terminal 3 — the API over both stores, on :8000
+uv run resgraph serve
+
+# terminal 4 — seed a 10k-resource world, then churn at 2,000 msg/s
+uv run resgraph-gen seed --sink redis
+uv run resgraph-gen run --sink redis --rate 2000 --duration 600
+```
+
+Grafana is at <http://localhost:3000> (anonymous, provisioned from the
+repo): throughput, consumer lag against its SLO threshold, API latency
+by store, error-budget burn — all moving.
+
+<!-- SCREENSHOT: docs/blog/images/07-dashboard-under-load.png —
+     the overview dashboard during the INC-001 chaos drill. -->
+
+Ask it something:
+
+```bash
+uv run resgraph query blast-radius --id vm-000042
+curl "localhost:8000/blast-radius/vm-000042?at=2026-01-03T00:00:00Z"
+```
+
+## Benchmark highlights
+
+Apple M3 laptop, 8 GB RAM, stores in Docker alongside. Methodology,
+full tables, and every caveat: [BENCHMARKS.md](BENCHMARKS.md) — the
+README never carries a number that file can't back.
+
+| What | Number | The caveat that keeps it honest |
+|---|---|---|
+| Hot ingest, single consumer | 12,500 updates/s (10,500 sustained) | measured **solo**; ~3,500/s with the full stack co-located |
+| Cold append | 194k events/s (batch 8,192) | drops to 24.3k at batch 1,024 — the knee is the finding |
+| Time travel (`state_at`, 1M events) | 0.17–0.39 s p50 | with snapshots; pure replay up to 0.55 s |
+| Composite blast-radius as-of | 0.250 s p50 / 0.393 s p95 | 10k resources, 1M events; p95 is what the SLO is derived from |
+| Storage, 1M events | 18 MB data / 25 MB total | at batch 8,192; small batches 14× the metadata |
+| Hot-store loss to fully restored | 395 s, zero loss | induced (chaos drill): detected T+172 s by SLO burn, rebuilt in 21 s, reconciled exact — [INC-001](docs/incidents/INC-001-hotstore-loss.md) |
+
+## Where things are
+
+- [SPEC.md](SPEC.md) — the decision log: every choice with its
+  rejections and reversal conditions (D-numbers, cited from PRs).
+- [BENCHMARKS.md](BENCHMARKS.md) — methodology + hardware for every
+  number above.
+- [docs/incidents/](docs/incidents/) — incident reports, starting with
+  the induced hot-store loss.
+- [docs/security-posture.md](docs/security-posture.md) — the controls,
+  each enforced, alarmed, or measured.
+- [docs/blog/posts/](docs/blog/posts/) — the build, written up as it
+  happened.
+- [INDEX.md](INDEX.md) — repo map.

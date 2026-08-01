@@ -126,6 +126,7 @@ class StreamConsumer:
     def _apply_batch(self, entries, counters: dict[str, int], pending: bool = False) -> None:
         before = dict(counters)
         t0 = time.perf_counter()
+        obs.READ.add(len(entries), self._attrs)
         pairs = []  # (entry_id, raw payload, parsed message)
         invalid = []
         for entry_id, fields in entries:

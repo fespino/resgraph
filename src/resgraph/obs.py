@@ -47,6 +47,7 @@ class EventSink:
 
 _meter = otel_metrics.get_meter("resgraph")
 
+READ = _meter.create_counter("ingest_read", description="entries read from the stream")
 APPLIED = _meter.create_counter("ingest_applied", description="messages applied")
 SKIPPED = _meter.create_counter("ingest_skipped", description="stale messages skipped (D3)")
 INVALID = _meter.create_counter("ingest_invalid", description="parse-poison entries dropped")
@@ -137,8 +138,9 @@ def _refresh_instruments() -> None:
     meter; module globals are swapped so callers holding
     ``obs.APPLIED`` style references keep working.
     """
-    global _meter, APPLIED, SKIPPED, INVALID, DLQ, BATCH_SECONDS, API_SECONDS
+    global _meter, READ, APPLIED, SKIPPED, INVALID, DLQ, BATCH_SECONDS, API_SECONDS
     _meter = otel_metrics.get_meter("resgraph")
+    READ = _meter.create_counter("ingest_read", description="entries read from the stream")
     APPLIED = _meter.create_counter("ingest_applied", description="messages applied")
     SKIPPED = _meter.create_counter("ingest_skipped", description="stale messages skipped (D3)")
     INVALID = _meter.create_counter("ingest_invalid", description="parse-poison entries dropped")

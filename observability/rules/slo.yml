@@ -1,0 +1,48 @@
+# D18 SLO rules — ratio SLIs, thresholds derived from BENCHMARKS.md.
+#
+# Freshness: good scrape interval = max worker lag <= 31500 messages
+#   (3 s x 10,500 sustained updates/s — the ingest table's longer-run
+#   number, not the sweep peak). Objective: 99% of intervals per run.
+# Composite latency: good request = answered within 0.6 s
+#   (1.5 x measured composite p95 0.393 s, rounded; the 0.6 histogram
+#   bucket boundary counts good events exactly). Objective: 95%.
+#
+# Fast-burn thresholds: alert when a 5m window burns the run's budget
+# at >= 6x the sustainable rate — i.e. would exhaust a 30-min run's
+# budget in <= 5 minutes:  1 - 6 x (1 - objective).
+#   freshness: 1 - 6 x 0.01 = 0.94
+#   composite: 1 - 6 x 0.05 = 0.70
+# Per-run windows mean there is no slow-burn tier to measure (D18).
+groups:
+  - name: slo
+    interval: 15s
+    rules:
+      - record: slo:ingest_lag:max
+        expr: max(ingest_lag)
+      - record: slo:ingest_freshness:good
+        expr: max(ingest_lag) <= bool 31500
+      - record: slo:ingest_freshness:ratio_5m
+        expr: avg_over_time(slo:ingest_freshness:good[5m])
+      - record: slo:composite_latency:ratio_5m
+        expr: >
+          sum(rate(api_request_seconds_bucket{source="composite",le="0.6"}[5m]))
+          /
+          sum(rate(api_request_seconds_count{source="composite"}[5m]))
+      - alert: IngestFreshnessFastBurn
+        expr: slo:ingest_freshness:ratio_5m < 0.94
+        for: 2m
+        labels:
+          slo: ingest-freshness
+        annotations:
+          summary: >-
+            Ingest freshness burning >=6x sustainable rate: the consumer
+            is falling behind faster than the run's budget allows.
+      - alert: CompositeLatencyFastBurn
+        expr: slo:composite_latency:ratio_5m < 0.70
+        for: 2m
+        labels:
+          slo: composite-latency
+        annotations:
+          summary: >-
+            Composite latency burning >=6x sustainable rate: under 70%
+            of composite requests are answering within 0.6s.

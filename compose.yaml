@@ -21,6 +21,28 @@ services:
     image: memgraph/memgraph-mage@sha256:f252561ba38f4c5f530f9d0c7d916f47a37ed20fdfdcfd9b596ca149bd9a5fd8
     ports: ["7687:7687"]
     command: ["--log-level=WARNING", "--memory-limit=2048"]
+  prometheus:
+    # Observability profile (D17): opt-in so default runs stay lean —
+    # the observer must not distort the benchmarks it observes.
+    profiles: ["obs"]
+    image: prom/prometheus:v3.9.1@sha256:1f0f50f06acaceb0f5670d2c8a658a599affe7b0d8e78b898c1035653849a702
+    ports: ["9090:9090"]
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./observability/rules:/etc/prometheus/rules:ro
+    extra_hosts: ["host.docker.internal:host-gateway"]
+  grafana:
+    profiles: ["obs"]
+    image: grafana/grafana:12.3.0@sha256:70d9599b186ce287be0d2c5ba9a78acb2e86c1a68c9c41449454d0fc3eeb84e8
+    ports: ["3000:3000"]
+    # anonymous admin: a local-only dashboard behind no network boundary;
+    # auth here would be theater
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
   postgres:
     # Benchmark-only (profile: bench): the recursive-CTE null hypothesis
     # for the traversal benchmark — "graph beats recursive SQL" is a

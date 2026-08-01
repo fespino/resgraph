@@ -193,6 +193,50 @@ diamond explicitly rather than relying on a fixture that happened to have
 the shape I assumed. Even "surely the random world contains this obvious
 pattern" is an assumption worth measuring before you build a test on it.
 
+## Addendum, three phases later: the impossible path
+
+This section was added after publication, because the store produced a
+result worth documenting. One day CI started failing with a dependency
+path that ended at the wrong node:
+
+```
+path=['container-000001', 'vm-000047', 'container-000001']
+```
+
+Read that carefully: the query pattern *requires* every match to end
+at the target (`MATCH p = (a)-[…]->(b:host {id: $b})`), so a returned
+path ending anywhere else isn't a wrong answer — it's semantically
+impossible output. That distinction set the debugging strategy: stop
+suspecting the golden data or the query, and make the store prove
+itself at the boundary. The first move was a guard in
+`dependency_path` that validates the returned path's endpoints and
+raises with the **whole** path — the assertion diff had shown only two
+elements; the guard's first catch delivered the line above, which
+says the topology and edges were right and only the terminal node's
+id was wrong.
+
+The bisection that followed killed every comfortable hypothesis in
+order. Architecture (CI is amd64, the laptop arm64): dead — it
+reproduced locally. Store version: dead — 3.11.0 and 3.12.0 both
+affected. The trigger turned out to be state, not platform: a **fresh
+store instance** that loads a world, bulk-deletes it, and loads
+another. In that state the exact query text fails deterministically
+while a semantically identical rephrasing succeeds — and `FREE
+MEMORY`, which forces storage garbage collection, makes it vanish
+(51/51 across fresh-container suite runs that previously failed every
+time). Deleted-but-uncollected vertices from the wiped world were
+getting bound into path materialization.
+
+The fix is a `wipe()` helper — bulk delete plus forced GC — at every
+full-wipe call site, all of which are test fixtures and benchmarks;
+the ingest never bulk-deletes. The endpoint guard stays in the query
+layer permanently, and the upstream report is tracked in
+[#36](https://github.com/fespino/resgraph/issues/36). Two lessons
+earned their place here: when output is *impossible* rather than
+wrong, instrument the boundary instead of debugging your own code —
+and a guard that dumps the entire artifact turns a flaky assertion
+into a one-shot diagnostic.
+
 ## What I'd take to the next project
 
 - **Read the shape, not just the number.** A flat curve where you expected

@@ -79,6 +79,15 @@ present technical need; the spec says so in those words, with a
 reversal condition that evicts the format if it never earns more than
 the costs measured below.
 
+!!! note "Update: the eviction notice expired unused"
+    One phase later, the reversal condition was discharged the honest
+    way rather than quietly forgotten: a second engine — DuckDB's own
+    Iceberg reader, no pyiceberg involved — reads the events table
+    from its metadata file alone and, loaded with the repo's shipped
+    SQL semantics, reproduces `state_at(T)` exactly, duplicates and
+    all. The interop this paragraph promises is now a passing test
+    instead of a claim.
+
 ## Two clocks
 
 Iceberg's native time travel lets you query any table as of a past

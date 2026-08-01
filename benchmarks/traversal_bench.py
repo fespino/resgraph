@@ -18,7 +18,7 @@ from resgraph.gen.world import World
 from resgraph.graph.client import get_driver
 from resgraph.graph.loader import load_snapshot
 from resgraph.graph.queries import DEP_EDGES
-from resgraph.graph.schema import init_schema
+from resgraph.graph.schema import init_schema, wipe
 
 PG = "postgresql://postgres:resgraph@localhost:5433/postgres"
 SEED, RUNS, N_TARGETS, DEPTHS = 42, 5, 20, (3, 5)
@@ -50,7 +50,7 @@ def load_stores(size: int) -> tuple[World, list[str]]:
     print(f"# world {size}: {len(w.alive_ids())} resources", file=sys.stderr)
     d = get_driver()
     with d.session() as s:
-        s.run("MATCH (n) DETACH DELETE n").consume()
+        wipe(s)
         init_schema(s)
         counts = load_snapshot(s, Churn(w).snapshot())
     d.close()

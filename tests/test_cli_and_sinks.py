@@ -103,6 +103,7 @@ def test_gen_run_duration_bounded(monkeypatch):
 def test_platform_cli_end_to_end():
     from resgraph.cli import app as plat_app
     from resgraph.graph.client import get_driver
+    from resgraph.graph.schema import wipe
 
     try:
         d = get_driver()
@@ -114,7 +115,7 @@ def test_platform_cli_end_to_end():
             raise
         pytest.skip("memgraph not reachable")
     with d.session() as s:
-        s.run("MATCH (n) DETACH DELETE n").consume()
+        wipe(s)
     d.close()
 
     snap = runner.invoke(gen_app, ["seed", "--seed", "9", "--resources", "80"])

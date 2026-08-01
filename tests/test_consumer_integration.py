@@ -20,7 +20,7 @@ from resgraph.gen.world import World
 from resgraph.graph import ingest
 from resgraph.graph.client import get_driver
 from resgraph.graph.consumer import Consumer
-from resgraph.graph.schema import init_schema
+from resgraph.graph.schema import init_schema, wipe
 from resgraph.schema import Op, UpdateMessage
 
 pytestmark = pytest.mark.integration
@@ -71,7 +71,7 @@ def stream(redis_client, request):
 
 @pytest.fixture()
 def clean_store(session):
-    session.run("MATCH (n) DETACH DELETE n").consume()
+    wipe(session)
     yield session
 
 

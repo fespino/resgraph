@@ -361,6 +361,24 @@ evolution via a `schema_version` bump — the format is decoration:
 either exercise one deliberately or swap to plain parquet and record
 the simplification.
 
+**Likely resolutions, identified in advance** (so the serving-layer
+phase inherits a checklist, not a threat): (1) snapshot-pinned
+pagination cursors in the API phase — a frozen view across pages of a
+growing table is Iceberg-exclusive; (2) agent forensics — "what did
+the system know when the agent acted" is a *commit-time* question
+(D13's rejection covers world-time questions only), answered by
+pinning the snapshot ID in the agent's run record; (3) a rollback
+drill in the incident-runbook phase (bad batch → roll back →
+re-consume → reconcile); (4) write-audit-publish if D12's compaction
+trigger ever fires; (5) incremental snapshot scans as an
+eviction-proof tail for slow subscribers (heals D12's maxlen
+limitation for table-tailing consumers) — **with the coupling this
+creates recorded now: `cold maintain` currently expires all
+non-current snapshots, which would strand an incremental tailer;
+retention must become subscriber-aware (expire nothing newer than the
+slowest tailer's resume point) before (5) ships**; (6) the snapshot
+log as change-management evidence in the compliance phase.
+
 ### D12 — Cold layout: an append-only event log plus derived snapshots
 
 Two tables:

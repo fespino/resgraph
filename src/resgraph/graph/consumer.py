@@ -15,19 +15,8 @@ __all__ = ["DEFAULT_STREAM", "Consumer"]
 
 
 class Consumer(StreamConsumer):
-    def __init__(
-        self,
-        redis_url: str,
-        session,
-        stream: str = DEFAULT_STREAM,
-        group: str = "resgraph-ingest",
-        name: str = "c1",
-        batch: int = 1024,
-        block_ms: int = 1000,
-    ) -> None:
+    def __init__(self, redis_url: str, session, **kwargs) -> None:
         def apply(msgs: list[UpdateMessage]) -> tuple[int, int]:
             return apply_batch(session, msgs)
 
-        super().__init__(
-            redis_url, apply, stream=stream, group=group, name=name, batch=batch, block_ms=block_ms
-        )
+        super().__init__(redis_url, apply, **kwargs)

@@ -11,7 +11,8 @@
 - docs/security-posture.md — every security control and why it exists
 - src/resgraph/graph/ — hot store client, DDL, snapshot loader, traversal queries (D8–D9),
   idempotent ingest apply (D3/D10)
-- src/resgraph/consumer.py — generic stream consumer loop (pending-first recovery, ack-after-apply)
+- src/resgraph/consumer.py — generic stream consumer loop (pending-first recovery,
+  ack-after-apply, apply-failure containment: retry/split/DLQ per D14 addendum)
 - src/resgraph/cold/ — Iceberg cold store: catalog/tables/appends, CLI (D11–D13)
 - src/resgraph/query/ — filter DSL, mini planner, execution over both stores (D16)
 - src/resgraph/api/ — FastAPI surface: budgets, labeled sources, lazy explain (D15)

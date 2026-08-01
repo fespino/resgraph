@@ -209,6 +209,6 @@ def test_poison_entry_is_dropped_not_wedged(redis_client, clean_store, stream):
     consumer = Consumer(REDIS_URL, clean_store, stream=stream, group="g-poison", name="c1")
     counters = consumer.run(exit_on_idle=True)
     consumer.close()
-    assert counters == {"read": 3, "applied": 1, "skipped": 0, "invalid": 2}
+    assert counters == {"read": 3, "applied": 1, "skipped": 0, "invalid": 2, "dead_lettered": 0}
     assert redis_client.xpending(stream, "g-poison")["pending"] == 0
     assert ingest.read_node(clean_store, good.resource_id) is not None

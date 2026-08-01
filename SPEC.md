@@ -312,6 +312,47 @@ notifiers, a different tool.
 idempotent-or-dedupable may not use this model — it would need the
 outbox D3 already points to.
 
+**D14 addendum — apply-failure containment (#44).** Parse poison was
+always handled (count, log, ack); a message that parses and then makes
+the apply raise had no story: unacked batch, crash, redelivery of the
+same batch — a deterministic apply failure was an infinite crash loop.
+Three mechanisms close it, all in `StreamConsumer` so both stores
+inherit them:
+
+- **Retry with backoff, then binary split.** An apply exception fails
+  the whole batch (batch atomicity is correct) but no longer kills the
+  loop: the batch retries with exponential backoff; if retries
+  exhaust, it splits in halves — one attempt each, recursing — until
+  the poisonous entry is isolated. D3 makes the re-application safe:
+  a replayed sub-batch cannot double-apply. Halving finds one poison
+  in a 1024-entry batch in ~10 applies; item-by-item would take 1024.
+  The split phase deliberately does NOT re-run the backoff ladder: the
+  full batch already survived it, so a residual failure is treated as
+  deterministic. A transient error surviving that far can wrongly
+  dead-letter an innocent entry — accepted, because that failure is
+  *visible and replayable* (the DLQ keeps the payload) while the
+  alternative failure mode (retry forever) is an invisible liveness
+  loss.
+- **Delivery-cap quarantine.** In-process retries never bump Redis's
+  delivery counter, so the cap (`XPENDING`'s `times_delivered` > 5)
+  is purely a cross-restart guard: an entry that keeps arriving in
+  the pending drain after repeated crashes goes to the dead-letter
+  stream instead of another lap.
+- **The DLQ is `<stream>:dlq`** — original payload, error, source
+  entry id, delivery count. Apply-poison keeps its payload because a
+  valid message that failed to apply may be replayable after a fix;
+  parse-poison stays ack-and-drop (unparseable bytes have no replay
+  story). Counters gain `dead_lettered`; nonzero means read the DLQ.
+
+**Rejected:** item-by-item apply on failure (O(n) transactions at
+batch 1024 vs O(log n)); unlimited retries (the crash loop this
+fixes); automatic DLQ replay (replay is a human decision here — an
+automated replayer would need its own design, though D3 already makes
+manual re-ingestion of DLQ entries safe).
+**Reversal condition:** if DLQ entries ever accumulate faster than a
+human triages them, that is the trigger for the automated replayer —
+designed then, with its own D-number.
+
 ## Phase 4 — the cold store
 
 ### D11 — Cold store engine: Iceberg via pyiceberg, queried through DuckDB

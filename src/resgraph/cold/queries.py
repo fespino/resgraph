@@ -78,16 +78,38 @@ def _latest_snapshot(catalog, t: datetime) -> tuple[pa.Table, int]:
     return base, wm
 
 
-def state_at(catalog, t: datetime, use_snapshots: bool = True) -> list[dict]:
-    """World state at event time t — one dict per alive resource."""
+def state_at(
+    catalog,
+    t: datetime,
+    use_snapshots: bool = True,
+    where: str | None = None,
+    params: dict | None = None,
+    annotate: bool = False,
+) -> list[dict]:
+    """World state at event time t — one dict per alive resource.
+
+    `where` is a D16-planner-compiled predicate over the state columns.
+    annotate=False filters the result; annotate=True keeps every row and
+    adds a `matched` bool instead — the composite route needs the full
+    topology to traverse, with predicate evaluation still in DuckDB.
+    """
     base, wm = _latest_snapshot(catalog, t) if use_snapshots else (_EMPTY_BASE, -1)
     con = duckdb.connect()
     con.register("base", base)
     con.register("events", _events_arrow(catalog, min_sequence=wm))
-    rows = con.execute(_STATE_SQL, {"t": t, "wm": wm}).arrow().read_all().to_pylist()
+    sql = _STATE_SQL
+    if where and annotate:
+        sql = f"SELECT *, ({where}) AS matched FROM ({_STATE_SQL})"
+    elif where:
+        sql = f"SELECT * FROM ({_STATE_SQL}) WHERE {where}"
+    rows = (
+        con.execute(sql, {"t": t, "wm": wm, **(params or {})}).arrow().read_all().to_pylist()
+    )
     for r in rows:
         r["attrs"] = json.loads(r["attrs"])
         r["relationships"] = json.loads(r["relationships"])
+        if annotate:
+            r["matched"] = bool(r.get("matched")) if where else True
     return rows
 
 

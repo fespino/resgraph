@@ -113,6 +113,17 @@ recorded that I'd done so. Recording the disagreement is the discipline
 visibly working — a later reader sees not just what the code does but
 that the choice was deliberate.
 
+This pattern has a canonical name — Alexis King's
+["Parse, don't validate"](https://lexi-lambda.github.io/blog/2019/11/05/parse-don-t-validate/):
+a parser turns less-structured input into a type in which the illegal
+states cannot exist, so downstream code never apologizes for its
+inputs. The schema here is a parser, not a checklist — a naive
+timestamp, a payload-carrying delete, a v2 wearing v1's shape: none of
+them can be *represented* past this boundary. That framing later paid
+for itself directly, when applying the essay's lens to the grown
+codebase surfaced an invariant two components relied on that no type
+enforced — but that's a later phase's story.
+
 One small decision that looks wrong until you see it: the schema version
 is typed as `Literal[1]`, a single allowed value, not a general integer.
 That feels needlessly rigid until you realize it's the *versioning hook*.

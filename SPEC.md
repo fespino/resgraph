@@ -70,6 +70,30 @@ trivial and matches how real inventory APIs (cloud asset feeds) behave.
 dominating write cost at fleet scale, introduce `relationships_diff` as
 schema_version 2, additive.
 
+**D2 addendum (phase 4, tightening — after King's
+["Parse, don't validate"](https://lexi-lambda.github.io/blog/2019/11/05/parse-don-t-validate/)):**
+two coherence rules move into the parser, where the schema's other
+invariants already live:
+
+- **`resource_id`'s prefix MUST equal `resource_type`.** The invariant
+  was unstated and relied on: the snapshot loader keys node labels off
+  `resource_type`, the ingest off the id prefix — a message where the
+  two disagreed parsed cleanly and would have materialized *different
+  nodes* depending on which write path it took. That message is now
+  unrepresentable.
+- **`relationships[].target_id`'s prefix MUST be a known resource
+  type.** Previously enforced mid-transaction inside the ingest apply
+  (shotgun-style); now a parse error at the boundary. The remaining
+  in-consumer checks demote to defense-in-depth where derived strings
+  enter query text.
+
+This *tightens* the accepted-message set: incoherent producers that
+were previously half-accepted (inconsistently, per path) are now
+rejected at parse time. The essay is the standing guide for this
+schema: an invariant a consumer relies on belongs in the type, not in
+the consumer — `label_for()` remains the parse point for the one
+boundary raw strings still cross (user-supplied query ids).
+
 ### D3 — Idempotency: per-resource applied-sequence watermark
 
 Each resource node in the hot store carries `applied_seq` (uint64). The

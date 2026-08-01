@@ -5,10 +5,12 @@
 | Name                               |    Stmts |     Miss |   Cover |   Missing |
 |----------------------------------- | -------: | -------: | ------: | --------: |
 | src/resgraph/\_\_init\_\_.py       |        0 |        0 |    100% |           |
-| src/resgraph/cli.py                |       64 |       10 |     84% |29-31, 54-62 |
+| src/resgraph/api/\_\_init\_\_.py   |        0 |        0 |    100% |           |
+| src/resgraph/api/app.py            |      123 |       23 |     81% |116-118, 121-123, 130, 157-167, 199-200, 224-225, 227, 243, 268 |
+| src/resgraph/cli.py                |       68 |       12 |     82% |29-31, 54-62, 93-95 |
 | src/resgraph/cold/\_\_init\_\_.py  |        0 |        0 |    100% |           |
 | src/resgraph/cold/cli.py           |       46 |       24 |     48% |17, 23-24, 39-50, 58-59, 69-76, 85, 94, 101 |
-| src/resgraph/cold/queries.py       |       73 |        8 |     89% |162-164, 176-178, 180, 185 |
+| src/resgraph/cold/queries.py       |       92 |        9 |     90% |137, 217-219, 231-233, 235, 240 |
 | src/resgraph/cold/rebuild.py       |       20 |        3 |     85% |     46-48 |
 | src/resgraph/cold/store.py         |       57 |        2 |     96% |   72, 120 |
 | src/resgraph/consumer.py           |       65 |        6 |     91% |67, 79, 82, 97, 99-100 |
@@ -22,10 +24,14 @@
 | src/resgraph/graph/consumer.py     |        9 |        0 |    100% |           |
 | src/resgraph/graph/ingest.py       |       89 |        4 |     96% |100, 152, 246, 283 |
 | src/resgraph/graph/loader.py       |       28 |        0 |    100% |           |
-| src/resgraph/graph/queries.py      |       40 |        0 |    100% |           |
+| src/resgraph/graph/queries.py      |       45 |        0 |    100% |           |
 | src/resgraph/graph/schema.py       |       19 |        0 |    100% |           |
+| src/resgraph/query/\_\_init\_\_.py |        0 |        0 |    100% |           |
+| src/resgraph/query/dsl.py          |       42 |        1 |     98% |        51 |
+| src/resgraph/query/executor.py     |       77 |        7 |     91% |41, 46, 48, 56, 60, 70-71 |
+| src/resgraph/query/planner.py      |       83 |        2 |     98% |   74, 101 |
 | src/resgraph/schema.py             |       49 |        0 |    100% |           |
-| **TOTAL**                          |  **816** |   **67** | **92%** |           |
+| **TOTAL**                          | **1169** |  **103** | **91%** |           |
 
 
 ## Setup coverage badge

@@ -51,6 +51,16 @@ jobs:
         name: bandit
         run: uv run bandit -c pyproject.toml -r src/ -q
         continue-on-error: true
+      - id: promtool
+        name: promtool (SLO rules)
+        # rules checked AND unit-tested (synthetic series -> alert must
+        # fire); runs in the same digest-pinned image compose uses, so
+        # the promtool that gates CI is the prometheus that evaluates
+        # in the obs profile (D18)
+        run: |
+          docker run --rm -v "$PWD/observability/rules:/rules:ro" --entrypoint promtool prom/prometheus:v3.9.1@sha256:1f0f50f06acaceb0f5670d2c8a658a599affe7b0d8e78b898c1035653849a702 check rules /rules/slo.yml
+          docker run --rm -v "$PWD/observability/rules:/rules:ro" --entrypoint promtool prom/prometheus:v3.9.1@sha256:1f0f50f06acaceb0f5670d2c8a658a599affe7b0d8e78b898c1035653849a702 test rules /rules/slo_test.yml
+        continue-on-error: true
       - id: tests
         name: pytest
         # pipefail is load-bearing: without it the step's exit code is
@@ -76,6 +86,7 @@ jobs:
             echo "| ruff check | $(s "${{ steps.lint.outcome }}") |"
             echo "| ruff format | $(s "${{ steps.format.outcome }}") |"
             echo "| bandit | $(s "${{ steps.bandit.outcome }}") |"
+            echo "| promtool | $(s "${{ steps.promtool.outcome }}") |"
             echo "| pytest | $(s "${{ steps.tests.outcome }}") — $(tail -1 pytest.out) |"
           } > ci-summary.md
           cat ci-summary.md >> "$GITHUB_STEP_SUMMARY"
@@ -97,5 +108,5 @@ jobs:
           name: python-coverage-comment-action
           path: python-coverage-comment-action.txt
       - name: Gate
-        if: steps.lint.outcome == 'failure' || steps.format.outcome == 'failure' || steps.bandit.outcome == 'failure' || steps.tests.outcome == 'failure'
+        if: steps.lint.outcome == 'failure' || steps.format.outcome == 'failure' || steps.bandit.outcome == 'failure' || steps.promtool.outcome == 'failure' || steps.tests.outcome == 'failure'
         run: exit 1

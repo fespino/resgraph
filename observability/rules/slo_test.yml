@@ -1,0 +1,53 @@
+# promtool unit tests — alerting rules are the least-tested code in
+# most shops; these feed synthetic series and assert the alerts fire
+# (and, just as important, don't fire on healthy series).
+rule_files:
+  - slo.yml
+
+evaluation_interval: 15s
+
+tests:
+  - interval: 15s
+    input_series:
+      # lag pinned far above the 31,500 threshold for 10 minutes
+      - series: 'ingest_lag{worker="w1"}'
+        values: "80000+0x40"
+    alert_rule_test:
+      - eval_time: 8m
+        alertname: IngestFreshnessFastBurn
+        exp_alerts:
+          - exp_labels:
+              slo: ingest-freshness
+            exp_annotations:
+              summary: >-
+                Ingest freshness burning >=6x sustainable rate: the
+                consumer is falling behind faster than the run's budget
+                allows.
+
+  - interval: 15s
+    input_series:
+      # healthy: lag well under threshold the whole time
+      - series: 'ingest_lag{worker="w1"}'
+        values: "1000+0x40"
+    alert_rule_test:
+      - eval_time: 8m
+        alertname: IngestFreshnessFastBurn
+        exp_alerts: []
+
+  - interval: 15s
+    input_series:
+      # composite: 10 requests per interval, only half within 0.6s
+      - series: 'api_request_seconds_bucket{source="composite",le="0.6",route="/blast-radius/{resource_id}"}'
+        values: "0+5x40"
+      - series: 'api_request_seconds_count{source="composite",route="/blast-radius/{resource_id}"}'
+        values: "0+10x40"
+    alert_rule_test:
+      - eval_time: 8m
+        alertname: CompositeLatencyFastBurn
+        exp_alerts:
+          - exp_labels:
+              slo: composite-latency
+            exp_annotations:
+              summary: >-
+                Composite latency burning >=6x sustainable rate: under
+                70% of composite requests are answering within 0.6s.

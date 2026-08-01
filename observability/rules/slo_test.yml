@@ -51,3 +51,15 @@ tests:
               summary: >-
                 Composite latency burning >=6x sustainable rate: under
                 70% of composite requests are answering within 0.6s.
+
+  - interval: 15s
+    input_series:
+      # healthy: 10 requests per interval, 9 within 0.6s (0.90 > 0.70)
+      - series: 'api_request_seconds_bucket{source="composite",le="0.6",route="/blast-radius/{resource_id}"}'
+        values: "0+9x40"
+      - series: 'api_request_seconds_count{source="composite",route="/blast-radius/{resource_id}"}'
+        values: "0+10x40"
+    alert_rule_test:
+      - eval_time: 8m
+        alertname: CompositeLatencyFastBurn
+        exp_alerts: []

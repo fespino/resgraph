@@ -43,6 +43,25 @@ def load_snapshot_cmd() -> None:
     typer.echo(json.dumps(counts))
 
 
+@app.command("rebuild")
+def rebuild_cmd(
+    at: str = typer.Option(None, help="Event time (ISO); defaults to newest cold event."),
+) -> None:
+    """Rebuild the hot store from cold history into an EMPTY store (DR).
+
+    Watermarks are restored from the log, so resuming `resgraph ingest`
+    afterwards is safe — replayed history is skipped, not re-applied."""
+    from datetime import datetime
+
+    from resgraph.cold import store as cold_store
+    from resgraph.cold.rebuild import rebuild
+
+    catalog = cold_store.get_catalog()
+    with _session() as s:
+        result = rebuild(s, catalog, datetime.fromisoformat(at) if at else None)
+    typer.echo(json.dumps(result))
+
+
 @app.command("ingest")
 def ingest_cmd(
     redis_url: str = typer.Option("redis://localhost:6379"),

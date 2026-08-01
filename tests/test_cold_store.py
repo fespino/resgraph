@@ -188,3 +188,68 @@ def test_cold_consumer_crash_causes_duplicates_not_wrong_answers(tmp_path):
     assert total_rows == len(MSGS) + len(crashed_batch)  # duplicates exist...
     t = MSGS[-1].event_time
     _assert_state_matches(queries.state_at(cat, t), _oracle(MSGS, t))  # ...answers don't
+
+
+# --- rebuild-from-cold: the DR drill (needs memgraph) --------------------
+
+
+@pytest.mark.integration
+def test_rebuild_from_cold_restores_state_and_watermarks(tmp_path):
+    """Kill the hot store, rebuild from the log, and prove three things:
+    state matches the oracle, the watermarks survived (stale replay
+    skips), and post-rebuild ingest of newer events applies normally."""
+    from resgraph.cold.rebuild import rebuild
+    from resgraph.graph import ingest
+    from resgraph.graph.client import get_driver
+    from resgraph.graph.schema import wipe
+
+    try:
+        driver = get_driver()
+        driver.verify_connectivity()
+    except Exception:
+        if os.environ.get("RESGRAPH_REQUIRE_STORES"):
+            raise
+        pytest.skip("memgraph not reachable (docker compose up -d memgraph)")
+
+    cat = store.get_catalog(tmp_path)
+    store.ensure_tables(cat)
+    cut = len(MSGS) - 50  # rebuild at T, with 50 newer events still in the log
+    t = MSGS[cut - 1].event_time
+    store.append_events(cat, MSGS)
+
+    expected = _oracle(MSGS, t)
+    with driver.session() as s:
+        wipe(s)  # the disaster
+        result = rebuild(s, cat, t)
+        assert result["nodes"] == len(expected)
+
+        # state matches the oracle, watermark included
+        for rid, m in expected.items():
+            node = ingest.read_node(s, rid)
+            assert node is not None and node["attrs"] == dict(m.attrs), rid
+            assert node["applied_seq"] == m.sequence, rid
+
+        # stale replay is a no-op: every pre-T message skips
+        for m in MSGS[: cut - 1 : 37]:  # a stride of old messages
+            assert ingest.apply_message(s, m) is False, m.sequence
+
+        # the resurrection guard: a resource dead at T must keep its
+        # tombstone watermark, so its own OLD upserts skip too
+        dead = {d["resource_id"]: d for d in queries.tombstones_at(cat, t)}
+        assert dead, "fixture must contain at least one pre-T deletion"
+        revived = 0
+        for m in MSGS[: cut - 1]:
+            if m.resource_id in dead and m.op is Op.UPSERT:
+                assert ingest.apply_message(s, m) is False, m.resource_id
+                revived += 1
+        assert revived > 0  # the guard was actually exercised
+
+        # the stream tail applies normally on resume
+        applied, _ = ingest.apply_batch(s, MSGS[cut:])
+        assert applied > 0
+        t_end = MSGS[-1].event_time
+        final = _oracle(MSGS, t_end)
+        got = {r["resource_id"] for r in queries.state_at(cat, t_end)}
+        alive_hot = {rid for rid in got if (n := ingest.read_node(s, rid)) and not n["deleted"]}
+        assert alive_hot == set(final)
+    driver.close()

@@ -208,29 +208,38 @@ separately — the distinction turned out to be the finding.
 | append | 200k | 1,024 | 24.3k events/s |
 | append | 200k | 8,192 | **194k events/s** |
 | append | 200k | 65,536 | 222k events/s |
+| append, sustained | 1M | 1,024 | **5,635 events/s** (see compounding note) |
 | append, sustained | 1M | 8,192 | **136.5k events/s** |
 | `state_at` p50, snapshots on | 1M | — | **0.17–0.39 s** (25%→95% marks) |
 | `state_at` p50, pure replay | 1M | — | 0.21–0.55 s |
 | snapshot materialization | 1M | — | 0.54 s each |
 | storage, data / total | 1M | 8,192 | **18 MB / 25 MB** (123 files) |
+| storage, data / total | 1M | 1,024 | 22.9 MB / **363.5 MB** (977 files) |
 | storage, data / total | 200k | 1,024 | 4.1 MB / **20.8 MB** (196 files) |
 
 ### Findings (the numbers argue with each other, usefully)
 
-**Commit granularity inverts the hot store's knee.** The hot ingest
-measured 1,024 as its batch sweet spot with 2,048 regressing; the cold
-path is the opposite — 1,024 costs 8× the throughput of 8,192, because
-every batch is an Iceberg commit (manifest write + metadata swap) and
-commit overhead dominates small appends. Same stream, two sinks,
-opposite optima: that is why the batch size is a per-sink knob, not a
-shared constant.
+**Commit granularity inverts the hot store's knee — and the penalty
+compounds.** The hot ingest measured 1,024 as its batch sweet spot
+with 2,048 regressing; the cold path is the opposite, and worse than
+the sweep suggests. At 200k events, batch 1,024 costs 8× the
+throughput of 8,192. Run the same configuration to 1M and it degrades
+to **5,635 events/s — 24× slower** — because each Iceberg commit
+rewrites metadata that grows with the table's accumulated snapshots
+and manifests: the small-batch tax is not a constant, it compounds
+with table history (177 s of append time at 1M vs the ~41 s the 200k
+rate would predict). Same stream, two sinks, opposite optima — and a
+sweep at one scale does not extrapolate; the 1M row exists because a
+review question forced the measurement.
 
-**Commit granularity is also a storage decision.** At batch 1,024 the
-Iceberg *metadata* runs 4–5× the size of the *data* (20.8 MB total
-around 4.1 MB of parquet at 200k), and it compounds with commit count:
-the first 1M-event ingest ran at consumer-default batching and left
-**366 MB** on disk — versus **25 MB** for the same events at batch
-8,192. The data was never the problem; a thousand small commits were.
+**Commit granularity is also a storage decision.** Same million
+events, same method: **363.5 MB total at batch 1,024** (977 files)
+versus **25.2 MB at 8,192** (123 files) — while the parquet data is
+18–23 MB either way (the spread itself is small-files row-group
+overhead). The data was never the problem; a thousand commits'
+metadata was. (An earlier ad-hoc ingest showed ~366 MB by `du` on
+mixed stream content — directionally right, methodologically loose;
+the numbers above are the same-generator, same-method measurement.)
 
 **Replay is already fast; snapshots buy the tail.** Pure event replay
 answers `state_at` on a 1M-event history in 0.21–0.55 s — DuckDB over

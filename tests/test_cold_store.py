@@ -249,9 +249,14 @@ def test_rebuild_from_cold_restores_state_and_watermarks(tmp_path):
         assert applied > 0
         t_end = MSGS[-1].event_time
         final = _oracle(MSGS, t_end)
+        # same world means same world: alive set, attrs, and watermarks
         got = {r["resource_id"] for r in queries.state_at(cat, t_end)}
         alive_hot = {rid for rid in got if (n := ingest.read_node(s, rid)) and not n["deleted"]}
         assert alive_hot == set(final)
+        for rid, m in final.items():
+            node = ingest.read_node(s, rid)
+            assert node["attrs"] == dict(m.attrs), rid
+            assert node["applied_seq"] == m.sequence, rid
     driver.close()
 
 

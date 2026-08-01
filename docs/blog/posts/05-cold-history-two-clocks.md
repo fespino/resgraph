@@ -92,6 +92,18 @@ from ingestion bookkeeping. The decision (D13 in the spec) locks that
 in: Iceberg snapshots remain physical machinery; questions about the
 past are answered from event time, always.
 
+Event time carries its own caveat, and it deserves stating rather
+than burying: an as-of answer is only as complete as ingestion. Ask
+about a very recent T while the cold consumer lags and the answer is
+provisional — stragglers still in the stream will change it once they
+land. Every event-time system has this completeness problem (it is
+why stream processors grew their own notion of watermarks); this
+platform's version is unusually tame — a single producer assigning
+monotone sequences means an answer at T is final as soon as the
+consumer's position passes T — but "check the consumer's lag before
+trusting a fresh timestamp" is part of the query contract, not an
+operational footnote.
+
 ## The benchmark: last phase's advice, inverted
 
 The hot-store phase measured batch size 1,024 as its throughput sweet
@@ -102,24 +114,31 @@ image:
 |---|---|---|---|
 | append | 200k | 1,024 | 24.3k events/s |
 | append | 200k | 8,192 | **194k events/s** |
+| append, sustained | 1M | 1,024 | **5,635 events/s** |
 | append, sustained | 1M | 8,192 | **136.5k events/s** |
 | `state_at` p50, snapshots on | 1M | — | 0.17–0.39 s |
-| storage, data / total | 1M | 8,192 | 18 MB / 25 MB |
+| storage, data / total | 1M | 1,024 | 22.9 MB / **363.5 MB** |
+| storage, data / total | 1M | 8,192 | 18 MB / **25 MB** |
 
-Batch 1,024 costs **eight times** the throughput of 8,192, because
-every batch is an Iceberg commit — a manifest write and an atomic
-metadata swap — and commit overhead dominates small appends. Same
-stream, two sinks, opposite optima: the number that tuned the hot
-consumer would have crippled the cold one, which is the concrete
-argument for per-sink batch knobs over shared constants.
+At 200k events, batch 1,024 costs eight times the throughput of
+8,192, because every batch is an Iceberg commit — a manifest write
+and an atomic metadata swap — and commit overhead dominates small
+appends. But the sweep number does not extrapolate, and the reason is
+the sharper finding: run the same 1,024 configuration to a million
+events and it degrades to 5,635 events/s — **24× slower** — because
+each commit rewrites metadata that grows with the table's accumulated
+snapshots and manifests. The small-batch tax is not a constant; it
+compounds with table history. Same stream, two sinks, opposite
+optima: the number that tuned the hot consumer would have crippled
+the cold one — the argument for per-sink batch knobs, and for
+re-running sweeps at the scale you intend to operate.
 
-The second finding hides in the storage column. The first 1M-event
-ingest ran at the hot consumer's default batching and left **366 MB**
-on disk. The same events at batch 8,192: **25 MB**. The data was never
-the problem — eighteen megabytes of parquet either way. The other ~340
-MB was Iceberg *metadata*, compounding across a thousand small
-commits. Commit granularity turned out to be a storage decision, not
-just a latency one.
+The second finding is the storage column. The same million events
+cost **363.5 MB** at batch 1,024 and **25 MB** at 8,192 — while the
+parquet *data* is 18–23 MB either way (even that spread is the
+small-files cost, in row-group form). Everything else is Iceberg
+metadata, compounding across a thousand commits. Commit granularity
+turned out to be a storage decision, not just a latency one.
 
 The footnote to the remedy: expiring old snapshots (every
 commit is one) pruned the metadata log from 196 entries to 1 and freed

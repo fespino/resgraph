@@ -88,8 +88,7 @@ def test_reconcile_detects_hot_divergence(stores):
         apply_batch(session, msgs[snap_n:])
 
 
-def test_oracle_catches_a_message_both_stores_missed(stores, tmp_path_factory):
-    session, cat, msgs = stores
+def test_oracle_catches_a_message_both_stores_missed(tmp_path_factory):
     churn = Churn(World(SEED, RESOURCES))
     fed = list(churn.snapshot()) + [churn.next_message() for _ in range(CHURN - 1)]
     tail = churn.next_message()  # the message "evicted" before either store saw it

@@ -50,7 +50,15 @@ take the newest snapshot at or before T, replay the events above its
 watermark, let the highest sequence per resource win, treat deletes as
 absence. That is the same shape the hot store's own recovery uses, and
 the same shape databases have always been underneath — the log is the
-truth, everything else is a view that can be rebuilt from it.
+truth, everything else is a view that can be rebuilt from it. The
+canonical argument for that sentence is Jay Kreps'
+["The Log"](https://www.linkedin.com/blog/engineering/distributed-systems/log-what-every-software-engineer-should-know-about-real-time-datas-unifying);
+this phase is a small working proof of it, with one deviation worth
+naming: where Kafka unifies the subscribable log and the durable log,
+this design splits them — the stream transports, the events table
+remembers — which is why new consumers here bootstrap from the cold
+store and then tail the stream, rather than replaying a topic from
+offset zero.
 
 Delivery is at-least-once and the writer stays deliberately dumb:
 duplicate appends are legal, and readers dedupe on

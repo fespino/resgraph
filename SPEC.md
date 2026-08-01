@@ -351,6 +351,12 @@ DISTINCT dedupe.
 file explosion per partition; hidden partitioning does not save a bad
 spec. (`resource_type` as a second partition dimension is deferred
 until a measured query wants the pruning.)
+**Rejected:** log compaction as the stream-retention strategy (retain
+the latest record per key — keyspace-bounded, and a compacted log can
+bootstrap subscribers forever) — Redis Streams has no native
+compaction, and in this design the cold store plays that role:
+`state_snapshots` is the compacted view, `events` is the full log,
+and the stream stays transport.
 **Reversal condition:** if the benchmark shows read-side dedupe
 dominating as-of latency at target scale, add a compaction job that
 rewrites deduped partitions — the read semantics stay identical.
@@ -375,6 +381,28 @@ first time history is replayed.
 **Reversal condition:** none foreseen for the semantics; if the
 checkpoint-plus-log implementation misses the D4 as-of budget, tune
 snapshot cadence or add partition pruning before touching semantics.
+
+**D12/D13 addendum (reviewed against Kreps' "The Log"):** this design
+splits what Kafka unifies — the *subscribable* log (Redis stream,
+ephemeral) and the *durable* log (the events table). Two consequences,
+named so they stop being implicit:
+
+- **New subscribers cannot bootstrap from the stream.** The platform's
+  onboarding pattern is state-transfer-plus-tail: bootstrap from the
+  cold store (`state_at`, or a full events replay for
+  history-dependent consumers), then tail the stream — replayed
+  overlap is absorbed by the consumer's own idempotency/dedupe.
+  `rebuild` is this pattern's first instance, not a special case.
+- **Reprocessing (projection evolution) is replay from the events
+  table.** Today, state-at-T rebuild is provably equivalent to a full
+  replay for the hot store: convergence (D10) makes final state a pure
+  function of each resource's highest-sequence message, so both paths
+  land identically. That equivalence **breaks for history-dependent
+  projections** (change counters, churn rates, edge history).
+  **Trigger:** when the first such projection arrives, build
+  replay-from-cold (events scanned in sequence order, fed through the
+  consumer's apply); until then, rebuild suffices and the property
+  suite carries the proof.
 
 ### D4 addendum — cold budgets
 

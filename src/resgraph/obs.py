@@ -93,6 +93,7 @@ _meter.create_observable_gauge(
     description="messages behind the stream head (broker's view)",
 )
 
+
 def init_metrics(port: int | None = None) -> None:
     """Install the SDK provider + Prometheus reader (idempotent).
 

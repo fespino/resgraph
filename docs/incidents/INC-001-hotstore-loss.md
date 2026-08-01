@@ -41,4 +41,4 @@ Three aborted drill runs, each a finding — recorded because an honest drill's 
 
 - [x] Outage-vs-poison exception classes (D14 supersession) — landed before the drill, verified by it
 - [x] Drill script hardened: constructed initial state, handshake waits, in-window gate, pattern kills
-- [ ] Contended-capacity note in BENCHMARKS: solo numbers carry an implicit "with nothing else running"
+- [x] Contended-capacity note in BENCHMARKS: solo numbers carry an implicit "with nothing else running"

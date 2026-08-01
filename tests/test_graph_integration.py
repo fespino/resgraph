@@ -15,7 +15,7 @@ from resgraph.gen.world import World
 from resgraph.graph import queries
 from resgraph.graph.client import cypher, get_driver
 from resgraph.graph.loader import StoreNotEmptyError, load_snapshot
-from resgraph.graph.schema import init_schema, node_count
+from resgraph.graph.schema import init_schema, node_count, wipe
 
 pytestmark = pytest.mark.integration
 
@@ -39,7 +39,7 @@ def session():
 @pytest.fixture(scope="session")
 def world(session):
     s = session
-    s.run("MATCH (n) DETACH DELETE n").consume()
+    wipe(s)
     init_schema(s)
     w = World(SEED, RESOURCES)
     counts = load_snapshot(s, Churn(w).snapshot())

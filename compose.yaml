@@ -15,6 +15,9 @@ services:
     # -mage variant: the algorithm library costs nothing locally and
     # later statistical queries may want it. Memory-limited — the store
     # gets a budget like everything else.
+    # 3.12.0 (latest as of 2026-08-01). Affected by the BFS
+    # deleted-vertex anomaly (#36) — as is 3.11.0; wipe() is the
+    # workaround, so no version dodges it.
     image: memgraph/memgraph-mage@sha256:f252561ba38f4c5f530f9d0c7d916f47a37ed20fdfdcfd9b596ca149bd9a5fd8
     ports: ["7687:7687"]
     command: ["--log-level=WARNING", "--memory-limit=2048"]

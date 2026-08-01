@@ -40,3 +40,10 @@ def init_schema(session) -> None:
 
 def node_count(session) -> int:
     return session.run("MATCH (n) RETURN count(n) AS c").single()["c"]
+
+
+def wipe(session) -> None:
+    """Delete everything, then force storage GC. Without the GC pass,
+    BFS paths can bind deleted-but-uncollected vertices (issue #36)."""
+    session.run("MATCH (n) DETACH DELETE n").consume()
+    session.run("FREE MEMORY").consume()

@@ -30,7 +30,7 @@ from resgraph.gen.sinks import RedisSink
 from resgraph.gen.world import World
 from resgraph.graph.client import get_driver
 from resgraph.graph.consumer import Consumer
-from resgraph.graph.schema import init_schema
+from resgraph.graph.schema import init_schema, wipe
 
 REDIS_URL = "redis://localhost:6379"
 STREAM = "resgraph:bench:ingest"
@@ -62,7 +62,7 @@ def publish(resources: int, messages: int) -> int:
 def wipe_store() -> None:
     d = get_driver()
     with d.session() as s:
-        s.run("MATCH (n) DETACH DELETE n").consume()
+        wipe(s)
         init_schema(s)
     d.close()
 

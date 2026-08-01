@@ -47,6 +47,8 @@ class StreamConsumer:
         max_deliveries: int = 5,
         max_retries: int = 3,
         backoff_s: float = 0.5,
+        retryable_exceptions: tuple[type[BaseException], ...] = (),
+        outage_backoff_cap_s: float = 5.0,
     ) -> None:
         import redis
 
@@ -60,6 +62,8 @@ class StreamConsumer:
         self.max_deliveries = max_deliveries
         self.max_retries = max_retries
         self.backoff_s = backoff_s
+        self.retryable_exceptions = retryable_exceptions
+        self.outage_backoff_cap_s = outage_backoff_cap_s
         self.dlq = f"{stream}:dlq"
         self._attrs = {"worker": name}
         obs.register_lag_reader(name, self._read_lag)
@@ -161,13 +165,29 @@ class StreamConsumer:
             return
         msgs = [m for _, _, m in pairs]
         err = None
-        for attempt in range(retries + 1):
-            if attempt:
-                time.sleep(self.backoff_s * 2 ** (attempt - 1))
+        attempt = 0
+        outage_attempts = 0
+        while True:
             try:
                 t0 = time.perf_counter()
                 applied, skipped = self.apply_fn(msgs)
                 obs.BATCH_SECONDS.record(time.perf_counter() - t0, self._attrs)
+            except self.retryable_exceptions as e:
+                # Connection-class failure: the store is down, the
+                # messages are fine. Wait for it to come back — never
+                # counts as poison, never splits, never dead-letters
+                # (D14 supersession: outage is not poison).
+                outage_attempts += 1
+                if outage_attempts == 1 or outage_attempts % 20 == 0:
+                    log.warning(
+                        "store unavailable, holding %d entries (attempt %d): %s",
+                        len(msgs),
+                        outage_attempts,
+                        e,
+                    )
+                delay = self.backoff_s * 2 ** min(outage_attempts, 6)
+                time.sleep(min(delay, self.outage_backoff_cap_s))
+                continue
             except Exception as e:
                 err = e
                 log.warning(
@@ -177,6 +197,10 @@ class StreamConsumer:
                     retries + 1,
                     e,
                 )
+                attempt += 1
+                if attempt > retries:
+                    break
+                time.sleep(self.backoff_s * 2 ** (attempt - 1))
                 continue
             counters["applied"] += applied
             counters["skipped"] += skipped

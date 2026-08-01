@@ -353,6 +353,24 @@ manual re-ingestion of DLQ entries safe).
 human triages them, that is the trigger for the automated replayer —
 designed then, with its own D-number.
 
+**D14 addendum, superseded in part (phase 6, #54):** the containment
+above conflated two failure classes the drill was designed to expose:
+*this message is bad* and *the store is down*. A multi-minute outage
+would walk the entire in-flight backlog through retry → split → DLQ —
+quarantining healthy messages because their store was napping.
+Superseding rule: **outage is not poison.** Consumers declare
+connection-class exceptions (`retryable_exceptions`; the hot consumer
+passes the Bolt driver's ServiceUnavailable/SessionExpired/
+TransientError); those retry forever with capped backoff and never
+count toward the retry ladder, never split, never dead-letter — the
+messages are fine, the store will return, and D3 makes the eventual
+re-apply safe. Only apply-class errors walk the poison path.
+Acceptance: store down for minutes under load → DLQ stays flat
+(test_consumer_dlq.py, time-compressed; the drill runs it for real).
+**Rejected:** a circuit breaker pausing XREADGROUP — equivalent
+liveness, more state; the blocked apply already provides backpressure
+by construction (the consumer reads nothing while holding a batch).
+
 ## Phase 4 — the cold store
 
 ### D11 — Cold store engine: Iceberg via pyiceberg, queried through DuckDB

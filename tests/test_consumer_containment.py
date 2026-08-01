@@ -120,3 +120,47 @@ def test_deterministic_failure_exhausts_exactly_the_retry_ladder():
 
     assert calls["n"] == c.max_retries + 1
     assert counters["dead_lettered"] == 1 and len(stub.dlq) == 1
+
+
+class OutageError(Exception):
+    pass
+
+
+def test_outage_is_not_poison():
+    """Connection-class failures retry past every ladder and cap without
+    ever splitting or dead-lettering (D14 supersession)."""
+    entries, _ = _entries(8)
+    calls = {"n": 0}
+
+    def apply(batch):
+        calls["n"] += 1
+        if calls["n"] <= 25:  # far beyond max_retries=3 and the cap
+            raise OutageError("store down")
+        return (len(batch), 0)
+
+    c, stub = _consumer(apply)
+    c.retryable_exceptions = (OutageError,)
+    counters = _counters()
+    c._apply_batch(entries, counters)
+
+    assert calls["n"] == 26
+    assert counters["applied"] == 8 and counters["dead_lettered"] == 0
+    assert stub.dlq == []
+    assert sorted(stub.acked) == sorted(eid for eid, _ in entries)
+
+
+def test_poison_still_poisons_when_outage_class_is_declared():
+    entries, msgs = _entries(8)
+    poison = (msgs[3].resource_id, msgs[3].sequence)
+
+    def apply(batch):
+        if any((m.resource_id, m.sequence) == poison for m in batch):
+            raise RuntimeError("constraint violation")
+        return (len(batch), 0)
+
+    c, stub = _consumer(apply)
+    c.retryable_exceptions = (OutageError,)
+    counters = _counters()
+    c._apply_batch(entries, counters)
+
+    assert counters["dead_lettered"] == 1 and counters["applied"] == 7

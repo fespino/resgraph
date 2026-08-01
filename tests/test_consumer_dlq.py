@@ -157,3 +157,45 @@ def test_crash_looped_entries_quarantined_by_delivery_cap(redis_client, stream):
     assert len(dlq) == 3
     assert all(int(fields[b"deliveries"]) > 5 for _, fields in dlq)
     assert redis_client.xpending(stream, group)["pending"] == 0
+
+
+def test_store_outage_under_load_keeps_dlq_flat(redis_client, stream):
+    """The D14-supersession acceptance test, time-compressed: the
+    chapter-scale version is a 2-minute outage; here the 'store' rejects
+    every apply for the first second of wall time, then recovers. Under
+    the pre-supersession behavior every in-flight entry would walk
+    retry -> split -> DLQ; now the DLQ must stay flat and everything
+    applies after recovery."""
+    import time as _time
+
+    class StoreDown(Exception):
+        pass
+
+    msgs = _messages(60)
+    _fill(redis_client, stream, msgs)
+    deadline = _time.monotonic() + 1.0
+    applied = []
+
+    def apply(batch):
+        if _time.monotonic() < deadline:
+            raise StoreDown("connection refused")
+        applied.extend(batch)
+        return (len(batch), 0)
+
+    consumer = StreamConsumer(
+        REDIS_URL,
+        apply,
+        stream=stream,
+        group="g-outage",
+        name="c1",
+        block_ms=100,
+        backoff_s=0.05,
+        retryable_exceptions=(StoreDown,),
+    )
+    counters = consumer.run(exit_on_idle=True)
+    consumer.close()
+
+    assert counters["dead_lettered"] == 0
+    assert counters["applied"] == len(msgs)
+    assert not redis_client.exists(f"{stream}:dlq")
+    assert redis_client.xpending(stream, "g-outage")["pending"] == 0

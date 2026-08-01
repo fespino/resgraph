@@ -131,6 +131,39 @@ def diff(catalog, t1: datetime, t2: datetime) -> dict:
     }
 
 
+def tombstones_at(catalog, t: datetime) -> list[dict]:
+    """Resources whose last event at t is a delete — needed by rebuild:
+    without them, redelivered pre-t upserts would resurrect the dead.
+    Full event scan on purpose (no snapshot base): snapshots hold only
+    alive rows, so a delete below the snapshot watermark would hide."""
+    con = duckdb.connect()
+    con.register("events", _events_arrow(catalog))
+    return (
+        con.execute(
+            """
+            SELECT resource_id, resource_type, sequence, event_time
+            FROM (
+                SELECT DISTINCT resource_id, resource_type, sequence, event_time, op,
+                       row_number() OVER (PARTITION BY resource_id ORDER BY sequence DESC) AS rn
+                FROM events WHERE event_time <= $t
+            )
+            WHERE rn = 1 AND op = 'delete'
+            ORDER BY resource_id
+            """,
+            {"t": t},
+        )
+        .arrow()
+        .read_all()
+        .to_pylist()
+    )
+
+
+def latest_event_time(catalog) -> datetime | None:
+    con = duckdb.connect()
+    con.register("events", _events_arrow(catalog))
+    return con.execute("SELECT max(event_time) FROM events").fetchone()[0]
+
+
 def snapshot_at(catalog, t: datetime | None = None) -> dict:
     """Materialize state_at(t) into the snapshots table (t defaults to the
     newest event). The snapshot's watermark is the max sequence at or

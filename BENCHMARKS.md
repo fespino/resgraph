@@ -190,6 +190,17 @@ under concurrent watermark writes is untested and tracked in #32.
 — peak 82 MB, flat across run lengths (the consumer holds one batch,
 never the stream).
 
+**Contended capacity — solo numbers carry an implicit "with nothing
+else running".** The table above measures the hot consumer with the
+rest of the platform quiet. With the full stack co-located on the same
+laptop — cold consumer committing to Iceberg, Prometheus + Grafana
+scraping, publisher producing — sustained hot-ingest capacity drops to
+**~3,500 updates/s**, roughly a third of the solo figure (observed
+during the INC-001 chaos drill, `docs/incidents/INC-001-hotstore-loss.md`,
+which pinned its load at 2,500/s for exactly this reason). Any capacity
+plan built on a benchmark row must first ask what else shares the
+machine.
+
 ## Cold store — append rate, event-time travel, storage (D11–D13, D4)
 
 **Hardware:** Apple M3, 8 GB RAM, macOS 15.2 (laptop; everything

@@ -176,3 +176,26 @@ def test_reserved_attr_keys_rejected():
                 resource_id="vm-x",
                 attrs={key: "boom"},
             )
+
+
+def test_id_prefix_must_match_resource_type():
+    with pytest.raises(ValidationError, match="does not match"):
+        UpdateMessage(
+            sequence=1,
+            event_time="2026-01-01T00:00:00Z",
+            op="upsert",
+            resource_type="vm",
+            resource_id="host-1",
+        )
+
+
+def test_unknown_target_prefix_rejected():
+    with pytest.raises(ValidationError, match="not a known resource type"):
+        UpdateMessage(
+            sequence=1,
+            event_time="2026-01-01T00:00:00Z",
+            op="upsert",
+            resource_type="vm",
+            resource_id="vm-1",
+            relationships=[{"type": "runs_on", "target_id": "evil-1"}],
+        )

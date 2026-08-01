@@ -84,6 +84,17 @@ def ingest_cmd(
     typer.echo(json.dumps(counters))
 
 
+@app.command("serve")
+def serve_cmd(
+    host: str = typer.Option("127.0.0.1"),
+    port: int = typer.Option(8000),
+) -> None:
+    """Serve the D15 API over both stores."""
+    import uvicorn
+
+    uvicorn.run("resgraph.api.app:app", host=host, port=port)
+
+
 @query_app.command("blast-radius")
 def blast_radius_cmd(
     id: str = typer.Option(...),

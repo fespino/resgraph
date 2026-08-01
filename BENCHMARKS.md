@@ -189,3 +189,58 @@ under concurrent watermark writes is untested and tracked in #32.
 **D4 ingest memory ceiling (<512 MB RSS): validated with ~6× headroom**
 — peak 82 MB, flat across run lengths (the consumer holds one batch,
 never the stream).
+
+## Cold store — append rate, event-time travel, storage (D11–D13, D4)
+
+**Hardware:** Apple M3, 8 GB RAM, macOS 15.2 (laptop; everything
+in-process — no containers involved in the cold path).
+**Date / PR:** 2026-08-01 / #43.
+**Method:** `benchmarks/cold_bench.py` — seeded 10k-world stream
+appended in batches; the append clock covers Arrow conversion + the
+Iceberg commit only (generation excluded). As-of latency: p50 of 3 at
+fixed fractional positions through a 1M-event history, with snapshots
+at the 25/50/75% marks and without any. Storage from file sizes on
+disk, data (parquet) and total (parquet + Iceberg metadata) reported
+separately — the distinction turned out to be the finding.
+
+| Measure | N | Batch | Result |
+|---|---|---|---|
+| append | 200k | 1,024 | 24.3k events/s |
+| append | 200k | 8,192 | **194k events/s** |
+| append | 200k | 65,536 | 222k events/s |
+| append, sustained | 1M | 8,192 | **136.5k events/s** |
+| `state_at` p50, snapshots on | 1M | — | **0.17–0.39 s** (25%→95% marks) |
+| `state_at` p50, pure replay | 1M | — | 0.21–0.55 s |
+| snapshot materialization | 1M | — | 0.54 s each |
+| storage, data / total | 1M | 8,192 | **18 MB / 25 MB** (123 files) |
+| storage, data / total | 200k | 1,024 | 4.1 MB / **20.8 MB** (196 files) |
+
+### Findings (the numbers argue with each other, usefully)
+
+**Commit granularity inverts the hot store's knee.** The hot ingest
+measured 1,024 as its batch sweet spot with 2,048 regressing; the cold
+path is the opposite — 1,024 costs 8× the throughput of 8,192, because
+every batch is an Iceberg commit (manifest write + metadata swap) and
+commit overhead dominates small appends. Same stream, two sinks,
+opposite optima: that is why the batch size is a per-sink knob, not a
+shared constant.
+
+**Commit granularity is also a storage decision.** At batch 1,024 the
+Iceberg *metadata* runs 4–5× the size of the *data* (20.8 MB total
+around 4.1 MB of parquet at 200k), and it compounds with commit count:
+the first 1M-event ingest ran at consumer-default batching and left
+**366 MB** on disk — versus **25 MB** for the same events at batch
+8,192. The data was never the problem; a thousand small commits were.
+
+**Replay is already fast; snapshots buy the tail.** Pure event replay
+answers `state_at` on a 1M-event history in 0.21–0.55 s — DuckDB over
+18 MB of parquet does not need help at this scale. Snapshot
+acceleration matters where the replay is longest (0.55 → 0.39 s at the
+95% mark) and its value grows with history length; at laptop scale it
+is a correct-by-property-test optimization waiting for a bigger world.
+
+**D4 cold budgets: all three validated, no supersession** — append
+136.5k vs ≥10k (13×), as-of 0.39 s vs < 2 s (5×), storage 25 MB vs
+< 500 MB (20×), each at the documented batch size. First phase where
+every provisional budget held; the margin says the budgets were set
+timidly after two phases of misses, which is itself calibration data.

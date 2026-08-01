@@ -93,22 +93,20 @@ _meter.create_observable_gauge(
     description="messages behind the stream head (broker's view)",
 )
 
-_initialized = False
-
-
 def init_metrics(port: int | None = None) -> None:
     """Install the SDK provider + Prometheus reader (idempotent).
 
     port=None registers the collector without serving it — the API
     mounts /metrics itself; workers pass a port and get an HTTP
-    exporter endpoint.
+    exporter endpoint. Idempotence is read off the provider itself:
+    once the SDK MeterProvider is installed, there is nothing to do.
     """
-    global _initialized
-    if _initialized:
-        return
     from opentelemetry.exporter.prometheus import PrometheusMetricReader
     from opentelemetry.sdk.metrics import MeterProvider
     from opentelemetry.sdk.metrics.view import ExplicitBucketHistogramAggregation, View
+
+    if isinstance(otel_metrics.get_meter_provider(), MeterProvider):
+        return
 
     views = [
         View(
@@ -128,7 +126,6 @@ def init_metrics(port: int | None = None) -> None:
         from prometheus_client import start_http_server
 
         start_http_server(port)
-    _initialized = True
 
 
 def _refresh_instruments() -> None:

@@ -22,18 +22,18 @@
 | src/resgraph/graph/\_\_init\_\_.py |        0 |        0 |    100% |           |
 | src/resgraph/graph/client.py       |       14 |        0 |    100% |           |
 | src/resgraph/graph/consumer.py     |       12 |        0 |    100% |           |
-| src/resgraph/graph/ingest.py       |       89 |        4 |     96% |100, 152, 246, 283 |
+| src/resgraph/graph/ingest.py       |       98 |        4 |     96% |102, 158, 252, 294 |
 | src/resgraph/graph/loader.py       |       28 |        0 |    100% |           |
 | src/resgraph/graph/queries.py      |       45 |        0 |    100% |           |
 | src/resgraph/graph/schema.py       |       19 |        0 |    100% |           |
-| src/resgraph/obs.py                |       80 |        4 |     95% |84-85, 127-129 |
+| src/resgraph/obs.py                |       82 |        4 |     95% |87-88, 130-132 |
 | src/resgraph/query/\_\_init\_\_.py |        0 |        0 |    100% |           |
 | src/resgraph/query/dsl.py          |       42 |        1 |     98% |        51 |
 | src/resgraph/query/executor.py     |       77 |        7 |     91% |41, 46, 48, 56, 60, 70-71 |
 | src/resgraph/query/planner.py      |       83 |        2 |     98% |   74, 101 |
 | src/resgraph/reconcile.py          |       46 |        8 |     83% | 60-71, 84 |
 | src/resgraph/schema.py             |       49 |        0 |    100% |           |
-| **TOTAL**                          | **1433** |  **139** | **90%** |           |
+| **TOTAL**                          | **1444** |  **139** | **90%** |           |
 
 
 ## Setup coverage badge

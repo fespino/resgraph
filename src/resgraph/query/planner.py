@@ -136,6 +136,7 @@ def plan(query: Query) -> Plan:
             detail = f"state_at({query.at.isoformat()})"
             if where:
                 detail += f", matched := ({where})"
+            detail += f", project [{', '.join(composite_projection(bool(residual)))}]"
             steps.append(Step("cold", "duckdb", detail, [str(p) for p in claimable]))
             steps.append(
                 Step("python", "traverse", f"bfs from {query.root!r} depth<={query.depth}")
@@ -164,3 +165,21 @@ def plan(query: Query) -> Plan:
 
 def bind_params(predicates: list[Predicate]) -> dict[str, Any]:
     return {f"p{i}": p.value for i, p in enumerate(predicates)}
+
+
+def where_cols(predicates: list[Predicate]) -> tuple[str, ...]:
+    """Columns a compiled cold predicate reads — the scan needs them, the
+    result doesn't."""
+    return tuple(
+        sorted({"resource_type" if p.field == "type" else "attrs" for p in predicates})
+    )
+
+
+def composite_projection(has_residual: bool) -> tuple[str, ...]:
+    """The composite route returns ids and types and traverses
+    relationships; attrs only cross the boundary when a residual
+    predicate needs to read them."""
+    return ("attrs", "relationships", "resource_type") if has_residual else (
+        "relationships",
+        "resource_type",
+    )

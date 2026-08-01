@@ -15,14 +15,19 @@ import pyarrow as pa
 
 from .store import EVENTS, SNAPSHOTS
 
-_STATE_SQL = """
+_DATA_COLS = ("resource_type", "attrs", "relationships")
+
+
+def _state_sql(data_cols: tuple[str, ...]) -> str:
+    cols = ", ".join(("resource_id", *data_cols, "sequence"))
+    return f"""
 WITH delta AS (
-    SELECT DISTINCT resource_id, resource_type, attrs, relationships, sequence, op
+    SELECT DISTINCT {cols}, op
     FROM events
     WHERE event_time <= $t AND sequence > $wm
 ),
 unioned AS (
-    SELECT resource_id, resource_type, attrs, relationships, sequence, 'upsert' AS op
+    SELECT {cols}, 'upsert' AS op
     FROM base
     UNION ALL
     SELECT * FROM delta
@@ -31,7 +36,7 @@ ranked AS (
     SELECT *, row_number() OVER (PARTITION BY resource_id ORDER BY sequence DESC) AS rn
     FROM unioned
 )
-SELECT resource_id, resource_type, attrs, relationships, sequence
+SELECT {cols}
 FROM ranked
 WHERE rn = 1 AND op = 'upsert'
 ORDER BY resource_id
@@ -48,11 +53,12 @@ _EMPTY_BASE = pa.table(
 )
 
 
-def _events_arrow(catalog, min_sequence: int = -1) -> pa.Table:
+def _events_arrow(catalog, min_sequence: int = -1, fields: tuple[str, ...] = ()) -> pa.Table:
     table = catalog.load_table(EVENTS)
+    kwargs = {"selected_fields": fields} if fields else {}
     if min_sequence >= 0:
-        return table.scan(row_filter=f"sequence > {min_sequence}").to_arrow()
-    return table.scan().to_arrow()
+        return table.scan(row_filter=f"sequence > {min_sequence}", **kwargs).to_arrow()
+    return table.scan(**kwargs).to_arrow()
 
 
 def _latest_snapshot(catalog, t: datetime) -> tuple[pa.Table, int]:
@@ -85,6 +91,8 @@ def state_at(
     where: str | None = None,
     params: dict | None = None,
     annotate: bool = False,
+    projection: tuple[str, ...] | None = None,
+    where_cols: tuple[str, ...] = (),
 ) -> list[dict]:
     """World state at event time t — one dict per alive resource.
 
@@ -92,22 +100,42 @@ def state_at(
     annotate=False filters the result; annotate=True keeps every row and
     adds a `matched` bool instead — the composite route needs the full
     topology to traverse, with predicate evaluation still in DuckDB.
+
+    `projection` is the D16 addendum's other half: which data columns to
+    return (resource_id and sequence always come back). `where_cols`
+    names the columns the predicate reads — scanned and evaluated, never
+    returned unless also projected. Both prune at the Iceberg scan, so
+    unrequested columns never cross the Arrow boundary.
     """
+    out_cols = tuple(c for c in _DATA_COLS if projection is None or c in projection)
+    inner_cols = tuple(c for c in _DATA_COLS if c in out_cols or c in where_cols)
     base, wm = _latest_snapshot(catalog, t) if use_snapshots else (_EMPTY_BASE, -1)
     con = duckdb.connect()
     con.register("base", base)
-    con.register("events", _events_arrow(catalog, min_sequence=wm))
-    sql = _STATE_SQL
+    con.register(
+        "events",
+        _events_arrow(
+            catalog,
+            min_sequence=wm,
+            fields=("resource_id", "sequence", "op", "event_time", *inner_cols),
+        ),
+    )
+    sql = _state_sql(inner_cols)
+    out_sel = ", ".join(("resource_id", *out_cols, "sequence"))
     if where and annotate:
-        sql = f"SELECT *, ({where}) AS matched FROM ({_STATE_SQL})"
+        sql = f"SELECT {out_sel}, ({where}) AS matched FROM ({sql})"
     elif where:
-        sql = f"SELECT * FROM ({_STATE_SQL}) WHERE {where}"
+        sql = f"SELECT {out_sel} FROM ({sql}) WHERE {where}"
+    elif inner_cols != out_cols:
+        sql = f"SELECT {out_sel} FROM ({sql})"
     rows = (
         con.execute(sql, {"t": t, "wm": wm, **(params or {})}).arrow().read_all().to_pylist()
     )
     for r in rows:
-        r["attrs"] = json.loads(r["attrs"])
-        r["relationships"] = json.loads(r["relationships"])
+        if "attrs" in out_cols:
+            r["attrs"] = json.loads(r["attrs"])
+        if "relationships" in out_cols:
+            r["relationships"] = json.loads(r["relationships"])
         if annotate:
             r["matched"] = bool(r.get("matched")) if where else True
     return rows

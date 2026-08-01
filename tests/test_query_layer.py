@@ -11,14 +11,16 @@ from datetime import UTC, datetime
 
 import pytest
 from fastapi.testclient import TestClient
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 from resgraph.api import app as api_app
 from resgraph.cold import queries as cold_queries
 from resgraph.cold import store as cold_store
 from resgraph.gen.churn import Churn
-from resgraph.gen.world import World
+from resgraph.gen.world import ATTR_POOLS, World
 from resgraph.query.dsl import Predicate, parse_filter
-from resgraph.query.executor import QueryContext
+from resgraph.query.executor import QueryContext, _residual_filter
 from resgraph.query.planner import KNOWN_FIELDS, Query, place, plan
 from resgraph.schema import Op
 
@@ -144,6 +146,58 @@ def test_plan_rejects_unknown_type_and_type_ordering():
 def test_live_world_is_not_an_endpoint():
     with pytest.raises(ValueError):
         plan(Query("world"))
+
+
+# --- planner properties (random inputs, invariants hold) -----------------
+
+_FIELDS = st.sampled_from(
+    sorted(KNOWN_FIELDS - {"type"}) + ["attrs.frobnitz", "size", "attrs.made_up"]
+)
+_PREDS = st.one_of(
+    st.builds(
+        Predicate,
+        _FIELDS,
+        st.sampled_from(["=", "!="]),
+        st.one_of(st.integers(-100, 100), st.sampled_from(["z1", "up", "r3"])),
+    ),
+    st.builds(
+        Predicate, _FIELDS, st.sampled_from(["<", "<=", ">", ">="]), st.integers(-100, 100)
+    ),
+)
+
+
+@given(preds=st.lists(_PREDS, max_size=6))
+def test_placement_partitions_predicates_exactly(preds):
+    claimable, residual = place(preds)
+    assert sorted(map(str, claimable + residual)) == sorted(map(str, preds))
+    assert all(p.field in KNOWN_FIELDS for p in claimable)
+    assert all(p.field not in KNOWN_FIELDS for p in residual)
+
+
+_KNOWN_ATTR_VALUES = sorted(
+    {
+        (f"attrs.{key}", value)
+        for pools in ATTR_POOLS.values()
+        for key, values in pools.items()
+        for value in values
+    },
+    key=str,
+)
+
+
+@settings(max_examples=15, deadline=None)
+@given(choice=st.sampled_from(_KNOWN_ATTR_VALUES), op=st.sampled_from(["=", "!="]))
+def test_pushed_equals_forced_residual(catalog, choice, op):
+    """The optimized-vs-unoptimized comparison: pushing a predicate into
+    the DuckDB scan and filtering the full world in Python must agree
+    for any generator-known attr and value."""
+    field, value = choice
+    pred = Predicate(field, op, value)
+    ctx = QueryContext(catalog=catalog)
+    pushed = plan(Query("world", at=T_END, predicates=[pred])).execute(ctx)
+    full = plan(Query("world", at=T_END)).execute(ctx)
+    forced = _residual_filter(full, [pred])
+    assert {r["id"] for r in pushed} == {r["id"] for r in forced}
 
 
 # --- execution against the cold store + oracle ---------------------------

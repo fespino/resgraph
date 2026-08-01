@@ -605,12 +605,40 @@ that needs row statistics to make — either is the signal to adopt a
 federated engine (Trino-shaped) rather than grow one here, and the
 decision to adopt gets its own D-number.
 
+**D16 addendum (reviewed against Grove's [*How Query Engines
+Work*](https://howqueryengineswork.com/)):** two findings from reading
+the book this phase's vocabulary doc cites.
+
+- **Projection push-down was the missing half.** The book's
+  data-source contract is `scan(projection)` — column pruning is the
+  baseline, stated *before* predicates; its optimizer's first
+  implemented rule is projection push-down. This planner pushed
+  predicates and returned every column, JSON-parsing `attrs` for
+  thirty thousand rows to answer with four — exactly the
+  Arrow-boundary tax the phase's own benchmark named as the dominant
+  cost. Placement now has both halves: predicates (`where` +
+  `where_cols`) and columns (`projection`), both pruned at the Iceberg
+  scan so unrequested columns never cross the boundary. Measured:
+  composite p50 at 1M events 0.371 s → **0.250 s** (BENCHMARKS.md).
+- **The Plan is a logical plan with the physical choice pre-made.**
+  The book separates logical from physical plans for three stated
+  reasons — per-operator algorithm choice, environment adaptation,
+  cost-based selection among candidates — and all three are absent
+  here by design: one algorithm per route, one environment, statistics
+  refused. `Step.detail` carrying compiled Cypher/SQL at plan time is
+  that collapse, made deliberately; the reversal condition above (the
+  first stats-needing choice) is precisely the moment a separate
+  physical layer would earn its existence. The book's own teaching
+  engine concedes the point in practice — its planner makes fixed
+  physical choices; the separation is pedagogy until there are real
+  alternatives to choose between.
+
 ### D4 addendum — query-layer budgets (provisional)
 
 | Budget | Target | Measured |
 |---|---|---|
 | live endpoints (hot), p50 server-side | < 100 ms | **2.5 ms** end-to-end (BENCHMARKS.md) |
-| composite as-of blast radius, 1M-event history, p50 | < 2 s | **0.371 s** (BENCHMARKS.md) |
+| composite as-of blast radius, 1M-event history, p50 | < 2 s | **0.250 s** after projection push-down; 0.371 s before (BENCHMARKS.md) |
 | `explain=true`, any endpoint | < 50 ms, zero store contact | **0.012 ms**; zero-contact asserted by test |
 | residual-filter delta | measured and reported, no target — it is the push-down argument's evidence | **2.5× at 1M events** — and it grows with scale (BENCHMARKS.md) |
 

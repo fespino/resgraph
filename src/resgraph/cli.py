@@ -89,6 +89,23 @@ def ingest_cmd(
     typer.echo(json.dumps(counters))
 
 
+@app.command("reconcile")
+def reconcile_cmd(
+    oracle: str = typer.Option(None, help="resgraph-gen final-state JSONL to compare against."),
+) -> None:
+    """Compare hot store vs cold store (vs the generator oracle, if
+    given). Exit 1 on any disagreement — the drill's exit criterion."""
+    from resgraph.cold import store as cold_store
+    from resgraph.reconcile import load_oracle, reconcile
+
+    catalog = cold_store.get_catalog()
+    oracle_state = load_oracle(oracle) if oracle else None
+    with _session() as s:
+        result = reconcile(s, catalog, oracle_state)
+    typer.echo(json.dumps(result, default=str))
+    raise typer.Exit(0 if result["ok"] else 1)
+
+
 @app.command("serve")
 def serve_cmd(
     host: str = typer.Option("127.0.0.1"),

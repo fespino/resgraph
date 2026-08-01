@@ -1,5 +1,6 @@
 """resgraph-gen — CLI entry point."""
 
+import json
 import time
 from itertools import islice
 
@@ -34,6 +35,42 @@ def seed(
     while chunk := list(islice(snapshot, batch)):
         out.emit_many(chunk)
     out.close()
+
+
+@app.command("final-state")
+def final_state(
+    seed: int = 42,
+    resources: int = 10_000,
+    count: int = 0,
+) -> None:
+    """Replay the deterministic stream and print the final alive state
+    as JSONL — the oracle `resgraph reconcile --oracle` compares
+    against (D6 makes this exact, not statistical)."""
+    from resgraph.schema import Op
+
+    churn = Churn(World(seed, resources))
+    last = {}
+    for m in churn.snapshot():
+        last[m.resource_id] = m
+    for _ in range(count):
+        m = churn.next_message()
+        last[m.resource_id] = m
+    for rid in sorted(last):
+        m = last[rid]
+        if m.op is Op.UPSERT:
+            print(
+                json.dumps(
+                    {
+                        "resource_id": rid,
+                        "resource_type": m.resource_type.value,
+                        "sequence": m.sequence,
+                        "attrs": dict(m.attrs),
+                        "relationships": [
+                            {"type": r.type, "target_id": r.target_id} for r in m.relationships
+                        ],
+                    }
+                )
+            )
 
 
 @app.command()

@@ -20,7 +20,7 @@ from resgraph.cold import store as cold_store
 from resgraph.gen.churn import Churn
 from resgraph.gen.world import ATTR_POOLS, World
 from resgraph.query.dsl import Predicate, parse_filter
-from resgraph.query.executor import QueryContext, _residual_filter
+from resgraph.query.executor import QueryContext, _residual_filter, execute_plan
 from resgraph.query.planner import KNOWN_FIELDS, Query, place, plan
 from resgraph.schema import Op
 
@@ -121,9 +121,7 @@ def test_live_route_pushes_into_cypher():
 
 def test_composite_evaluates_predicates_as_match_column_not_scan_reduction():
     p = plan(
-        Query(
-            "blast_radius", root="vm-000001", at=T_LIVE, predicates=parse_filter("attrs.zone=z1")
-        )
+        Query("blast_radius", root="vm-000001", at=T_LIVE, predicates=parse_filter("attrs.zone=z1"))
     )
     cold = next(s for s in p.steps if s.store == "cold")
     assert "matched :=" in cold.detail and "WHERE" not in cold.detail
@@ -160,9 +158,7 @@ _PREDS = st.one_of(
         st.sampled_from(["=", "!="]),
         st.one_of(st.integers(-100, 100), st.sampled_from(["z1", "up", "r3"])),
     ),
-    st.builds(
-        Predicate, _FIELDS, st.sampled_from(["<", "<=", ">", ">="]), st.integers(-100, 100)
-    ),
+    st.builds(Predicate, _FIELDS, st.sampled_from(["<", "<=", ">", ">="]), st.integers(-100, 100)),
 )
 
 
@@ -194,8 +190,8 @@ def test_pushed_equals_forced_residual(catalog, choice, op):
     field, value = choice
     pred = Predicate(field, op, value)
     ctx = QueryContext(catalog=catalog)
-    pushed = plan(Query("world", at=T_END, predicates=[pred])).execute(ctx)
-    full = plan(Query("world", at=T_END)).execute(ctx)
+    pushed = execute_plan(plan(Query("world", at=T_END, predicates=[pred])), ctx)
+    full = execute_plan(plan(Query("world", at=T_END)), ctx)
     forced = _residual_filter(full, [pred])
     assert {r["id"] for r in pushed} == {r["id"] for r in forced}
 
@@ -232,7 +228,7 @@ def test_composite_blast_radius_matches_oracle(catalog):
     state = _oracle_state(T_END)
     roots = sorted(state)[:5] + sorted(r for r in state if r.startswith("host"))[:2]
     for root in roots:
-        got = plan(Query("blast_radius", root=root, at=T_END)).execute(ctx)
+        got = execute_plan(plan(Query("blast_radius", root=root, at=T_END)), ctx)
         assert {r["id"] for r in got} == _oracle_blast(T_END, root, 3), root
 
 
@@ -240,10 +236,13 @@ def test_composite_filter_selects_within_the_affected_set(catalog):
     ctx = QueryContext(catalog=catalog)
     state = _oracle_state(T_END)
     root = next(r for r in sorted(state) if _oracle_blast(T_END, r, 3))
-    unfiltered = {r["id"] for r in plan(Query("blast_radius", root=root, at=T_END)).execute(ctx)}
-    filtered = plan(
-        Query("blast_radius", root=root, at=T_END, predicates=parse_filter("type=vm"))
-    ).execute(ctx)
+    unfiltered = {
+        r["id"] for r in execute_plan(plan(Query("blast_radius", root=root, at=T_END)), ctx)
+    }
+    filtered = execute_plan(
+        plan(Query("blast_radius", root=root, at=T_END, predicates=parse_filter("type=vm"))),
+        ctx,
+    )
     assert {r["id"] for r in filtered} <= unfiltered
     assert all(r["type"] == "vm" for r in filtered)
     assert {r["id"] for r in filtered} == {i for i in unfiltered if i.startswith("vm")}
@@ -253,15 +252,20 @@ def test_residual_filters_after_traverse(catalog):
     ctx = QueryContext(catalog=catalog)
     state = _oracle_state(T_END)
     root = next(r for r in sorted(state) if _oracle_blast(T_END, r, 3))
-    got = plan(
-        Query("blast_radius", root=root, at=T_END, predicates=parse_filter("attrs.frobnitz=9"))
-    ).execute(ctx)
+    got = execute_plan(
+        plan(
+            Query("blast_radius", root=root, at=T_END, predicates=parse_filter("attrs.frobnitz=9"))
+        ),
+        ctx,
+    )
     assert got == []
 
 
 def test_world_pushdown_equals_oracle_filter(catalog):
     ctx = QueryContext(catalog=catalog)
-    got = plan(Query("world", at=T_END, predicates=parse_filter("attrs.zone=z1"))).execute(ctx)
+    got = execute_plan(
+        plan(Query("world", at=T_END, predicates=parse_filter("attrs.zone=z1"))), ctx
+    )
     expected = {rid for rid, m in _oracle_state(T_END).items() if m.attrs.get("zone") == "z1"}
     assert {r["id"] for r in got} == expected
     assert all(r["attrs"]["zone"] == "z1" for r in got)
@@ -269,7 +273,7 @@ def test_world_pushdown_equals_oracle_filter(catalog):
 
 def test_numeric_pushdown_on_json_attr(catalog):
     ctx = QueryContext(catalog=catalog)
-    got = plan(Query("world", at=T_END, predicates=parse_filter("attrs.cpu>=4"))).execute(ctx)
+    got = execute_plan(plan(Query("world", at=T_END, predicates=parse_filter("attrs.cpu>=4"))), ctx)
     expected = {
         rid
         for rid, m in _oracle_state(T_END).items()
@@ -280,7 +284,7 @@ def test_numeric_pushdown_on_json_attr(catalog):
 
 def test_missing_store_is_a_named_error():
     with pytest.raises(RuntimeError, match="hot store"):
-        plan(Query("blast_radius", root="vm-000001")).execute(QueryContext())
+        execute_plan(plan(Query("blast_radius", root="vm-000001")), QueryContext())
 
 
 # --- the API surface (D15) ------------------------------------------------

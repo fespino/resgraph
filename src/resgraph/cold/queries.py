@@ -18,9 +18,7 @@ from .store import EVENTS, SNAPSHOTS
 _DATA_COLS = ("resource_type", "attrs", "relationships")
 
 
-def _state_sql(data_cols: tuple[str, ...]) -> str:
-    cols = ", ".join(("resource_id", *data_cols, "sequence"))
-    return f"""
+_STATE_TEMPLATE = """
 WITH delta AS (
     SELECT DISTINCT {cols}, op
     FROM events
@@ -41,6 +39,15 @@ FROM ranked
 WHERE rn = 1 AND op = 'upsert'
 ORDER BY resource_id
 """
+
+
+def _state_sql(data_cols: tuple[str, ...]) -> str:
+    # B608 suppressions here and in state_at: identifiers come from
+    # _DATA_COLS, never callers; the where fragment is planner-compiled
+    # (D16) with all values as bound parameters.
+    cols = ", ".join(("resource_id", *data_cols, "sequence"))
+    return _STATE_TEMPLATE.format(cols=cols)  # nosec B608
+
 
 _EMPTY_BASE = pa.table(
     {
@@ -123,14 +130,12 @@ def state_at(
     sql = _state_sql(inner_cols)
     out_sel = ", ".join(("resource_id", *out_cols, "sequence"))
     if where and annotate:
-        sql = f"SELECT {out_sel}, ({where}) AS matched FROM ({sql})"
+        sql = f"SELECT {out_sel}, ({where}) AS matched FROM ({sql})"  # nosec B608
     elif where:
-        sql = f"SELECT {out_sel} FROM ({sql}) WHERE {where}"
+        sql = f"SELECT {out_sel} FROM ({sql}) WHERE {where}"  # nosec B608
     elif inner_cols != out_cols:
-        sql = f"SELECT {out_sel} FROM ({sql})"
-    rows = (
-        con.execute(sql, {"t": t, "wm": wm, **(params or {})}).arrow().read_all().to_pylist()
-    )
+        sql = f"SELECT {out_sel} FROM ({sql})"  # nosec B608
+    rows = con.execute(sql, {"t": t, "wm": wm, **(params or {})}).arrow().read_all().to_pylist()
     for r in rows:
         if "attrs" in out_cols:
             r["attrs"] = json.loads(r["attrs"])

@@ -20,7 +20,7 @@ from resgraph.cold import store as cold_store
 from resgraph.graph import client as hot_client
 from resgraph.graph.ingest import read_node
 from resgraph.query.dsl import parse_filter
-from resgraph.query.executor import QueryContext
+from resgraph.query.executor import QueryContext, execute_plan
 from resgraph.query.planner import Query as PlannerQuery
 from resgraph.query.planner import plan as make_plan
 
@@ -187,9 +187,7 @@ def blast_radius(
     preds, at_t = _parse(filter, at)
     try:
         p = make_plan(
-            PlannerQuery(
-                "blast_radius", root=resource_id, depth=depth, at=at_t, predicates=preds
-            )
+            PlannerQuery("blast_radius", root=resource_id, depth=depth, at=at_t, predicates=preds)
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
@@ -197,7 +195,7 @@ def blast_radius(
         return _explain_response(p.explain())
     log.debug("plan %s", json.dumps(p.explain()))
     try:
-        rows = p.execute(ctx)
+        rows = execute_plan(p, ctx)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     rows, truncated, total = _cap(rows)
@@ -227,7 +225,7 @@ def world(
         raise HTTPException(status_code=400, detail=str(e)) from e
     if explain:
         return _explain_response(p.explain())
-    rows = p.execute(ctx)
+    rows = execute_plan(p, ctx)
     rows, truncated, total = _cap(rows)
     return WorldOut(
         fetched_at=_now(),

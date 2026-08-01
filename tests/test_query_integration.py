@@ -20,7 +20,7 @@ from resgraph.graph.ingest import apply_batch
 from resgraph.graph.loader import load_snapshot
 from resgraph.graph.schema import init_schema, wipe
 from resgraph.query.dsl import parse_filter
-from resgraph.query.executor import QueryContext
+from resgraph.query.executor import QueryContext, execute_plan
 from resgraph.query.planner import Query, plan
 
 pytestmark = pytest.mark.integration
@@ -65,8 +65,8 @@ def test_composite_at_now_equals_live_blast_radius(ctx):
     t = msgs[-1].event_time
     disagreements = []
     for root in _roots(msgs):
-        live = plan(Query("blast_radius", root=root)).execute(qctx)
-        cold = plan(Query("blast_radius", root=root, at=t)).execute(qctx)
+        live = execute_plan(plan(Query("blast_radius", root=root)), qctx)
+        cold = execute_plan(plan(Query("blast_radius", root=root, at=t)), qctx)
         live_ids = sorted(r["id"] for r in live)
         cold_ids = sorted(r["id"] for r in cold)
         if live_ids != cold_ids:
@@ -80,6 +80,8 @@ def test_boundary_holds_under_pushdown_and_residual(ctx):
     for flt in ("type=vm", "attrs.zone=z1", "type=container AND attrs.restarts>=2"):
         preds = parse_filter(flt)
         for root in _roots(msgs)[:8]:
-            live = plan(Query("blast_radius", root=root, predicates=preds)).execute(qctx)
-            cold = plan(Query("blast_radius", root=root, at=t, predicates=preds)).execute(qctx)
+            live = execute_plan(plan(Query("blast_radius", root=root, predicates=preds)), qctx)
+            cold = execute_plan(
+                plan(Query("blast_radius", root=root, at=t, predicates=preds)), qctx
+            )
             assert {r["id"] for r in live} == {r["id"] for r in cold}, (root, flt)

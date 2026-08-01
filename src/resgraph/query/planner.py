@@ -1,7 +1,8 @@
 """The mini planner (D16): placement, lazy plans, visible residuals.
 
-A Plan is data until .execute(ctx) — explain() serializes it without
-touching a store. Placement is a table lookup: type and generator-known
+A Plan is data until executor.execute_plan runs it — explain()
+serializes it without touching a store; this module imports no store
+code. Placement is a table lookup: type and generator-known
 attr fields are claimable by both stores; the route decides which one
 runs them; everything else is a residual filter, applied in Python and
 flagged in the plan.
@@ -61,11 +62,6 @@ class Plan:
             "steps": [s.as_dict() for s in self.steps],
             "residual": [str(p) for p in self.residual],
         }
-
-    def execute(self, ctx) -> list[dict]:
-        from .executor import execute_plan
-
-        return execute_plan(self, ctx)
 
 
 def place(predicates: list[Predicate]) -> tuple[list[Predicate], list[Predicate]]:
@@ -146,8 +142,7 @@ def plan(query: Query) -> Plan:
                 Step(
                     "cold",
                     "duckdb",
-                    f"state_at({query.at.isoformat()})"
-                    + (f" WHERE {where}" if where else ""),
+                    f"state_at({query.at.isoformat()})" + (f" WHERE {where}" if where else ""),
                     [str(p) for p in claimable],
                 )
             )
@@ -170,16 +165,18 @@ def bind_params(predicates: list[Predicate]) -> dict[str, Any]:
 def where_cols(predicates: list[Predicate]) -> tuple[str, ...]:
     """Columns a compiled cold predicate reads — the scan needs them, the
     result doesn't."""
-    return tuple(
-        sorted({"resource_type" if p.field == "type" else "attrs" for p in predicates})
-    )
+    return tuple(sorted({"resource_type" if p.field == "type" else "attrs" for p in predicates}))
 
 
 def composite_projection(has_residual: bool) -> tuple[str, ...]:
     """The composite route returns ids and types and traverses
     relationships; attrs only cross the boundary when a residual
     predicate needs to read them."""
-    return ("attrs", "relationships", "resource_type") if has_residual else (
-        "relationships",
-        "resource_type",
+    return (
+        ("attrs", "relationships", "resource_type")
+        if has_residual
+        else (
+            "relationships",
+            "resource_type",
+        )
     )

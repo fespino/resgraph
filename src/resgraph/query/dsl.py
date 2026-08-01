@@ -12,11 +12,11 @@ from typing import Literal
 Op = Literal["=", "!=", "<", "<=", ">", ">="]
 
 _TERM = re.compile(
-    r"^\s*(?P<field>[A-Za-z_][A-Za-z0-9_.]*)\s*"
-    r"(?P<op><=|>=|!=|=|<|>)\s*"
-    r"(?P<value>[^\s]+)\s*$"
+    r"^(?P<field>[A-Za-z_][A-Za-z0-9_.]*)\s*(?P<op><=|>=|!=|=|<|>)\s*(?P<value>\S+)$"
 )
 _AND = re.compile(r"\s+AND\s+", re.IGNORECASE)
+
+MAX_FILTER_LEN = 512
 
 
 @dataclass(frozen=True)
@@ -47,12 +47,14 @@ def parse_filter(text: str | None) -> list[Predicate]:
     outside the D16 grammar."""
     if not text or not text.strip():
         return []
+    if len(text) > MAX_FILTER_LEN:
+        raise ValueError(f"filter longer than {MAX_FILTER_LEN} chars")
     if re.search(r"\bOR\b", text, re.IGNORECASE):
         raise ValueError("OR is not supported (D16: conjunctions only)")
     if "(" in text or ")" in text:
         raise ValueError("grouping is not supported (D16: conjunctions only)")
     preds = []
-    for term in _AND.split(text.strip()):
+    for term in (t.strip() for t in _AND.split(text.strip())):
         m = _TERM.match(term)
         if not m:
             raise ValueError(f"cannot parse filter term: {term!r}")

@@ -22,7 +22,7 @@ from resgraph.cold import store
 from resgraph.gen.churn import Churn
 from resgraph.gen.world import World
 from resgraph.query.dsl import parse_filter
-from resgraph.query.executor import QueryContext, _blast_bfs, _residual_filter
+from resgraph.query.executor import QueryContext, _blast_bfs, _residual_filter, execute_plan
 from resgraph.query.planner import (
     Query,
     _duckdb_where,
@@ -189,7 +189,7 @@ def main() -> None:
         pushed = []
         for _ in range(REPS):
             t0 = time.perf_counter()
-            plan(q).execute(QueryContext(catalog=cat))
+            execute_plan(plan(q), QueryContext(catalog=cat))
             pushed.append(time.perf_counter() - t0)
         residual = []
         for _ in range(REPS):

@@ -253,3 +253,15 @@ def test_rebuild_from_cold_restores_state_and_watermarks(tmp_path):
         alive_hot = {rid for rid in got if (n := ingest.read_node(s, rid)) and not n["deleted"]}
         assert alive_hot == set(final)
     driver.close()
+
+
+def test_maintain_expires_snapshots_but_keeps_data(tmp_path):
+    cat = store.get_catalog(tmp_path)
+    store.ensure_tables(cat)
+    for i in range(0, 300, 100):  # three commits = three snapshots
+        store.append_events(cat, MSGS[i : i + 100])
+    rows_before = cat.load_table(store.EVENTS).scan().to_arrow().num_rows
+    result = store.maintain(cat, tmp_path)
+    assert result[store.EVENTS]["snapshots_before"] == 3
+    assert result[store.EVENTS]["snapshots_after"] == 1
+    assert cat.load_table(store.EVENTS).scan().to_arrow().num_rows == rows_before

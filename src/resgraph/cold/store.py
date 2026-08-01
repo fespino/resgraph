@@ -121,3 +121,35 @@ def append_events(catalog: SqlCatalog, msgs: list[UpdateMessage]) -> int:
     table = catalog.load_table(EVENTS)
     table.append(events_to_arrow(msgs))
     return len(msgs)
+
+
+def maintain(catalog, directory: Path | None = None) -> dict:
+    """Expire non-current Iceberg snapshots on both tables.
+
+    Every append commit is a snapshot; the unexpired snapshot log is
+    metadata the planner carries forever. Expiry prunes that log — it
+    does NOT reclaim disk (measured: 196 → 1 snapshots, 0 MB freed):
+    orphaned files and small-file compaction are engine territory
+    (Spark/Trino). The disk numbers in the result state the limitation
+    rather than hiding it."""
+    from datetime import UTC, datetime
+
+    d = (directory or cold_dir()).resolve()
+
+    def disk() -> float:
+        return sum(f.stat().st_size for f in d.rglob("*") if f.is_file()) / 1024**2
+
+    before_mb = disk()
+    result: dict = {}
+    for name in (EVENTS, SNAPSHOTS):
+        table = catalog.load_table(name)
+        before = len(table.metadata.snapshots)
+        table.maintenance.expire_snapshots().older_than(datetime.now(UTC)).commit()
+        table = catalog.load_table(name)
+        result[name] = {
+            "snapshots_before": before,
+            "snapshots_after": len(table.metadata.snapshots),
+        }
+    result["disk_mb_before"] = round(before_mb, 1)
+    result["disk_mb_after"] = round(disk(), 1)
+    return result

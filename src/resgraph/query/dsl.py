@@ -14,7 +14,7 @@ Op = Literal["=", "!=", "<", "<=", ">", ">="]
 _TERM = re.compile(
     r"^(?P<field>[A-Za-z_][A-Za-z0-9_.]*)\s*(?P<op><=|>=|!=|=|<|>)\s*(?P<value>\S+)$"
 )
-_AND = re.compile(r"\s+AND\s+", re.IGNORECASE)
+_AND = re.compile(r"\bAND\b", re.IGNORECASE)
 
 MAX_FILTER_LEN = 512
 

@@ -24,5 +24,9 @@ flowchart LR
   Q2 --> A
 ```
 
-Status: phase 0 — decision log + wire schema. Each increment lands via
-issue → PR, citing the SPEC decisions (D-numbers) it implements.
+Status: phases 0–4 complete — foundations + security posture, the
+deterministic generator, the graph hot store, the streaming ingest, and
+the Iceberg cold store with event-time travel (phase 4 in review).
+Each increment lands via issue → PR, citing the SPEC decisions
+(D-numbers) it implements; every phase's end state is tagged
+(`phase-N-*`) and benchmarked (BENCHMARKS.md).

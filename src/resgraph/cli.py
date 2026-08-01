@@ -5,6 +5,7 @@ import sys
 
 import typer
 
+from resgraph.cold.cli import app as cold_app
 from resgraph.graph import queries
 from resgraph.graph.client import get_driver
 from resgraph.graph.consumer import DEFAULT_STREAM, Consumer
@@ -15,6 +16,7 @@ from resgraph.schema import UpdateMessage
 app = typer.Typer(help="resgraph platform CLI.", add_completion=False)
 query_app = typer.Typer(help="Traversal queries against the hot store.")
 app.add_typer(query_app, name="query")
+app.add_typer(cold_app, name="cold")
 
 
 def _session():

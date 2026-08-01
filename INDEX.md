@@ -10,5 +10,7 @@
 - .github/workflows/ — CI + security gates (see docs/security-posture.md)
 - docs/security-posture.md — every security control and why it exists
 - src/resgraph/graph/ — hot store client, DDL, snapshot loader, traversal queries (D8–D9),
-  idempotent ingest apply + stream consumer (D3/D10)
+  idempotent ingest apply (D3/D10)
+- src/resgraph/consumer.py — generic stream consumer loop (pending-first recovery, ack-after-apply)
+- src/resgraph/cold/ — Iceberg cold store: catalog/tables/appends, CLI (D11–D13)
 - benchmarks/ — measurement scripts (methods in BENCHMARKS.md)

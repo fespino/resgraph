@@ -5,7 +5,13 @@
 | Name                               |    Stmts |     Miss |   Cover |   Missing |
 |----------------------------------- | -------: | -------: | ------: | --------: |
 | src/resgraph/\_\_init\_\_.py       |        0 |        0 |    100% |           |
-| src/resgraph/cli.py                |       53 |        3 |     94% |     27-29 |
+| src/resgraph/cli.py                |       64 |       10 |     84% |29-31, 54-62 |
+| src/resgraph/cold/\_\_init\_\_.py  |        0 |        0 |    100% |           |
+| src/resgraph/cold/cli.py           |       46 |       24 |     48% |17, 23-24, 39-50, 58-59, 69-76, 85, 94, 101 |
+| src/resgraph/cold/queries.py       |       73 |        8 |     89% |162-164, 176-178, 180, 185 |
+| src/resgraph/cold/rebuild.py       |       20 |        3 |     85% |     46-48 |
+| src/resgraph/cold/store.py         |       57 |        2 |     96% |   72, 120 |
+| src/resgraph/consumer.py           |       65 |        6 |     91% |67, 79, 82, 97, 99-100 |
 | src/resgraph/gen/\_\_init\_\_.py   |        0 |        0 |    100% |           |
 | src/resgraph/gen/churn.py          |       65 |        4 |     94% |47-49, 108 |
 | src/resgraph/gen/cli.py            |       43 |        6 |     86% | 17, 72-76 |
@@ -13,13 +19,13 @@
 | src/resgraph/gen/world.py          |      115 |        0 |    100% |           |
 | src/resgraph/graph/\_\_init\_\_.py |        0 |        0 |    100% |           |
 | src/resgraph/graph/client.py       |       14 |        0 |    100% |           |
-| src/resgraph/graph/consumer.py     |       64 |        6 |     91% |76, 89, 92, 107, 109-110 |
+| src/resgraph/graph/consumer.py     |        9 |        0 |    100% |           |
 | src/resgraph/graph/ingest.py       |       89 |        4 |     96% |100, 152, 246, 283 |
 | src/resgraph/graph/loader.py       |       28 |        0 |    100% |           |
 | src/resgraph/graph/queries.py      |       40 |        0 |    100% |           |
 | src/resgraph/graph/schema.py       |       19 |        0 |    100% |           |
 | src/resgraph/schema.py             |       36 |        0 |    100% |           |
-| **TOTAL**                          |  **586** |   **23** | **96%** |           |
+| **TOTAL**                          |  **803** |   **67** | **92%** |           |
 
 
 ## Setup coverage badge

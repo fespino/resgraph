@@ -24,8 +24,8 @@
 | src/resgraph/graph/loader.py       |       28 |        0 |    100% |           |
 | src/resgraph/graph/queries.py      |       40 |        0 |    100% |           |
 | src/resgraph/graph/schema.py       |       19 |        0 |    100% |           |
-| src/resgraph/schema.py             |       36 |        0 |    100% |           |
-| **TOTAL**                          |  **803** |   **67** | **92%** |           |
+| src/resgraph/schema.py             |       49 |        0 |    100% |           |
+| **TOTAL**                          |  **816** |   **67** | **92%** |           |
 
 
 ## Setup coverage badge

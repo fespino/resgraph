@@ -13,4 +13,9 @@
   idempotent ingest apply (D3/D10)
 - src/resgraph/consumer.py — generic stream consumer loop (pending-first recovery, ack-after-apply)
 - src/resgraph/cold/ — Iceberg cold store: catalog/tables/appends, CLI (D11–D13)
+- src/resgraph/query/ — filter DSL, mini planner, execution over both stores (D16)
+- src/resgraph/api/ — FastAPI surface: budgets, labeled sources, lazy explain (D15)
+- sql/cold_semantics.sql — D13 event-time semantics as portable SQL for any engine
+  reading the Iceberg table directly (D15 addendum)
+- docs/planner-vocabulary.md — the mini planner mapped to query-engine terms
 - benchmarks/ — measurement scripts (methods in BENCHMARKS.md)

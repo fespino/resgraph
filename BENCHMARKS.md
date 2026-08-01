@@ -253,3 +253,55 @@ is a correct-by-property-test optimization waiting for a bigger world.
 < 500 MB (20×), each at the documented batch size. First phase where
 every provisional budget held; the margin says the budgets were set
 timidly after two phases of misses, which is itself calibration data.
+
+## Query layer — composite split, push-down delta, live endpoints (D15–D16, D4)
+
+**Hardware:** Apple M3, 8 GB RAM, macOS 15.2 (laptop; Memgraph in
+Docker for the live rows, cold path in-process).
+**Date / PR:** 2026-08-01 / phase 5.
+**Method:** `benchmarks/query_bench.py` — seeded worlds at four sizes;
+composite timed per step (cold reconstruction / BFS traverse /
+result filter), p50 of 7. Push-down delta on the `/world` route: the
+same `attrs.zone=z1` predicate evaluated in the DuckDB scan vs forced
+into the Python residual path, identical results asserted by the test
+suite. Live rows: p50 of 200 requests through the full API path
+(in-process TestClient over a real Memgraph, 5k-resource world +
+20k churn), so route + validation + serialization are included.
+
+| Measure | World | Result |
+|---|---|---|
+| composite as-of blast radius, p50 | 10k res / 1M events | **0.371 s** (reconstruct 0.27, traverse 0.010) |
+| composite as-of blast radius, p50 | 10k res / 500k events | 0.185 s |
+| composite as-of blast radius, p50 | 5k res / 100k events | 0.074 s |
+| `/world` pushed vs residual, p50 | 10k res / 1M events | **0.145 s vs 0.367 s (2.5×)** |
+| `/world` pushed vs residual, p50 | 5k res / 100k events | 0.041 s vs 0.074 s (1.8×) |
+| `/world` pushed vs residual, p50 | 1k res / 10k events | 0.025 s vs 0.033 s (1.3×) |
+| live `/blast-radius` end-to-end, p50 | 5k res + 20k churn | **2.5 ms** |
+| live `/resources/{id}` end-to-end, p50 | 5k res + 20k churn | 2.2 ms |
+| `plan()` + `explain()`, p50 | — | **0.012 ms** |
+
+### Findings
+
+**The composite is a reconstruction with a rounding error attached.**
+At every size, cold `state_at` is 94–97% of the composite; the BFS
+traverse over the reconstructed world is ~10 ms even at 30k alive
+resources. Optimizing this query means optimizing reconstruction
+(snapshot cadence, partition pruning) — the ephemeral-graph half of
+D16 never becomes the problem at this scale.
+
+**The push-down delta grows with scale — and the cost is the
+boundary, not the predicate.** 1.3× at 10k events, 2.5× at 1M. The
+residual path doesn't lose by evaluating predicates slowly; it loses
+by materializing every row into Python (Arrow → dicts → JSON parse)
+before the filter can look at them, and that serialization tax scales
+with world size while the pushed filter's cost scales with matches.
+Push-down is less about where the comparison runs than about how much
+data crosses the engine boundary.
+
+**D4 query budgets: all validated, no supersession** — live p50
+2.5 ms vs < 100 ms (40×), composite 0.371 s at 1M vs < 2 s (5×),
+explain 0.012 ms vs < 50 ms with zero store contact (asserted by
+test, not just timed). Second consecutive phase with every budget
+holding; the margins stay large, which now reads less like timidity
+and more like laptop-scale queries simply being cheap — the budgets
+exist for the day they stop being.

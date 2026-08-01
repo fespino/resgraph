@@ -6,6 +6,7 @@ and the residual filter that the plan already flagged.
 """
 
 from collections import deque
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
@@ -19,14 +20,26 @@ from .planner import Plan, _cypher_where, _duckdb_where, bind_params
 
 @dataclass
 class QueryContext:
+    """Store handles, created on first use — a plan that never executes
+    (explain) must never open a connection."""
+
     session: Any = None
     catalog: Any = None
+    session_factory: Callable[[], Any] | None = None
+    catalog_factory: Callable[[], Any] | None = None
 
     def require(self, store: str):
-        handle = self.session if store == "hot" else self.catalog
-        if handle is None:
-            raise RuntimeError(f"query needs the {store} store but none is configured")
-        return handle
+        if store == "hot":
+            if self.session is None and self.session_factory is not None:
+                self.session = self.session_factory()
+            if self.session is None:
+                raise RuntimeError("query needs the hot store but none is configured")
+            return self.session
+        if self.catalog is None and self.catalog_factory is not None:
+            self.catalog = self.catalog_factory()
+        if self.catalog is None:
+            raise RuntimeError("query needs the cold store but none is configured")
+        return self.catalog
 
 
 def _matches(row: dict, p: Predicate) -> bool:

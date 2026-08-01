@@ -609,10 +609,10 @@ decision to adopt gets its own D-number.
 
 | Budget | Target | Measured |
 |---|---|---|
-| live endpoints (hot), p50 server-side | < 100 ms | — |
-| composite as-of blast radius, 1M-event history, p50 | < 2 s | — |
-| `explain=true`, any endpoint | < 50 ms, zero store contact | — |
-| residual-filter delta | measured and reported, no target — it is the push-down argument's evidence | — |
+| live endpoints (hot), p50 server-side | < 100 ms | **2.5 ms** end-to-end (BENCHMARKS.md) |
+| composite as-of blast radius, 1M-event history, p50 | < 2 s | **0.371 s** (BENCHMARKS.md) |
+| `explain=true`, any endpoint | < 50 ms, zero store contact | **0.012 ms**; zero-contact asserted by test |
+| residual-filter delta | measured and reported, no target — it is the push-down argument's evidence | **2.5× at 1M events** — and it grows with scale (BENCHMARKS.md) |
 
 The composite budget rides on the D4 cold budget (`state_at` 0.39 s
 at the 95% mark): reconstruction dominates, traverse and serialization

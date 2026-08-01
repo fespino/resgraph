@@ -124,6 +124,22 @@ exception is a control you'll eventually disable entirely:
 | TruffleHog | `.trufflehogignore` | deliberate test fixtures only |
 | osv-scanner | `osv-scanner.toml` | justification + link required |
 | zizmor | `.github/zizmor.yml` | written waiver per rule per file |
+| bandit | inline `# nosec BXXX` | per-site only, never config-wide; rationale at the site; documented below |
+
+**The standing bandit exception (B608, `cold/queries.py`).** The
+query layer builds SQL from strings — dynamic WHERE and projection
+make that unavoidable; identifiers cannot be bound parameters in SQL,
+which is why every query engine does the same. The suppression is
+sound because the injection boundary is elsewhere: untrusted input is
+parsed at the HTTP edge into a closed predicate algebra (fields from
+a generator-derived allowlist, operators from a fixed set, values as
+bound parameters — D16), and raw query passthrough is a rejected
+alternative on the record (D15). A caller able to hand `state_at` a
+hostile fragment is already running Python in-process and needs no
+injection. **The suppression becomes wrong the day any endpoint
+accepts SQL text** — that change must revisit both the D15 rejection
+and this paragraph. B608 stays enabled repo-wide precisely so that
+day is loud.
 
 ## Honest limitations
 

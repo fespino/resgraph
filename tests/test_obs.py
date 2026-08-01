@@ -24,11 +24,13 @@ def test_counters_and_histograms_export_with_expected_names():
     obs.APPLIED.add(3, {"worker": "w-test"})
     obs.BATCH_SECONDS.record(0.05, {"worker": "w-test"})
     obs.API_SECONDS.record(0.2, {"route": "/world", "source": "cold"})
+    obs.PHANTOMS_CREATED.add(2)
     out = _scrape()
     assert b"ingest_applied_total" in out
     assert b'worker="w-test"' in out
     assert b"ingest_batch_apply_seconds_bucket" in out
     assert b"api_request_seconds_bucket" in out
+    assert b"graph_phantoms_created_total" in out
 
 
 def test_api_histogram_has_bucket_at_the_slo_threshold():

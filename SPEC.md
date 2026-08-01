@@ -767,6 +767,29 @@ permanently — cardinality discipline starts on day one.
 the always-on evaluator this design borrows from Prometheus; when it
 lands, re-evaluate migrating SLO evaluation onto the platform itself.
 
+#### D17 addendum — instrument coverage, decided not defaulted (#60)
+
+The phase-6 build dropped two planned instrument groups without a
+recorded decision; this addendum is that decision.
+
+- **Built: `graph_phantoms_created` (counter).** Phantom creation is
+  observable exactly and for free: the edge-apply MERGEs can only
+  ever create phantom target nodes (sources are MATCHed), so the
+  write summary's `nodes_created` *is* the phantom count — no
+  scrape-time store query needed.
+- **Rejected: a current-phantom-count gauge.** Reading it live means
+  the metrics path querying the observed store at scrape time —
+  exactly the observer/observed coupling the failure-domain argument
+  above forbids. The current count is a store fact, available on
+  demand (`queries.stats` reports it) and derivable from the counter
+  plus resolutions when history matters.
+- **Deferred: cold-writer instruments** (queue depth, rows per
+  flush). Cold-path health is already triangulated by consumer lag,
+  the drill's drain gates, and reconcile — a queue-depth panel would
+  be furniture, not signal, until an incident says otherwise.
+  Reopen trigger: the first cold-path incident the existing signals
+  miss.
+
 ### D18 — Two per-run SLOs, ratio SLIs, thresholds derived not invented
 
 Method per the SRE Workbook's SLO-implementation chapter. SLO
@@ -824,6 +847,22 @@ adopt-trigger: a third SLO or multiwindow multi-burn alerting.
 with margin and zero toil tightens; an SLO missed by an honest
 system loosens; either change is a new D18 revision, never a silent
 edit.
+
+#### D18 addendum — two honesty notes from the closeout review (#60)
+
+- **Fast-burn multiplier: 6×, not the canonical 14.4×.** The 14.4×
+  fastest tier assumes a multi-week window with hours-scale budget
+  consumption; per-run windows re-derive from the same principle —
+  "budget exhausted in ≤5 minutes of a 30-minute run" — and that
+  arithmetic gives 6× (derivation as a comment in
+  `observability/rules/slo.yml`). Same rule, different window, shown
+  work.
+- **Policy scope, stated plainly:** of the budget policy's teeth,
+  only the drill gates are code today — "a load run that exhausts
+  its budget fails its run report" has no run-report harness behind
+  it yet. The clause binds drills until a load-run harness exists
+  (expected alongside #32's scale-out benchmarking); when it lands,
+  the report gate becomes code or this addendum reopens.
 
 ## Phase contracts
 - The generator MUST emit D2 messages exactly and expose `--seed`

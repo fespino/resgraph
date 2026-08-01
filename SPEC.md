@@ -313,6 +313,30 @@ cold-append budget after profiling, swap the writer (e.g. append via
 DuckDB's Iceberg support or a Rust writer) — the table format and
 layout (D12) survive; only the writer changes.
 
+**D11 amendment (phase 4, honesty pass):** with the phase built and
+measured, the challenge "is Iceberg justified for an append-only log?"
+gets its answer on the record: **not by current technical need.** Every
+capability the queries exercise — atomic per-batch visibility (one file
+per batch; a rename is equivalent), stats-based file pruning (DuckDB
+does it from parquet footers), schema stability (engineered via JSON
+strings, sidestepping evolution) — a plain parquet directory would
+match, without the measured Iceberg-specific costs (metadata
+amplification, compounding commit overhead). Native time travel is
+explicitly rejected (D13). The decision stands on the D1-shaped
+grounds: catalog/engine interop as the production exit path, latent
+rollback/branching, and deliberate skill-building — named plainly, not
+dressed as engineering necessity. The roadmap deepens *cold-store*
+usage (as-of serving, trigger replay, dashboard time travel, DR
+runbook) but all of it binds to the event-time layer, which is
+format-agnostic; one future phase measures Iceberg commit I/O as a
+*specimen*.
+**Sharpened reversal condition:** if by the end of the serving-layer
+phase no Iceberg-exclusive capability has been exercised — a second
+engine reading the table, a rollback used in an ops drill, or schema
+evolution via a `schema_version` bump — the format is decoration:
+either exercise one deliberately or swap to plain parquet and record
+the simplification.
+
 ### D12 — Cold layout: an append-only event log plus derived snapshots
 
 Two tables:
@@ -320,6 +344,12 @@ Two tables:
 - **`events`** — every D2 message, append-only, one row per message:
   the D2 fields flattened, `attrs` and `relationships` as JSON strings
   (arbitrary keys stay schema-stable), partitioned by `day(event_time)`.
+  *Recorded limitation (phase 4):* the day partition is **inert for
+  fixture data** — simulated world time advances ~100 µs per event, so
+  a million events span minutes and land in one partition. It costs
+  nothing and becomes real when event time spans days; kept, with the
+  admission that today it is decoration by the repo's own
+  indexes-are-budgets rule.
 - **`state_snapshots`** — periodic full world state (one row per
   alive resource) tagged with `as_of_time` + the max `sequence`
   included. Derived **from the events table**, never from the hot

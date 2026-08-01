@@ -486,6 +486,100 @@ named so they stop being implicit:
 
 All three validated with margin; no supersession needed.
 
+## Phase 5 — the query layer
+
+### D15 — API surface: one thin HTTP layer over both stores
+
+FastAPI service (`resgraph.api`), read-only. The endpoint set is the
+contract the agent phase will wrap as tools, so it is small and fixed:
+
+| Endpoint | Store | Notes |
+|---|---|---|
+| `GET /resources/{id}` | hot | current state + outbound edges |
+| `GET /blast-radius/{id}?depth=&filter=` | hot | D8 traversal, depth cap enforced at the API boundary too |
+| `GET /history/{id}` | cold | per-resource message history (D12) |
+| `GET /world?at=T&filter=` | cold | point-in-time state (D13) |
+| `GET /diff?from=&to=` | cold | created / deleted / changed between two moments |
+| `GET /blast-radius/{id}?at=T&filter=` | both | the composite — planner territory (D16) |
+
+Normative response rules:
+
+- Every list endpoint carries a **result budget**: max 1000 rows,
+  with `truncated: bool` and `total_count` so a capped answer is
+  visibly capped, never silently short.
+- Every response carries `fetched_at` (wall time of serving) and
+  `source: hot | cold | composite` — a caller must be able to tell
+  which clock and store produced an answer (D13 makes this
+  distinction user-visible; hiding it would re-create the two-clocks
+  confusion at the API boundary).
+- `?explain=true` on planner-backed endpoints returns the plan
+  **without executing** — no store is contacted.
+
+**Rejected:** exposing the stores' native query languages
+(Cypher/SQL passthrough) — maximum power, but it couples every caller
+to store choice, defeats result budgets, and hands the future agent
+phase an injection surface instead of a tool surface.
+**Rejected:** GraphQL — resolver flexibility is exactly the unplanned
+query shape the budgets exist to prevent; a fixed endpoint table is
+the budget.
+**Reversal condition:** when the agent phase needs a question this
+table cannot express, extend the filter DSL or add an endpoint —
+never a passthrough. If endpoint count outgrows a screen, that is the
+moment to revisit the surface design, not before.
+
+### D16 — Mini planner: predicate push-down across two stores
+
+Scope: a filter DSL of **conjunctions only** —
+`type=vm AND attrs.zone=z1` (equality + numeric comparison; no OR, no
+functions). Scope is the skill: two backends warrant a placement
+table, not an optimizer.
+
+- **Placement rule:** each predicate goes to the store best able to
+  evaluate it — type and known-attr filters compile into Cypher
+  `WHERE` (hot) or DuckDB `WHERE` (cold, `json_extract` on the attrs
+  column) depending on route; anything neither store claims becomes a
+  **residual filter** applied in Python and *flagged in the plan* — a
+  visible residual is a design smell you can see and measure.
+  The set of known attr fields is derived from the generator's
+  `ATTR_POOLS` (the D5 discipline again: the table is code, not
+  prose), so the placement table cannot drift from the world's
+  actual schema.
+- **Composite strategy ("blast radius as of T"):** reconstruct the
+  as-of-T world from cold (D13 `state_at`, predicates pushed into the
+  DuckDB scan), build an ephemeral in-memory digraph from the
+  surviving rows' relationships, BFS there with the same
+  dependent→dependency direction and depth cap as D8.
+  **Rejected:** time-traveling the hot store — it has no history;
+  that is D13's whole division of labor.
+  **Rejected:** loading as-of-T into a scratch Memgraph label-space —
+  heavier, stateful, and the ephemeral graph is bounded by the same
+  result budgets anyway.
+- **Lazy by construction:** `plan()` returns a `Plan`; nothing
+  touches a store until `.execute()`. `explain` is the plan
+  serialized, executed never.
+
+**Rejected:** a real parser + cost-based optimizer — theater at two
+backends. The placement table becomes a cost decision the moment two
+placements are both *possible* and statistics must choose; that is
+the build-vs-adopt line.
+**Reversal condition:** a third store, or the first placement choice
+that needs row statistics to make — either is the signal to adopt a
+federated engine (Trino-shaped) rather than grow one here, and the
+decision to adopt gets its own D-number.
+
+### D4 addendum — query-layer budgets (provisional)
+
+| Budget | Target | Measured |
+|---|---|---|
+| live endpoints (hot), p50 server-side | < 100 ms | — |
+| composite as-of blast radius, 1M-event history, p50 | < 2 s | — |
+| `explain=true`, any endpoint | < 50 ms, zero store contact | — |
+| residual-filter delta | measured and reported, no target — it is the push-down argument's evidence | — |
+
+The composite budget rides on the D4 cold budget (`state_at` 0.39 s
+at the 95% mark): reconstruction dominates, traverse and serialization
+must fit in the remainder.
+
 ## Phase contracts
 - The generator MUST emit D2 messages exactly and expose `--seed`
   for reproducibility.
@@ -493,6 +587,9 @@ All three validated with margin; no supersession needed.
   semantics.
 - The cold store MUST answer `state_at(T)` from its own tables alone
   (D12), with event-time semantics (D13).
+- The API MUST enforce result budgets and label every response with
+  its store of origin (D15); planner-backed endpoints MUST be able to
+  explain without executing (D16).
 - Any increment touching these contracts cites the D-number in its PR.
 
 

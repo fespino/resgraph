@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <title>Coverage for src/resgraph/query/planner.py: 98%</title>
+    <title>Coverage for src/resgraph/query/planner.py: 100%</title>
     <link rel="icon" sizes="32x32" href="favicon_32_cb_c827f16f.png">
     <link rel="stylesheet" href="style_cb_4667309f.css" type="text/css">
     <script src="coverage_html_cb_dd2e7eb5.js" defer></script>
@@ -12,7 +12,7 @@
     <div class="content">
         <h1>
             <span class="text">Coverage for </span><b>src<span class="sep">/</span>resgraph<span class="sep">/</span>query<span class="sep">/</span>planner.py</b>:
-            <span class="pc_cov">98%</span>
+            <span class="pc_cov">100%</span>
         </h1>
         <aside id="help_panel_wrapper">
             <input id="help_panel_state" type="checkbox">
@@ -55,8 +55,8 @@
         </aside>
         <h2>
             <span class="text">83 statements &nbsp;</span>
-            <button type="button" class="run button_toggle_run" value="run" data-shortcut="r" title="Toggle lines run">81<span class="text"> run</span></button>
-            <button type="button" class="mis show_mis button_toggle_mis" value="mis" data-shortcut="m" title="Toggle lines missing">2<span class="text"> missing</span></button>
+            <button type="button" class="run button_toggle_run" value="run" data-shortcut="r" title="Toggle lines run">83<span class="text"> run</span></button>
+            <button type="button" class="mis show_mis button_toggle_mis" value="mis" data-shortcut="m" title="Toggle lines missing">0<span class="text"> missing</span></button>
             <button type="button" class="exc show_exc button_toggle_exc" value="exc" data-shortcut="x" title="Toggle lines excluded">0<span class="text"> excluded</span></button>
         </h2>
         <p class="text">
@@ -65,7 +65,7 @@
             <a id="nextFileLink" class="nav" href="z_3aec9a5b99519259_reconcile_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.15.2">coverage.py v7.15.2</a>,
-            created at 2026-08-01 23:12 +0000
+            created at 2026-08-02 09:44 +0000
         </p>
         <aside class="hidden">
             <button type="button" class="button_next_chunk" data-shortcut="j"></button>
@@ -153,7 +153,7 @@
     <p class="run"><span class="n"><a id="t71" href="#t71">71</a></span><span class="t">    <span class="key">for</span> <span class="nam">p</span> <span class="key">in</span> <span class="nam">claimable</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t72" href="#t72">72</a></span><span class="t">        <span class="key">if</span> <span class="nam">p</span><span class="op">.</span><span class="nam">field</span> <span class="op">==</span> <span class="str">"type"</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t73" href="#t73">73</a></span><span class="t">            <span class="key">if</span> <span class="nam">p</span><span class="op">.</span><span class="nam">op</span> <span class="key">not</span> <span class="key">in</span> <span class="op">(</span><span class="str">"="</span><span class="op">,</span> <span class="str">"!="</span><span class="op">)</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis show_mis"><span class="n"><a id="t74" href="#t74">74</a></span><span class="t">                <span class="key">raise</span> <span class="nam">ValueError</span><span class="op">(</span><span class="fst">f"</span><span class="fst">type only supports = and !=: </span><span class="op">{</span><span class="nam">p</span><span class="op">}</span><span class="fst">"</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t74" href="#t74">74</a></span><span class="t">                <span class="key">raise</span> <span class="nam">ValueError</span><span class="op">(</span><span class="fst">f"</span><span class="fst">type only supports = and !=: </span><span class="op">{</span><span class="nam">p</span><span class="op">}</span><span class="fst">"</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t75" href="#t75">75</a></span><span class="t">            <span class="key">if</span> <span class="nam">p</span><span class="op">.</span><span class="nam">value</span> <span class="key">not</span> <span class="key">in</span> <span class="nam">_TYPES</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t76" href="#t76">76</a></span><span class="t">                <span class="key">raise</span> <span class="nam">ValueError</span><span class="op">(</span><span class="fst">f"</span><span class="fst">unknown type </span><span class="op">{</span><span class="nam">p</span><span class="op">.</span><span class="nam">value</span><span class="op">!</span><span class="nam">r</span><span class="op">}</span><span class="fst">"</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t77" href="#t77">77</a></span><span class="t">    <span class="key">return</span> <span class="nam">claimable</span><span class="op">,</span> <span class="nam">residual</span>&nbsp;</span><span class="r"></span></p>
@@ -180,7 +180,7 @@
     <p class="pln"><span class="n"><a id="t98" href="#t98">98</a></span><span class="t">        <span class="key">else</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t99" href="#t99">99</a></span><span class="t">            <span class="nam">key</span> <span class="op">=</span> <span class="nam">p</span><span class="op">.</span><span class="nam">field</span><span class="op">.</span><span class="nam">removeprefix</span><span class="op">(</span><span class="str">"attrs."</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t100" href="#t100">100</a></span><span class="t">            <span class="key">if</span> <span class="nam">isinstance</span><span class="op">(</span><span class="nam">p</span><span class="op">.</span><span class="nam">value</span><span class="op">,</span> <span class="nam">bool</span><span class="op">)</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis show_mis"><span class="n"><a id="t101" href="#t101">101</a></span><span class="t">                <span class="nam">lhs</span> <span class="op">=</span> <span class="fst">f"</span><span class="fst">TRY_CAST(json_extract(attrs, '$.</span><span class="op">{</span><span class="nam">key</span><span class="op">}</span><span class="fst">') AS BOOLEAN)</span><span class="fst">"</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t101" href="#t101">101</a></span><span class="t">                <span class="nam">lhs</span> <span class="op">=</span> <span class="fst">f"</span><span class="fst">TRY_CAST(json_extract(attrs, '$.</span><span class="op">{</span><span class="nam">key</span><span class="op">}</span><span class="fst">') AS BOOLEAN)</span><span class="fst">"</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t102" href="#t102">102</a></span><span class="t">            <span class="key">elif</span> <span class="nam">isinstance</span><span class="op">(</span><span class="nam">p</span><span class="op">.</span><span class="nam">value</span><span class="op">,</span> <span class="op">(</span><span class="nam">int</span><span class="op">,</span> <span class="nam">float</span><span class="op">)</span><span class="op">)</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t103" href="#t103">103</a></span><span class="t">                <span class="nam">lhs</span> <span class="op">=</span> <span class="fst">f"</span><span class="fst">TRY_CAST(json_extract(attrs, '$.</span><span class="op">{</span><span class="nam">key</span><span class="op">}</span><span class="fst">') AS DOUBLE)</span><span class="fst">"</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t104" href="#t104">104</a></span><span class="t">            <span class="key">else</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
@@ -271,7 +271,7 @@
             <a class="nav" href="z_3aec9a5b99519259_reconcile_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.15.2">coverage.py v7.15.2</a>,
-            created at 2026-08-01 23:12 +0000
+            created at 2026-08-02 09:44 +0000
         </p>
     </div>
 </footer>

@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "resgraph": {
+      "command": "uv",
+      "args": ["run", "resgraph-mcp"],
+      "cwd": "."
+    }
+  }
+}

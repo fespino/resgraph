@@ -26,3 +26,9 @@
 - scripts/drill-hotstore-loss.sh — the INC-001 chaos drill, scripted
 - docs/incidents/ — incident notes (induced drills labeled as such)
 - benchmarks/ — measurement scripts (methods in BENCHMARKS.md)
+- src/resgraph/tools/ — canonical tool layer (D19/D20): registry as the
+  single source of truth, budgets, refs+fetch shaping, HTTP projection
+- src/resgraph/mcp/ — MCP server over the registry (stdio), server card,
+  skills-as-prompts loader (D21)
+- skills/ — investigation playbooks (SKILL.md, validated at startup)
+- .mcp.json — Claude Code/Desktop wiring for the resgraph MCP server

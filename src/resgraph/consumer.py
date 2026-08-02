@@ -119,7 +119,7 @@ class StreamConsumer:
                     count=count,
                     block=self.block_ms if cursor == ">" else None,
                 )
-                resp_list = cast("list[tuple[Any, list[Entry]]]", resp)
+                resp_list = cast(list[tuple[Any, list[Entry]]], resp)
                 entries = resp_list[0][1] if resp_list else []
                 if not entries:
                     if cursor != ">":
@@ -240,7 +240,7 @@ class StreamConsumer:
             consumername=self.name,
         )
         deliveries = {
-            e["message_id"]: int(e["times_delivered"]) for e in cast("list[dict[str, Any]]", info)
+            e["message_id"]: int(e["times_delivered"]) for e in cast(list[dict[str, Any]], info)
         }
         kept: list[Pair] = []
         for entry_id, raw, msg in pairs:

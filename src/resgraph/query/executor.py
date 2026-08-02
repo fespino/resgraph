@@ -74,7 +74,7 @@ def _matches(row: dict[str, Any], p: Predicate) -> bool:
                 return value > p.value
             return value >= p.value
         case _:
-            assert_never(p.op)
+            return assert_never(p.op)
 
 
 def _residual_filter(rows: list[dict[str, Any]], residual: list[Predicate]) -> list[dict[str, Any]]:

@@ -947,6 +947,22 @@ those CLIs) does not transfer to a bespoke surface no model has seen,
 so task-shaped stands. Trigger: if agent traces show improvisation
 around the surface — questions the five tools cannot compose — test a
 wide/files-based arm before adding tool six.
+
+**Second named alternative (recorded, with trigger):** composition in
+code —
+[code execution with MCP](https://www.anthropic.com/engineering/code-execution-with-mcp)
+presents tool surfaces as code APIs so the agent writes a script;
+intermediate results stay in the execution environment (their
+benchmark: 150k → 2k tokens, 98.7%), converging with Azure SRE's
+tool-call chaining (60–70% projected). The known first candidate here
+is already shipped: the change-forensics playbook intersects
+world_diff refs with blast_radius refs in context — a set operation
+flowing through the model. Trigger: when traces show rote multi-tool
+sequences or in-context set operations over ref lists, evaluate
+executing composition registry-side — either a task-shaped composed
+tool, or agent-written code once a sandbox exists (its stated cost:
+secure execution, resource limits, monitoring — a later phase's
+machinery, not this one's).
 **Rejected:** porting the HTTP API 1:1 (route-shaped tools push
 orchestration into the agent); separate schema definitions per surface
 (precisely the drift class this decision exists to kill).

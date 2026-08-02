@@ -142,7 +142,7 @@ def test_platform_cli_end_to_end():
     )
     assert br.exit_code == 0
     path = runner.invoke(
-        plat_app, ["query", "path", "--from", "host-000001", "--to", "host-000001"]
+        main_cli.app, ["query", "path", "--from", "host-000001", "--to", "host-000001"]
     )
     assert path.exit_code == 0
 

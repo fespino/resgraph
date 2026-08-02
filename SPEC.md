@@ -21,6 +21,7 @@ maps each phase to its events.
 | 5 — query layer | D15–D16 | D4 (query-layer budgets) |
 | 6 — observability | D17–D18 | D14 (outage is not poison) |
 | post-6 (2026-08-02) | — | D0 (pyright strict gate, #68) |
+| 7 — MCP server | D19–D21 | — |
 
 ## D0 — Toolchain: typed Python, with the types enforced (phase 0)
 
@@ -894,6 +895,136 @@ edit.
   it yet. The clause binds drills until a load-run harness exists
   (expected alongside #32's scale-out benchmarking); when it lands,
   the report gate becomes code or this addendum reopens.
+
+## D19 — Tool surface: registry-canonical, task-shaped, dual-surface (phase 7)
+
+Canonical tool bodies live in `src/resgraph/tools/canonical/` as plain
+functions — Pydantic input model, Pydantic output model, and a
+keyword-only `CallerContext` the LLM never sees (transport-injected,
+absent from the LLM-facing schema, so a caller cannot supply its own
+authority). One `TOOL_REGISTRY` declares the surface; the MCP server
+and the HTTP `/tools/{name}` routes both derive from the same loop.
+The transport is never the truth-bearing module, and the drift guard
+(four AST-level CI assertions) makes a second definition structurally
+impossible rather than currently absent.
+
+Tools are TASK-shaped, not route-shaped: `blast_radius`,
+`dependency_path`, `resource_history`, `world_diff`, `fetch_resource`.
+An agent investigating an incident wants "blast_radius(db-42)", not
+five REST calls it must orchestrate itself. The discipline has a name
+— agent-computer-interface poka-yoke
+([Building Effective Agents](https://www.anthropic.com/research/building-effective-agents)):
+make the mistake structurally hard, not instructed-against.
+
+The registry carries production seams from day one, all metadata-only
+at v1: `scopes` (`resgraph:read`), `privileged` (admission rule: a
+tool is privileged iff it mutates platform state, is only legitimate
+inside an approval workflow, and external clients have no bypassing
+use case — v1's answer is "none", the seam costs one field), the four
+MCP risk-annotation hints (`readOnlyHint`/`destructiveHint`/
+`idempotentHint`/`openWorldHint` — declared explicitly on every tool
+because the
+[spec defaults](https://blog.modelcontextprotocol.io/posts/2026-03-16-tool-annotations/)
+read as destructive + open-world, and risk composes per session, not
+per tool), `timeout_s`, and a structured error-action map
+(rephrase / retry / give up) per the gaps named in the
+[MCP enterprise field report](https://arxiv.org/abs/2603.13417) —
+`timeout_s` is the laptop-scale simplification of their adaptive
+budgeting. Retrofitting any of these means reopening every tool;
+flipping enforcement on an existing field is one middleware.
+
+Pinned to MCP spec revision **`2026-07-28`** (stateless core). All
+five tools are single-shot reads — no session state, no handles —
+which is exactly the shape that revision asks for; skills-as-prompts
+and the server card ride primitives unaffected by its deprecations.
+
+**Named alternative (recorded, with trigger):** Microsoft's
+[Azure SRE Agent](https://techcommunity.microsoft.com/blog/appsonazureblog/context-engineering-lessons-from-building-azure-sre-agent/4481200/)
+collapsed 100+ narrow tools to ~5 WIDE ones (az/kubectl as whole CLI
+ecosystems) — endorsing the small count while disputing the shape.
+Their winning argument (lean on the model's training-data knowledge of
+those CLIs) does not transfer to a bespoke surface no model has seen,
+so task-shaped stands. Trigger: if agent traces show improvisation
+around the surface — questions the five tools cannot compose — test a
+wide/files-based arm before adding tool six.
+**Rejected:** porting the HTTP API 1:1 (route-shaped tools push
+orchestration into the agent); separate schema definitions per surface
+(precisely the drift class this decision exists to kill).
+**Reversal condition:** the named-alternative trigger above; also
+re-pin when the 2026-07-28 revision leaves RC if anything binding
+changed.
+
+## D20 — Budgets inside the tool: refs+fetch, token caps, freshness (phase 7)
+
+The agent must not be able to ask an unbounded question, and
+enforcement lives server-side, not in prompt etiquette:
+
+- **Clamps, not errors.** `depth` beyond the traversal cap clamps and
+  says so (`depth_clamped: true`). An agent that gets clamped keeps
+  working; one that gets a 500 retries in a loop.
+- **Refs+fetch.** Traversal and diff responses return bare refs
+  `{id, type, one_line}`; one polymorphic `fetch_resource(id, at=?)`
+  returns detail for any resource type. A 400-node blast radius with
+  full attributes is a blown context window the agent cannot steer;
+  refs let it fetch the three nodes it cares about. Independently
+  confirmed in production by Azure SRE's "treat large tool outputs as
+  data sources, not context."
+- **Token cap.** Every response serializes under
+  `TOOL_RESPONSE_TOKEN_CAP = 8000` (len/4 estimate — the ceiling is
+  the point, not the precision). Overflow paginates: `truncated:
+  true`, honest `total_count`, and a prose `pagination_hint` ("call
+  again with offset=N") — the consumer is a language model, so the
+  payload teaches the next move. Pagination is an argument, not a
+  separate tool.
+- **Freshness.** Every response carries `fetched_at` and
+  `source: hot|cold|composite`, propagated from the query layer
+  untouched. An agent reasoning over a 20-minute-old payload about a
+  live system needs to know to re-fetch; freshness IS correctness when
+  the world churns.
+- **Errors are steering surfaces.** A rejection says what to do
+  instead, in the message — not in documentation the model never
+  loads. [Stripe's steering experiments](https://stripe.dev/blog/ai-steering-experiments)
+  measured the asymmetry: passive documentation is ignored ("agents
+  simply don't wander"), while error-based steering reliably corrects
+  behavior.
+
+**Rejected:** fat traversal responses (see refs+fetch above); a
+separate `_page` tool (tool-selection where an argument suffices);
+erroring on over-cap depth (the retry-loop failure mode).
+**Reversal condition:** when callers with different context budgets
+exist, the cap moves from a constant into the protocol conversation
+(client declares, server shapes).
+
+## D21 — Skills as prompts: validated manifest, fixed six-section body (phase 7)
+
+Investigation playbooks ship as `skills/<slug>/SKILL.md` — YAML
+frontmatter validated by a Pydantic manifest, exposed over MCP as
+prompts. `tool_refs` are validated against `TOOL_REGISTRY` at load: a
+skill referencing a tool that doesn't exist **fails loudly at
+startup**, never silently at runtime.
+**Rejected:** soft-fail (exclude the bad skill and log) — at two
+skills, a silently missing playbook is a worse failure than a crashed
+startup; revisit only if skills become a governed corpus with
+independent authorship.
+
+Body: six sections in fixed order — Goal, When to use, Steps, Tools to
+call, Examples, Anti-patterns — positional consistency so the
+consuming LLM learns the shape once. Playbooks state constraints
+before narrative (budget discipline in the skill, not just the tool),
+the format
+[Stripe's grounding-file work](https://stripe.dev/blog/build-stripe-salesforce-integrations-faster-with-agents)
+validated: a constraint-first core (rules, signatures, failure modes —
+not tutorials) took a task from hours of failed iterations to minutes.
+v1 ships two skills deliberately different in shape: `incident-impact`
+(workflow) and `change-forensics` (analytical). The count stays small
+on evidence: [LangChain measured](https://www.langchain.com/blog/evaluating-skills)
+82% task completion with curated skills vs 9% without — and
+wrong-skill selection appearing at ~20 similar skills, so similarity
+at scale is the ceiling, not count alone.
+**Reversal condition:** if prose playbooks plateau in an evaluation
+loop, the named next experiment is compiling them to schema-validated
+step graphs ([AIP](https://arxiv.org/abs/2606.04781), 📄 Paper:
+arXiv:2606.04781 — 53%→67% with step-level repair).
 
 ## Phase contracts
 - The generator MUST emit D2 messages exactly and expose `--seed`

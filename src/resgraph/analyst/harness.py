@@ -14,6 +14,8 @@ are refused with an instruction to conclude, and the run is marked
 degraded.
 """
 
+import hashlib
+import json
 import re
 from dataclasses import dataclass, field
 from typing import Any, Protocol
@@ -99,6 +101,23 @@ class RunResult:
     usage: Usage
     trace: list[ToolCall] = field(default_factory=list)
     validation_failures: list[str] = field(default_factory=list)
+
+
+def cache_fingerprint(prompt: Prompt, toolset: Toolset) -> str:
+    """SHA-256 over everything that serializes before the cache
+    breakpoint: tool blocks plus the prefix system blocks. Recorded
+    next to the cache-hit metric so a cache regression is
+    self-diagnosing — an unchanged fingerprint means runtime behavior,
+    a changed one means a registry or prompt edit busted the cache."""
+    prefix: list[dict[str, Any]] = []
+    for block in prompt.system:
+        prefix.append(block)
+        if "cache_control" in block:
+            break
+    payload = json.dumps(
+        {"tools": toolset.blocks(), "system_prefix": prefix}, sort_keys=True, default=str
+    )
+    return hashlib.sha256(payload.encode()).hexdigest()
 
 
 def _ids(text: str) -> set[str]:

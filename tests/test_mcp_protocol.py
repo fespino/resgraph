@@ -164,9 +164,7 @@ async def _exercise_surface(seeded, tmp_path):
         # the cold tools must round-trip over the same stdout channel:
         # pyiceberg/duckdb initialize inside the server process here, so a
         # stray print would corrupt the framing and fail the parse
-        hist = await session.call_tool(
-            "resource_history", {"resource_id": "container-hub0000"}
-        )
+        hist = await session.call_tool("resource_history", {"resource_id": "container-hub0000"})
         hbody = hist.structured_content
         assert hbody is not None and hbody["total_count"] >= 1
         assert hbody["events"][0]["op"] == "upsert"

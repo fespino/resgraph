@@ -10,7 +10,7 @@ from typing import Literal
 
 from resgraph.query.executor import QueryContext
 
-Caller = Literal["mcp", "http"]
+Caller = Literal["mcp", "http", "analyst"]
 
 
 @dataclass(frozen=True)

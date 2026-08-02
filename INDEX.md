@@ -3,6 +3,7 @@
 - SPEC.md — decisions (D-NN) + phase contracts
 - src/resgraph/schema.py — D2 update-message schema (pydantic)
 - src/resgraph/gen/ — deterministic world generator (D5–D7) + causal-scenario planting (D25): world, churn, scenarios, sinks, CLI
+- src/resgraph/analyst/ — the triage agent (D22–D23): harness loop, report models, registry-derived Anthropic tool surface
 - BENCHMARKS.md — measured numbers with hardware + method (D4)
 - docs/stream-contract.md — why consumers must not assume referential integrity
 - tests/ — schema + per-component tests

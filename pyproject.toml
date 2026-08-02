@@ -12,6 +12,7 @@ requires-python = ">=3.13"
 dependencies = [
     "duckdb>=1.5.5",
     "fastapi>=0.141.1",
+    "mcp>=2.0.0",
     "neo4j>=6.2.0",
     "opentelemetry-api>=1.44.0",
     "opentelemetry-exporter-prometheus>=0.65b0",
@@ -19,6 +20,7 @@ dependencies = [
     "pyarrow>=25.0.0",
     "pydantic>=2.13.4",
     "pyiceberg[pyiceberg-core,sql-sqlite]>=0.11.1",
+    "pyyaml>=6.0.3",
     "redis>=8.0.1",
     "typer>=0.27.0",
     "uvicorn>=0.52.0",
@@ -27,6 +29,7 @@ dependencies = [
 [project.scripts]
 resgraph = "resgraph.cli:app"
 resgraph-gen = "resgraph.gen.cli:app"
+resgraph-mcp = "resgraph.mcp.server:main"
 
 [build-system]
 requires = ["uv_build>=0.12.0,<0.13.0"]

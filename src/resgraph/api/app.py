@@ -26,6 +26,7 @@ from resgraph.query.dsl import parse_filter
 from resgraph.query.executor import QueryContext, execute_plan
 from resgraph.query.planner import Query as PlannerQuery
 from resgraph.query.planner import plan as make_plan
+from resgraph.tools.http import mount_tools
 
 log = logging.getLogger("resgraph.api")
 
@@ -52,7 +53,7 @@ class AffectedOut(BaseModel):
     type: str
 
 
-class BlastRadiusOut(Envelope):
+class BlastRadiusApiOut(Envelope):
     root: str
     depth: int
     at: datetime | None
@@ -145,6 +146,8 @@ def get_ctx(request: Request):
 
 Ctx = Annotated[QueryContext, Depends(get_ctx)]
 
+mount_tools(app, get_ctx)
+
 
 def _now() -> datetime:
     return datetime.now(UTC)
@@ -217,7 +220,7 @@ def blast_radius(
         raise HTTPException(status_code=400, detail=str(e)) from e
     rows, truncated, total = _cap(rows)
     request.state.telemetry.update(total=total, truncated=truncated)
-    return BlastRadiusOut(
+    return BlastRadiusApiOut(
         fetched_at=_now(),
         source="hot" if at_t is None else "composite",
         root=resource_id,

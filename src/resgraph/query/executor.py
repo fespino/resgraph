@@ -66,15 +66,13 @@ def _matches(row: dict[str, Any], p: Predicate) -> bool:
             # old TypeError catch, made statically impossible instead
             if not isinstance(value, (int, float)) or not isinstance(p.value, (int, float)):
                 return False
-            match p.op:
-                case "<":
-                    return value < p.value
-                case "<=":
-                    return value <= p.value
-                case ">":
-                    return value > p.value
-                case ">=":
-                    return value >= p.value
+            if p.op == "<":
+                return value < p.value
+            if p.op == "<=":
+                return value <= p.value
+            if p.op == ">":
+                return value > p.value
+            return value >= p.value
         case _:
             assert_never(p.op)
 

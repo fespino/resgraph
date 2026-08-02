@@ -2,38 +2,50 @@
 
 [Full report](https://htmlpreview.github.io/?https://github.com/fespino/resgraph/blob/python-coverage-comment-action-data/htmlcov/index.html)
 
-| Name                               |    Stmts |     Miss |   Cover |   Missing |
-|----------------------------------- | -------: | -------: | ------: | --------: |
-| src/resgraph/\_\_init\_\_.py       |        0 |        0 |    100% |           |
-| src/resgraph/api/\_\_init\_\_.py   |        0 |        0 |    100% |           |
-| src/resgraph/api/app.py            |      147 |       14 |     90% |129-131, 134-136, 143, 172, 181, 216-217, 250, 267, 296 |
-| src/resgraph/cli.py                |       81 |        0 |    100% |           |
-| src/resgraph/cold/\_\_init\_\_.py  |        0 |        0 |    100% |           |
-| src/resgraph/cold/cli.py           |       49 |        1 |     98% |        48 |
-| src/resgraph/cold/queries.py       |       97 |        7 |     93% |145, 240-243, 245, 251 |
-| src/resgraph/cold/rebuild.py       |       23 |        3 |     87% |     50-52 |
-| src/resgraph/cold/store.py         |       59 |        1 |     98% |       122 |
-| src/resgraph/consumer.py           |      155 |        7 |     95% |84, 99, 111, 114, 130, 132-133 |
-| src/resgraph/gen/\_\_init\_\_.py   |        0 |        0 |    100% |           |
-| src/resgraph/gen/churn.py          |       65 |        4 |     94% |47-49, 108 |
-| src/resgraph/gen/cli.py            |       58 |        2 |     97% |   112-113 |
-| src/resgraph/gen/sinks.py          |       20 |        0 |    100% |           |
-| src/resgraph/gen/world.py          |      115 |        0 |    100% |           |
-| src/resgraph/graph/\_\_init\_\_.py |        0 |        0 |    100% |           |
-| src/resgraph/graph/client.py       |       16 |        0 |    100% |           |
-| src/resgraph/graph/consumer.py     |       14 |        0 |    100% |           |
-| src/resgraph/graph/ingest.py       |      105 |        6 |     94% |80-81, 110, 166, 260, 302 |
-| src/resgraph/graph/loader.py       |       31 |        0 |    100% |           |
-| src/resgraph/graph/queries.py      |       47 |        0 |    100% |           |
-| src/resgraph/graph/schema.py       |       22 |        0 |    100% |           |
-| src/resgraph/obs.py                |       82 |        2 |     98% |   137-139 |
-| src/resgraph/query/\_\_init\_\_.py |        0 |        0 |    100% |           |
-| src/resgraph/query/dsl.py          |       42 |        0 |    100% |           |
-| src/resgraph/query/executor.py     |       91 |        8 |     91% |46, 70, 73-77, 111, 152 |
-| src/resgraph/query/planner.py      |       83 |        0 |    100% |           |
-| src/resgraph/reconcile.py          |       52 |        2 |     96% |    55, 93 |
-| src/resgraph/schema.py             |       50 |        0 |    100% |           |
-| **TOTAL**                          | **1504** |   **57** | **96%** |           |
+| Name                                         |    Stmts |     Miss |   Cover |   Missing |
+|--------------------------------------------- | -------: | -------: | ------: | --------: |
+| src/resgraph/\_\_init\_\_.py                 |        0 |        0 |    100% |           |
+| src/resgraph/api/\_\_init\_\_.py             |        0 |        0 |    100% |           |
+| src/resgraph/api/app.py                      |      149 |       10 |     93% |135-137, 175, 184, 219-220, 253, 270, 299 |
+| src/resgraph/cli.py                          |       81 |        0 |    100% |           |
+| src/resgraph/cold/\_\_init\_\_.py            |        0 |        0 |    100% |           |
+| src/resgraph/cold/cli.py                     |       49 |        1 |     98% |        48 |
+| src/resgraph/cold/queries.py                 |       97 |        7 |     93% |145, 240-243, 245, 251 |
+| src/resgraph/cold/rebuild.py                 |       23 |        3 |     87% |     50-52 |
+| src/resgraph/cold/store.py                   |       59 |        1 |     98% |       122 |
+| src/resgraph/consumer.py                     |      155 |        7 |     95% |84, 99, 111, 114, 130, 132-133 |
+| src/resgraph/gen/\_\_init\_\_.py             |        0 |        0 |    100% |           |
+| src/resgraph/gen/churn.py                    |       65 |        4 |     94% |47-49, 108 |
+| src/resgraph/gen/cli.py                      |       58 |        2 |     97% |   112-113 |
+| src/resgraph/gen/sinks.py                    |       20 |        0 |    100% |           |
+| src/resgraph/gen/world.py                    |      115 |        0 |    100% |           |
+| src/resgraph/graph/\_\_init\_\_.py           |        0 |        0 |    100% |           |
+| src/resgraph/graph/client.py                 |       16 |        0 |    100% |           |
+| src/resgraph/graph/consumer.py               |       14 |        0 |    100% |           |
+| src/resgraph/graph/ingest.py                 |      105 |        5 |     95% |80-81, 110, 166, 260 |
+| src/resgraph/graph/loader.py                 |       31 |        0 |    100% |           |
+| src/resgraph/graph/queries.py                |       47 |        0 |    100% |           |
+| src/resgraph/graph/schema.py                 |       22 |        0 |    100% |           |
+| src/resgraph/mcp/\_\_init\_\_.py             |        0 |        0 |    100% |           |
+| src/resgraph/mcp/server.py                   |       65 |        2 |     97% |  137, 141 |
+| src/resgraph/mcp/skills.py                   |       38 |        0 |    100% |           |
+| src/resgraph/obs.py                          |       82 |        2 |     98% |   137-139 |
+| src/resgraph/query/\_\_init\_\_.py           |        0 |        0 |    100% |           |
+| src/resgraph/query/dsl.py                    |       42 |        0 |    100% |           |
+| src/resgraph/query/executor.py               |       91 |        7 |     92% |70, 73-77, 111, 152 |
+| src/resgraph/query/planner.py                |       83 |        0 |    100% |           |
+| src/resgraph/reconcile.py                    |       52 |        2 |     96% |    55, 93 |
+| src/resgraph/schema.py                       |       50 |        0 |    100% |           |
+| src/resgraph/tools/\_\_init\_\_.py           |        0 |        0 |    100% |           |
+| src/resgraph/tools/budgets.py                |       23 |        0 |    100% |           |
+| src/resgraph/tools/canonical/\_\_init\_\_.py |        0 |        0 |    100% |           |
+| src/resgraph/tools/canonical/entity.py       |       25 |        0 |    100% |           |
+| src/resgraph/tools/canonical/history.py      |       26 |        0 |    100% |           |
+| src/resgraph/tools/canonical/traversal.py    |       32 |        0 |    100% |           |
+| src/resgraph/tools/context.py                |        6 |        0 |    100% |           |
+| src/resgraph/tools/http.py                   |       21 |        0 |    100% |           |
+| src/resgraph/tools/registry.py               |       20 |        0 |    100% |           |
+| **TOTAL**                                    | **1762** |   **53** | **97%** |           |
 
 
 ## Setup coverage badge

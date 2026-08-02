@@ -160,10 +160,3 @@ TOOL_REGISTRY: tuple[ToolRegistration, ...] = (
         timeout_s=5.0,
     ),
 )
-
-
-def registry_entry(name: str) -> ToolRegistration:
-    for entry in TOOL_REGISTRY:
-        if entry.name == name:
-            return entry
-    raise KeyError(f"no such tool: {name!r}")

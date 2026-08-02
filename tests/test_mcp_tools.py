@@ -153,3 +153,33 @@ def test_http_surface_derives_entirely_from_the_registry():
         if "http" in entry.surfaces:
             assert f"/tools/{entry.name}" in paths
     assert client.post("/tools/blast_radius", json={}).status_code == 422
+
+
+def test_skill_with_unterminated_frontmatter_fails_loudly(tmp_path: Path):
+    d = tmp_path / "s"
+    d.mkdir()
+    p = d / "SKILL.md"
+    p.write_text("---\nname: s\n")
+    with pytest.raises(SkillError, match="frontmatter"):
+        load_skill(p)
+
+
+def test_skill_without_frontmatter_fails_loudly(tmp_path: Path):
+    d = tmp_path / "s"
+    d.mkdir()
+    p = d / "SKILL.md"
+    p.write_text("## Goal\n")
+    with pytest.raises(SkillError, match="frontmatter"):
+        load_skill(p)
+
+
+def test_skill_with_invalid_yaml_fails_loudly(tmp_path: Path):
+    p = _write_skill(tmp_path, _SECTIONS, tool_refs="[unclosed")
+    with pytest.raises(SkillError, match="manifest"):
+        load_skill(p)
+
+
+def test_single_oversized_item_still_ships_one_item_page():
+    giant = [ResourceRef(id="vm-000001", type="vm", one_line="x" * 100_000)]
+    page, truncated, hint, total = paginate_refs(giant, 0, "t")
+    assert len(page) == 1 and total == 1 and not truncated and hint is None

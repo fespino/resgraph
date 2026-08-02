@@ -113,3 +113,17 @@ def test_event_content_policy_no_payloads_no_unbounded_fields(tmp_path, monkeypa
         assert "attrs" not in e and "payload" not in e and "data" not in e
         for key, value in e.items():
             assert len(str(value)) <= 600, (key, value)
+
+
+def test_broken_lag_reader_does_not_kill_the_scrape():
+    obs.init_metrics()
+
+    def broken():
+        raise RuntimeError("reader died")
+
+    obs.register_lag_reader("w-broken", broken)
+    try:
+        out = _scrape().decode()
+        assert 'worker="w-broken"' not in out  # skipped, not fatal (D17)
+    finally:
+        obs.unregister_lag_reader("w-broken")

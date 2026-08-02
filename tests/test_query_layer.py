@@ -19,9 +19,9 @@ from resgraph.cold import queries as cold_queries
 from resgraph.cold import store as cold_store
 from resgraph.gen.churn import Churn
 from resgraph.gen.world import ATTR_POOLS, World
-from resgraph.query.dsl import Predicate, parse_filter
-from resgraph.query.executor import QueryContext, _residual_filter, execute_plan
-from resgraph.query.planner import KNOWN_FIELDS, Query, place, plan
+from resgraph.query.dsl import MAX_FILTER_LEN, Predicate, parse_filter
+from resgraph.query.executor import QueryContext, _matches, _residual_filter, execute_plan
+from resgraph.query.planner import KNOWN_FIELDS, Query, _duckdb_where, place, plan
 from resgraph.schema import Op
 
 SEED, RESOURCES, CHURN = 42, 100, 400
@@ -374,3 +374,89 @@ def test_diff_endpoint(client):
 def test_bad_requests_are_400(client, params):
     r = client.get("/blast-radius/vm-000001", params={"at": T_END.isoformat(), **params})
     assert r.status_code == 400
+
+
+# --- error paths (#65): guards the happy paths never walk ---------------
+
+
+def test_dsl_ordering_needs_a_numeric_value():
+    with pytest.raises(ValueError, match="numeric value"):
+        parse_filter("type > vm")
+
+
+def test_dsl_filter_length_guard():
+    with pytest.raises(ValueError, match="longer than"):
+        parse_filter("a" * (MAX_FILTER_LEN + 1) + "=1")
+
+
+def test_planner_rejects_type_ordering_even_with_numeric_value():
+    # the DSL lets "type > 5" through (numeric); the placement table
+    # is the layer that knows type doesn't order
+    with pytest.raises(ValueError, match="= and !="):
+        plan(Query("world", predicates=parse_filter("type > 5")))
+
+
+def test_duckdb_where_casts_booleans():
+    sql = _duckdb_where(parse_filter("attrs.encrypted = true"))
+    assert "BOOLEAN" in sql
+
+
+def test_context_raises_when_store_unconfigured():
+    ctx = QueryContext()
+    with pytest.raises(RuntimeError, match="hot store"):
+        ctx.require("hot")
+    with pytest.raises(RuntimeError, match="cold store"):
+        ctx.require("cold")
+
+
+def test_context_factories_run_lazily_once():
+    calls = {"n": 0}
+
+    def factory():
+        calls["n"] += 1
+        return object()
+
+    ctx = QueryContext(session_factory=factory)
+    assert ctx.require("hot") is ctx.require("hot")
+    assert calls["n"] == 1
+
+
+def test_matches_incomparable_and_missing_values():
+    assert not _matches({"attrs": {}}, Predicate("attrs.cpu", ">", 2))
+    assert not _matches({"state": "up"}, Predicate("state", ">", 3))
+    assert not _matches({"cpu": 4}, Predicate("cpu", "<", "x"))  # TypeError → False
+    assert _matches({"cpu": 4}, Predicate("cpu", "<=", 4))
+
+
+def test_world_bad_filter_is_a_400_not_a_crash(client):
+    at = MSGS[-1].event_time.isoformat()
+    assert client.get("/world", params={"at": at, "filter": "type > 5"}).status_code == 400
+    assert client.get("/world", params={"at": at, "filter": "no-operator-here"}).status_code == 400
+
+
+def test_history_route_serves_from_cold_alone(client):
+    r = client.get(f"/history/{MSGS[0].resource_id}")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["source"] == "cold" and body["events"] and body["truncated"] is False
+
+
+def test_resource_missing_deleted_and_invalid(catalog, monkeypatch):
+    # a fake hot session: read_node is monkeypatched, so it never runs
+    api_app.app.dependency_overrides[api_app.get_ctx] = lambda: QueryContext(
+        session=object(), catalog=catalog
+    )
+    try:
+        c = TestClient(api_app.app)
+        monkeypatch.setattr(api_app, "read_node", lambda s, rid: None)
+        assert c.get("/resources/vm-nope").status_code == 404
+        monkeypatch.setattr(api_app, "read_node", lambda s, rid: {"deleted": True})
+        assert c.get("/resources/vm-gone").status_code == 404
+
+        def boom(s, rid):
+            raise ValueError("bad id")
+
+        monkeypatch.setattr(api_app, "read_node", boom)
+        assert c.get("/resources/x").status_code == 400
+    finally:
+        api_app.app.dependency_overrides.clear()

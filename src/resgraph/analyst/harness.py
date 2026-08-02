@@ -38,8 +38,13 @@ _EXHAUSTED = (
 
 
 class Toolset(Protocol):
-    def blocks(self) -> list[dict[str, Any]]: ...
-    def execute(self, name: str, args: dict[str, Any]) -> ToolOutcome: ...
+    def blocks(self) -> list[dict[str, Any]]:
+        """Anthropic tool blocks for the API request."""
+        raise NotImplementedError
+
+    def execute(self, name: str, args: dict[str, Any]) -> ToolOutcome:
+        """Run one tool call in-process and report its outcome."""
+        raise NotImplementedError
 
 
 @dataclass(frozen=True)

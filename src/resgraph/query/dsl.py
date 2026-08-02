@@ -59,8 +59,7 @@ def parse_filter(text: str | None) -> list[Predicate]:
         )
     if "(" in text or ")" in text:
         raise ValueError(
-            "parentheses are not supported — write a flat AND chain: "
-            "type=vm AND attrs.zone=z1"
+            "parentheses are not supported — write a flat AND chain: type=vm AND attrs.zone=z1"
         )
     preds = []
     for term in (t.strip() for t in _AND.split(text.strip())):

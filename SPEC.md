@@ -1081,11 +1081,12 @@ Rows 0–6 are back-filled from tag-to-tag diffs
 | 4 | the same stream via a second consumer group (D14 — ingest untouched), `apply_batch` (phase 3), `load_snapshot` + `init_schema` (phase 2), `UpdateMessage` | phase-3 consumer containment loop extracted into the shared `StreamConsumer` base, behavior preserved (#43) |
 | 5 | cold catalog + store readers, `ATTR_POOLS` (D5), hot client, `read_node` + `SYSTEM_PROPS` (phase 3), `ResourceType` | `state_at` grew push-down parameters and `blast_radius` grew filter parameters, both additive with defaults (D16, #50); D2 validation tightened — id/target prefix checks (#50) |
 | 6 | stores, planner, and query layer untouched; wide-event module imports nothing from the platform | D14 addendum superseded in part — outage is not poison (#54); consumer loop grew quarantine/dead-letter hooks, additive (#54) |
+| 7 | `parse_filter` + the DSL, planner `plan`/`explain` + executor `execute_plan`/`QueryContext`, hot queries (`blast_radius`, `dependency_path`), cold queries (`history`, `diff`, `state_at`), `read_node` + `SYSTEM_PROPS`, hot client + cold catalog, generator (test/bench fixtures) | DSL/planner error messages rewritten as steering surfaces — behavior-visible text change, no signatures (D20, #77); API route model renamed `BlastRadiusApiOut` to clear the canonical name (OpenAPI title only, wire unchanged, #77); API gained the registry-derived `/tools` mount, additive (#77) |
 
-Running total through phase 6: 18 interfaces consumed unchanged,
-8 changes — every one of the 8 recorded as a D-amendment, a
-supersession, or an additive extension in the phase's PR. No unrecorded
-break yet; the table exists so the first one has nowhere to hide.
+Running total through phase 7: 25 interfaces consumed unchanged,
+11 changes — every one recorded as a D-amendment, a supersession, or
+an additive extension in the phase's PR. No unrecorded break yet; the
+table exists so the first one has nowhere to hide.
 
 ## Roadmap sequencing
 
@@ -1160,5 +1161,6 @@ Two rules:
 |---|---|---|---|
 | 2026-07-31 | "~80% of wall time in `socket.recv_into`" — the phase-3 profiling story, on the PR #29 record and in the post draft | ~37% of tottime is the raw syscall; ~80% is cumtime of the driver's whole receive path (buffering + parsing included). The conflation was caught by a pre-publication adversarial pass | Attribution corrected in the post, BENCHMARKS.md, and as a correcting reply on PR #29 — the wrong number was already part of that record. The finding (round-trip chattiness; batching fix) survived unchanged |
 | 2026-08-01 | "~366 MB cold-store footprint" — ad-hoc `du` over mixed stream content, early phase 4 | Directionally right, methodologically loose, and mis-attributed: at batch 1,024 the total is 363.5 MB but the parquet data is 18–23 MB at any batch size — the footprint was Iceberg commit metadata (977 files), not data. 25.2 MB total at batch 8,192 | BENCHMARKS.md carries the same-generator, same-method sweep and flags the ad-hoc number as loose; commit granularity recorded as a storage decision, not just a throughput one |
+| 2026-08-02 | "Pinned to MCP spec revision 2026-07-28" — D19 as first written during phase 7, and the phase's own protocol test | The pin was untested prose: the SDK negotiates that revision only on the stateless `discover` path, and the test was using the legacy `initialize` handshake, which negotiates an older revision — the suite was green while exercising the path the pinned revision deprecates | Caught pre-merge by reading the spec against the implementation (#77): the test switched to `discover` and now asserts the negotiated revision equals the pin, so an SDK upgrade that shifts it fails CI. The claim became true-and-tested before it shipped |
 
 

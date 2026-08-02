@@ -1,6 +1,9 @@
 """Through the protocol, not around it: spawn the server over stdio
 with the official client and assert the surface behaves as declared —
-clamps, caps, and a followable pagination hint included."""
+the negotiated spec revision, clamps, caps, and a followable
+pagination hint included. The stateless discover path is the one the
+pinned revision defines; initialize is the legacy handshake and
+negotiates older revisions."""
 
 import asyncio
 import json
@@ -90,7 +93,8 @@ async def _exercise_surface(tmp_path):
         env={**os.environ, "RESGRAPH_TELEMETRY_DIR": str(tmp_path / "telemetry")},
     )
     async with stdio_client(params) as (read, write), ClientSession(read, write) as session:
-        await session.initialize()
+        await session.discover()
+        assert session.protocol_version == "2026-07-28"
 
         tools = {t.name for t in (await session.list_tools()).tools}
         assert tools == {

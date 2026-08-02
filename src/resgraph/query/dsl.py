@@ -7,7 +7,7 @@ validate: downstream code only ever sees well-formed Predicates.
 
 import re
 from dataclasses import dataclass
-from typing import Literal
+from typing import Literal, cast
 
 Op = Literal["=", "!=", "<", "<=", ">", ">="]
 
@@ -59,7 +59,7 @@ def parse_filter(text: str | None) -> list[Predicate]:
         if not m:
             raise ValueError(f"cannot parse filter term: {term!r}")
         value = _coerce(m["value"])
-        op = m["op"]
+        op = cast(Op, m["op"])  # _TERM's op group closes exactly this set
         if op in ("<", "<=", ">", ">=") and isinstance(value, str):
             raise ValueError(f"ordering comparison needs a numeric value: {term!r}")
         preds.append(Predicate(m["field"], op, value))

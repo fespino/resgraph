@@ -18,11 +18,15 @@ is untested. Validate before trusting the scale-out lever.
 import logging
 import time
 from collections.abc import Callable
+from typing import Any, cast
 
 from pydantic import ValidationError
 
 from resgraph import obs
 from resgraph.schema import UpdateMessage
+
+Entry = tuple[bytes, dict[bytes, bytes]]  # (stream id, raw fields) as redis returns them
+Pair = tuple[bytes, bytes, UpdateMessage]  # (stream id, raw payload, parsed message)
 
 log = logging.getLogger("resgraph.consumer")
 
@@ -73,7 +77,8 @@ class StreamConsumer:
             for g in self.r.xinfo_groups(self.stream):
                 gname = g.get("name")
                 if gname in (self.group, self.group.encode()):
-                    return g.get("lag")
+                    lag = g.get("lag")
+                    return int(lag) if lag is not None else None
         except Exception:
             return None
         return None
@@ -114,7 +119,8 @@ class StreamConsumer:
                     count=count,
                     block=self.block_ms if cursor == ">" else None,
                 )
-                entries = resp[0][1] if resp else []
+                resp_list = cast("list[tuple[Any, list[Entry]]]", resp)
+                entries = resp_list[0][1] if resp_list else []
                 if not entries:
                     if cursor != ">":
                         cursor = ">"  # pending drained; switch to new entries
@@ -127,12 +133,14 @@ class StreamConsumer:
             pass  # an interrupt is a stop request; the counters still count
         return counters
 
-    def _apply_batch(self, entries, counters: dict[str, int], pending: bool = False) -> None:
+    def _apply_batch(
+        self, entries: list[Entry], counters: dict[str, int], pending: bool = False
+    ) -> None:
         before = dict(counters)
         t0 = time.perf_counter()
         obs.READ.add(len(entries), self._attrs)
-        pairs = []  # (entry_id, raw payload, parsed message)
-        invalid = []
+        pairs: list[Pair] = []  # (entry_id, raw payload, parsed message)
+        invalid: list[bytes] = []
         for entry_id, fields in entries:
             counters["read"] += 1
             try:
@@ -161,7 +169,7 @@ class StreamConsumer:
             **{k: counters[k] - before[k] for k in counters},
         )
 
-    def _apply_entries(self, pairs, counters: dict[str, int], retries: int) -> None:
+    def _apply_entries(self, pairs: list[Pair], counters: dict[str, int], retries: int) -> None:
         if not pairs:
             return
         msgs = [m for _, _, m in pairs]
@@ -222,7 +230,7 @@ class StreamConsumer:
         self._apply_entries(pairs[:mid], counters, retries=0)
         self._apply_entries(pairs[mid:], counters, retries=0)
 
-    def _quarantine_over_delivered(self, pairs, counters: dict[str, int]):
+    def _quarantine_over_delivered(self, pairs: list[Pair], counters: dict[str, int]) -> list[Pair]:
         info = self.r.xpending_range(
             self.stream,
             self.group,
@@ -231,8 +239,10 @@ class StreamConsumer:
             count=len(pairs),
             consumername=self.name,
         )
-        deliveries = {e["message_id"]: e["times_delivered"] for e in info}
-        kept = []
+        deliveries = {
+            e["message_id"]: int(e["times_delivered"]) for e in cast("list[dict[str, Any]]", info)
+        }
+        kept: list[Pair] = []
         for entry_id, raw, msg in pairs:
             n = deliveries.get(entry_id, 1)
             if n > self.max_deliveries:
@@ -243,9 +253,14 @@ class StreamConsumer:
                 kept.append((entry_id, raw, msg))
         return kept
 
-    def _dead_letter(self, entry_id, raw, error, counters: dict[str, int]) -> None:
-        info = self.r.xpending_range(self.stream, self.group, min=entry_id, max=entry_id, count=1)
-        n = info[0]["times_delivered"] if info else 0
+    def _dead_letter(
+        self, entry_id: bytes, raw: bytes, error: object, counters: dict[str, int]
+    ) -> None:
+        info = cast(
+            "list[dict[str, Any]]",
+            self.r.xpending_range(self.stream, self.group, min=entry_id, max=entry_id, count=1),
+        )
+        n = int(info[0]["times_delivered"]) if info else 0
         self.r.xadd(
             self.dlq,
             {"data": raw, "error": str(error)[:500], "source_id": entry_id, "deliveries": n},

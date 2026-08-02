@@ -21,7 +21,7 @@ from resgraph.gen.churn import Churn
 from resgraph.gen.world import ATTR_POOLS, World
 from resgraph.query.dsl import MAX_FILTER_LEN, Predicate, parse_filter
 from resgraph.query.executor import QueryContext, _matches, _residual_filter, execute_plan
-from resgraph.query.planner import KNOWN_FIELDS, Query, _duckdb_where, place, plan
+from resgraph.query.planner import KNOWN_FIELDS, Query, duckdb_where, place, plan
 from resgraph.schema import Op
 
 SEED, RESOURCES, CHURN = 42, 100, 400
@@ -397,7 +397,7 @@ def test_planner_rejects_type_ordering_even_with_numeric_value():
 
 
 def test_duckdb_where_casts_booleans():
-    sql = _duckdb_where(parse_filter("attrs.encrypted = true"))
+    sql = duckdb_where(parse_filter("attrs.encrypted = true"))
     assert "BOOLEAN" in sql
 
 

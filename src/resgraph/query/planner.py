@@ -33,7 +33,7 @@ class Step:
     detail: str
     pushed: list[str] = field(default_factory=list)
 
-    def as_dict(self) -> dict:
+    def as_dict(self) -> dict[str, object]:
         return {
             "store": self.store,
             "op": self.op,
@@ -57,7 +57,7 @@ class Plan:
     steps: list[Step]
     residual: list[Predicate]
 
-    def explain(self) -> dict:
+    def explain(self) -> dict[str, object]:
         return {
             "steps": [s.as_dict() for s in self.steps],
             "residual": [str(p) for p in self.residual],
@@ -77,7 +77,7 @@ def place(predicates: list[Predicate]) -> tuple[list[Predicate], list[Predicate]
     return claimable, residual
 
 
-def _cypher_where(predicates: list[Predicate]) -> str:
+def cypher_where(predicates: list[Predicate]) -> str:
     clauses = []
     for i, p in enumerate(predicates):
         if p.field == "type":
@@ -89,7 +89,7 @@ def _cypher_where(predicates: list[Predicate]) -> str:
     return " AND ".join(clauses)
 
 
-def _duckdb_where(predicates: list[Predicate]) -> str:
+def duckdb_where(predicates: list[Predicate]) -> str:
     clauses = []
     for i, p in enumerate(predicates):
         op = "<>" if p.op == "!=" else p.op
@@ -113,7 +113,7 @@ def plan(query: Query) -> Plan:
     if query.at is None:
         if query.kind == "world":
             raise ValueError("live /world is not an endpoint; use ?at=T (D15)")
-        where = _cypher_where(claimable)
+        where = cypher_where(claimable)
         steps.append(
             Step(
                 "hot",
@@ -124,7 +124,7 @@ def plan(query: Query) -> Plan:
             )
         )
     else:
-        where = _duckdb_where(claimable)
+        where = duckdb_where(claimable)
         if query.kind == "blast_radius":
             # Traversal needs the full as-of topology; predicates filter the
             # affected set, so they run as a computed match column in the

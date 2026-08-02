@@ -8,7 +8,7 @@ and the residual filter that the plan already flagged.
 from collections import deque
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, assert_never
 
 from resgraph.cold import queries as cold_queries
 from resgraph.graph import queries as hot_queries
@@ -17,10 +17,10 @@ from resgraph.graph.ingest import SYSTEM_PROPS
 from .dsl import Predicate
 from .planner import (
     Plan,
-    _cypher_where,
-    _duckdb_where,
     bind_params,
     composite_projection,
+    cypher_where,
+    duckdb_where,
     where_cols,
 )
 
@@ -49,33 +49,41 @@ class QueryContext:
         return self.catalog
 
 
-def _matches(row: dict, p: Predicate) -> bool:
+def _matches(row: dict[str, Any], p: Predicate) -> bool:
     if p.field.startswith("attrs."):
         value = row.get("attrs", {}).get(p.field.removeprefix("attrs."))
     else:
         value = row.get(p.field)
     if value is None:
         return False
-    if p.op in ("<", "<=", ">", ">=") and not isinstance(value, (int, float)):
-        return False
-    try:
-        return {
-            "=": lambda: value == p.value,
-            "!=": lambda: value != p.value,
-            "<": lambda: value < p.value,
-            "<=": lambda: value <= p.value,
-            ">": lambda: value > p.value,
-            ">=": lambda: value >= p.value,
-        }[p.op]()
-    except TypeError:
-        return False
+    match p.op:
+        case "=":
+            return value == p.value
+        case "!=":
+            return value != p.value
+        case "<" | "<=" | ">" | ">=":
+            # both sides numeric or the comparison is meaningless — the
+            # old TypeError catch, made statically impossible instead
+            if not isinstance(value, (int, float)) or not isinstance(p.value, (int, float)):
+                return False
+            match p.op:
+                case "<":
+                    return value < p.value
+                case "<=":
+                    return value <= p.value
+                case ">":
+                    return value > p.value
+                case ">=":
+                    return value >= p.value
+        case _:
+            assert_never(p.op)
 
 
-def _residual_filter(rows: list[dict], residual: list[Predicate]) -> list[dict]:
+def _residual_filter(rows: list[dict[str, Any]], residual: list[Predicate]) -> list[dict[str, Any]]:
     return [r for r in rows if all(_matches(r, p) for p in residual)]
 
 
-def _blast_bfs(rows: list[dict], root: str, depth: int) -> set[str]:
+def _blast_bfs(rows: list[dict[str, Any]], root: str, depth: int) -> set[str]:
     """Blast radius over reconstructed state: BFS along reversed dependency
     edges (D8 direction — dependents have a path TO the root)."""
     dependents: dict[str, list[str]] = {}
@@ -96,17 +104,19 @@ def _blast_bfs(rows: list[dict], root: str, depth: int) -> set[str]:
     return seen
 
 
-def execute_plan(plan: Plan, ctx: QueryContext) -> list[dict]:
+def execute_plan(plan: Plan, ctx: QueryContext) -> list[dict[str, Any]]:
     q = plan.query
     claimable = [p for p in q.predicates if p not in plan.residual]
 
     if q.at is None:
+        if q.root is None:
+            raise ValueError("live plan without a root (D16: only blast_radius runs live)")
         session = ctx.require("hot")
         affected = hot_queries.blast_radius(
             session,
             q.root,
             depth=q.depth,
-            extra_where=_cypher_where(claimable),
+            extra_where=cypher_where(claimable),
             params=bind_params(claimable),
             with_attrs=bool(plan.residual),
         )
@@ -126,7 +136,7 @@ def execute_plan(plan: Plan, ctx: QueryContext) -> list[dict]:
         state = cold_queries.state_at(
             catalog,
             q.at,
-            where=_duckdb_where(claimable) or None,
+            where=duckdb_where(claimable) or None,
             params=bind_params(claimable),
         )
         rows = [
@@ -140,10 +150,12 @@ def execute_plan(plan: Plan, ctx: QueryContext) -> list[dict]:
         ]
         return _residual_filter(rows, plan.residual)
 
+    if q.root is None:
+        raise ValueError("composite plan without a root (D16)")
     state = cold_queries.state_at(
         catalog,
         q.at,
-        where=_duckdb_where(claimable) or None,
+        where=duckdb_where(claimable) or None,
         params=bind_params(claimable),
         annotate=True,
         projection=composite_projection(bool(plan.residual)),

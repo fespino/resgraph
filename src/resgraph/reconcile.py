@@ -9,14 +9,19 @@ either consumer read it.
 """
 
 import json
+from datetime import datetime
 from pathlib import Path
+from typing import Any
+
+from neo4j import Session
+from pyiceberg.catalog import Catalog
 
 from resgraph.cold.queries import latest_event_time, state_at
 from resgraph.graph.client import cypher
 from resgraph.graph.ingest import SYSTEM_PROPS
 
 
-def dump_hot(session) -> dict[str, dict]:
+def dump_hot(session: Session) -> dict[str, dict[str, Any]]:
     """Alive, non-phantom state: one dict per resource, edges sorted."""
     rows = cypher(
         session,
@@ -29,7 +34,7 @@ def dump_hot(session) -> dict[str, dict]:
                        ELSE {type: type(r), target: t.id} END) AS rels
         """,
     )
-    out = {}
+    out: dict[str, dict[str, Any]] = {}
     for row in rows:
         props = row["props"]
         out[props["id"]] = {
@@ -43,9 +48,11 @@ def dump_hot(session) -> dict[str, dict]:
     return out
 
 
-def dump_cold(catalog) -> tuple[dict[str, dict], object]:
+def dump_cold(catalog: Catalog) -> tuple[dict[str, dict[str, Any]], datetime | None]:
     t = latest_event_time(catalog)
-    out = {}
+    out: dict[str, dict[str, Any]] = {}
+    if t is None:
+        return out, None
     for r in state_at(catalog, t):
         out[r["resource_id"]] = {
             "type": r["resource_type"],
@@ -56,8 +63,8 @@ def dump_cold(catalog) -> tuple[dict[str, dict], object]:
     return out, t
 
 
-def load_oracle(path: str | Path) -> dict[str, dict]:
-    out = {}
+def load_oracle(path: str | Path) -> dict[str, dict[str, Any]]:
+    out: dict[str, dict[str, Any]] = {}
     for line in Path(path).read_text().splitlines():
         if not line.strip():
             continue
@@ -71,8 +78,10 @@ def load_oracle(path: str | Path) -> dict[str, dict]:
     return out
 
 
-def compare(a: dict, b: dict, a_name: str, b_name: str) -> dict:
-    report = {
+def compare(
+    a: dict[str, dict[str, Any]], b: dict[str, dict[str, Any]], a_name: str, b_name: str
+) -> dict[str, Any]:
+    report: dict[str, Any] = {
         f"only_in_{a_name}": sorted(set(a) - set(b)),
         f"only_in_{b_name}": sorted(set(b) - set(a)),
         "attr_mismatches": [],
@@ -86,11 +95,13 @@ def compare(a: dict, b: dict, a_name: str, b_name: str) -> dict:
             report["relationship_mismatches"].append(rid)
         if a[rid]["sequence"] != b[rid]["sequence"]:
             report["sequence_mismatches"].append(rid)
-    report["ok"] = not any(v for v in report.values() if isinstance(v, list))
+    report["ok"] = not any(v for v in report.values() if isinstance(v, list))  # lists only pre-"ok"
     return report
 
 
-def reconcile(session, catalog, oracle: dict | None = None) -> dict:
+def reconcile(
+    session: Session, catalog: Catalog, oracle: dict[str, dict[str, Any]] | None = None
+) -> dict[str, Any]:
     hot = dump_hot(session)
     cold, t = dump_cold(catalog)
     result = {
@@ -103,6 +114,6 @@ def reconcile(session, catalog, oracle: dict | None = None) -> dict:
         result["oracle_count"] = len(oracle)
         result["oracle_vs_cold"] = compare(oracle, cold, "oracle", "cold")
     result["ok"] = all(
-        part["ok"] for key, part in result.items() if isinstance(part, dict) and "ok" in part
+        part["ok"] for part in result.values() if isinstance(part, dict) and "ok" in part
     )
     return result

@@ -9,10 +9,11 @@ store — laziness as an observable property, not a claim.
 import json
 import logging
 import time
+from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
-from fastapi import Depends, FastAPI, HTTPException, Query, Request
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
 from prometheus_client import make_asgi_app
 from pydantic import BaseModel
 
@@ -42,8 +43,8 @@ class ResourceOut(Envelope):
     id: str
     type: str
     phantom: bool
-    attrs: dict
-    relationships: list[dict]
+    attrs: dict[str, Any]
+    relationships: list[dict[str, str]]
 
 
 class AffectedOut(BaseModel):
@@ -62,14 +63,14 @@ class BlastRadiusOut(Envelope):
 
 class WorldOut(Envelope):
     at: datetime
-    resources: list[dict]
+    resources: list[dict[str, Any]]
     truncated: bool
     total_count: int
 
 
 class HistoryOut(Envelope):
     id: str
-    events: list[dict]
+    events: list[dict[str, Any]]
     truncated: bool
     total_count: int
 
@@ -91,8 +92,10 @@ def create_app() -> FastAPI:
     obs.init_metrics()
     app.mount("/metrics", make_asgi_app())
 
-    @app.middleware("http")
-    async def telemetry(request: Request, call_next):
+    @app.middleware("http")  # registration is the use; pyright can't see it
+    async def telemetry(  # pyright: ignore[reportUnusedFunction]
+        request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ):
         t = time.monotonic()
         response = await call_next(request)
         if request.url.path.startswith("/metrics"):
@@ -158,12 +161,12 @@ def _parse(filter_: str | None, at: str | None):
     return preds, at_t
 
 
-def _cap(rows: list) -> tuple[list, bool, int]:
+def _cap[T](rows: list[T]) -> tuple[list[T], bool, int]:
     return rows[:MAX_ROWS], len(rows) > MAX_ROWS, len(rows)
 
 
 @app.get("/resources/{resource_id}", response_model=ResourceOut)
-def resource(request: Request, resource_id: str, explain: bool = False, ctx: Ctx = None):
+def resource(request: Request, resource_id: str, ctx: Ctx, explain: bool = False):
     request.state.source = "plan" if explain else "hot"
     if explain:
         return _explain_response(
@@ -190,11 +193,11 @@ def resource(request: Request, resource_id: str, explain: bool = False, ctx: Ctx
 def blast_radius(
     request: Request,
     resource_id: str,
+    ctx: Ctx,
     depth: Annotated[int, Query(ge=1)] = 3,
     filter: str | None = None,
     at: str | None = None,
     explain: bool = False,
-    ctx: Ctx = None,
 ):
     preds, at_t = _parse(filter, at)
     request.state.source = "plan" if explain else ("hot" if at_t is None else "composite")
@@ -230,11 +233,13 @@ def blast_radius(
 def world(
     request: Request,
     at: str,
+    ctx: Ctx,
     filter: str | None = None,
     explain: bool = False,
-    ctx: Ctx = None,
 ):
     preds, at_t = _parse(filter, at)
+    if at_t is None:
+        raise HTTPException(status_code=400, detail="at must be a non-empty ISO-8601 timestamp")
     request.state.source = "plan" if explain else "cold"
     request.state.telemetry = {"at": at}
     try:
@@ -256,7 +261,7 @@ def world(
 
 
 @app.get("/history/{resource_id}")
-def history(request: Request, resource_id: str, explain: bool = False, ctx: Ctx = None):
+def history(request: Request, resource_id: str, ctx: Ctx, explain: bool = False):
     request.state.source = "plan" if explain else "cold"
     if explain:
         return _explain_response(
@@ -279,11 +284,13 @@ def diff(
     request: Request,
     from_t: Annotated[str, Query(alias="from")],
     to_t: Annotated[str, Query(alias="to")],
+    ctx: Ctx,
     explain: bool = False,
-    ctx: Ctx = None,
 ):
     _, t1 = _parse(None, from_t)
     _, t2 = _parse(None, to_t)
+    if t1 is None or t2 is None:
+        raise HTTPException(status_code=400, detail="from/to must be non-empty ISO-8601 timestamps")
     request.state.source = "plan" if explain else "cold"
     if explain:
         return _explain_response(
@@ -310,7 +317,7 @@ def diff(
     )
 
 
-def _explain_response(plan_repr) -> dict:
+def _explain_response(plan_repr: dict[str, Any] | list[dict[str, str]]) -> dict[str, Any]:
     return {
         "fetched_at": _now().isoformat(),
         "source": "plan",

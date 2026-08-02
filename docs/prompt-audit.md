@@ -23,3 +23,22 @@ The metric this table protects: token-weighted cache hit rate =
 `src/resgraph/analyst/harness.py`), reported by every eval run, target
 ≥ 0.9 on multi-turn runs. Token-weighted rather than call-counted so
 that one hard miss — a full prefix re-read — is visibly expensive.
+
+Diagnosing a rate drop, three branches (not two):
+
+1. **Fingerprint changed** — a registry or prompt edit busted the
+   cache; find the diff.
+2. **Fingerprint stable, prefix above the model's minimum** — runtime
+   behavior (retry editing history, message-order violation).
+3. **Fingerprint stable, prefix below the model's minimum** — the API
+   caches nothing below a per-model floor (1,024 tokens for Opus 4.8;
+   512–4,096 across families) and returns **no error**. A shrunken
+   prefix stops caching silently. Check estimated prefix tokens before
+   suspecting the harness.
+
+Two more API facts the eval runner leans on (prompt-caching docs):
+a cache entry only becomes usable after the first response *begins*,
+so parallel trials sharing a cold prefix each pay the write — the
+runner is serial per scenario on purpose; and `usage.input_tokens`
+counts only tokens after the last breakpoint, which is why
+`Usage.total_input` sums all three fields before dividing.

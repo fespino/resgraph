@@ -5,6 +5,9 @@ on:
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+# least-privilege default for any future job; the test job elevates
+# what it needs explicitly below
+permissions: read-all
 jobs:
   test:
     runs-on: ubuntu-latest

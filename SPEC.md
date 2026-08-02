@@ -1166,11 +1166,14 @@ not a credence readout — 📄 Paper:
 arXiv:2407.08388 — so the field earns meaning behaviorally, which the
 planted-difficulty ground truth makes measurable). And a **paired
 skill arm**: scenarios run with and without the D21 playbook loaded,
-same model and environment; a with-skill pass counts only if the skill
-was actually invoked, and both-pass cases score by relative cost
-(📄 Paper: [SkillTester](https://arxiv.org/abs/2603.28815) —
-arXiv:2603.28815) — the playbooks' value becomes our own measured
-number.
+same model and environment, and the intervention is ledgered in four
+stages — available, retrieved, invoked, relevant
+([lopopolo's harness-eval framework](https://github.com/lopopolo/harness-engineering/tree/trunk/evals/README.md)) —
+because "the skill was loaded" and "the skill did the work" are
+different claims; a with-skill pass counts only if invoked, and
+both-pass cases score by relative cost (📄 Paper:
+[SkillTester](https://arxiv.org/abs/2603.28815) — arXiv:2603.28815) —
+the playbooks' value becomes our own measured number.
 
 `scenario_type` and the failure-taxonomy tags are CLOSED enums with
 exhaustive dispatch (`assert_never` on the fall-through, per D0): a
@@ -1189,7 +1192,19 @@ The judge dimension runs k=1 (it grades prose, not correctness).
 Failure-derived items form the **regression suite**, expected to hold
 ~100% and reported separately from capability slices, which are
 allowed to start low — a capability slice at 0% across all trials
-indicts the scenario before the model.
+indicts the scenario before the model. A fix is confirmed only when
+FRESH items from the same failure class pass, not just the item that
+exposed it — a fix that only fixes its exposing item is overfit to
+the regression suite.
+
+**Iteration entries are pre-registered experiments:** before the
+re-run, the entry declares the hypothesis, the smallest isolated
+change, the predicted per-slice effect, and what result would
+invalidate the hypothesis — declared-then-measured, never measured-
+then-rationalized. Model, agent host, and harness stay fixed within a
+comparison; a model or thinking-config upgrade opens a new EPOCH:
+prior harness assumptions reset and the baseline is re-established
+rather than assumed to transfer.
 
 Run artifacts pin the full verdict environment: run_id, git_ref,
 model, thinking configuration, environment (cpu/mem limits, store

@@ -9,15 +9,13 @@ import pytest
 import uvicorn
 from typer.testing import CliRunner
 
-import resgraph.cli as main_cli
-import resgraph.cold.cli as cold_cli_mod
-import resgraph.cold.rebuild as rebuild_mod
-import resgraph.cold.store as store_mod
-import resgraph.gen.cli as gen_cli_mod
-import resgraph.reconcile as rec_mod
+from resgraph import cli as main_cli
+from resgraph import reconcile as rec_mod
+from resgraph.cold import cli as cold_cli_mod
+from resgraph.cold import rebuild as rebuild_mod
 from resgraph.cold import store as cold_store
+from resgraph.gen import cli as gen_cli_mod
 from resgraph.gen.churn import Churn
-from resgraph.gen.cli import app as gen_app
 from resgraph.gen.sinks import RedisSink, StdoutSink
 from resgraph.gen.world import World
 from resgraph.schema import Op, UpdateMessage
@@ -77,21 +75,21 @@ def test_redis_sink_pipelines(monkeypatch):
 
 
 def test_gen_run_stdout_deterministic():
-    a = runner.invoke(gen_app, ["run", "--seed", "7", "--resources", "60", "--count", "40"])
-    b = runner.invoke(gen_app, ["run", "--seed", "7", "--resources", "60", "--count", "40"])
+    a = runner.invoke(gen_cli_mod.app, ["run", "--seed", "7", "--resources", "60", "--count", "40"])
+    b = runner.invoke(gen_cli_mod.app, ["run", "--seed", "7", "--resources", "60", "--count", "40"])
     assert a.exit_code == 0 and a.stdout == b.stdout
     assert len(a.stdout.strip().splitlines()) == 40
 
 
 def test_gen_seed_snapshot_count():
-    r = runner.invoke(gen_app, ["seed", "--seed", "7", "--resources", "60"])
+    r = runner.invoke(gen_cli_mod.app, ["seed", "--seed", "7", "--resources", "60"])
     assert r.exit_code == 0
     lines = r.stdout.strip().splitlines()
     assert all(json.loads(line)["op"] == "upsert" for line in lines)
 
 
 def test_gen_run_rejects_unknown_sink():
-    r = runner.invoke(gen_app, ["run", "--sink", "carrier-pigeon", "--count", "1"])
+    r = runner.invoke(gen_cli_mod.app, ["run", "--sink", "carrier-pigeon", "--count", "1"])
     assert r.exit_code != 0
 
 
@@ -100,7 +98,8 @@ def test_gen_run_duration_bounded(monkeypatch):
     ticks = iter([0.0, 999.0, 999.0])
     monkeypatch.setattr("resgraph.gen.cli.time.monotonic", lambda: next(ticks, 999.0))
     r = runner.invoke(
-        gen_app, ["run", "--seed", "1", "--resources", "60", "--duration", "1", "--batch", "10"]
+        gen_cli_mod.app,
+        ["run", "--seed", "1", "--resources", "60", "--duration", "1", "--batch", "10"],
     )
     assert r.exit_code == 0
     assert len(r.stdout.strip().splitlines()) == 10  # exactly one batch, then time's up
@@ -111,7 +110,6 @@ def test_gen_run_duration_bounded(monkeypatch):
 
 @pytest.mark.integration
 def test_platform_cli_end_to_end():
-    from resgraph.cli import app as plat_app
     from resgraph.graph.client import get_driver
     from resgraph.graph.schema import wipe
 
@@ -128,18 +126,20 @@ def test_platform_cli_end_to_end():
         wipe(s)
     d.close()
 
-    snap = runner.invoke(gen_app, ["seed", "--seed", "9", "--resources", "80"])
-    load = runner.invoke(plat_app, ["load-snapshot"], input=snap.stdout)
+    snap = runner.invoke(gen_cli_mod.app, ["seed", "--seed", "9", "--resources", "80"])
+    load = runner.invoke(main_cli.app, ["load-snapshot"], input=snap.stdout)
     assert load.exit_code == 0 and json.loads(load.stdout)["nodes"] > 0
 
-    stats = runner.invoke(plat_app, ["query", "stats"])
+    stats = runner.invoke(main_cli.app, ["query", "stats"])
     assert stats.exit_code == 0 and json.loads(stats.stdout)["nodes"]
 
-    orphans = runner.invoke(plat_app, ["query", "orphans"])
+    orphans = runner.invoke(main_cli.app, ["query", "orphans"])
     assert orphans.exit_code == 0
 
     # host-000001 exists — hosts are created first (D5 seeding order)
-    br = runner.invoke(plat_app, ["query", "blast-radius", "--id", "host-000001", "--depth", "2"])
+    br = runner.invoke(
+        main_cli.app, ["query", "blast-radius", "--id", "host-000001", "--depth", "2"]
+    )
     assert br.exit_code == 0
     path = runner.invoke(
         plat_app, ["query", "path", "--from", "host-000001", "--to", "host-000001"]
@@ -152,7 +152,7 @@ def test_platform_cli_end_to_end():
 
 def test_gen_final_state_prints_alive_world():
     res = runner.invoke(
-        gen_app, ["final-state", "--seed", "7", "--resources", "20", "--count", "30"]
+        gen_cli_mod.app, ["final-state", "--seed", "7", "--resources", "20", "--count", "30"]
     )
     assert res.exit_code == 0
     rows = [json.loads(ln) for ln in res.stdout.splitlines() if ln.strip()]
@@ -162,7 +162,8 @@ def test_gen_final_state_prints_alive_world():
 
 def test_gen_run_throttled_emits_exact_count():
     res = runner.invoke(
-        gen_app, ["run", "--seed", "7", "--resources", "20", "--count", "40", "--rate", "5000"]
+        gen_cli_mod.app,
+        ["run", "--seed", "7", "--resources", "20", "--count", "40", "--rate", "5000"],
     )
     assert res.exit_code == 0
     assert len([ln for ln in res.stdout.splitlines() if ln.strip()]) == 40
@@ -182,7 +183,9 @@ def test_gen_seed_routes_through_the_redis_sink(monkeypatch):
             pass
 
     monkeypatch.setattr(gen_cli_mod, "RedisSink", StubSink)
-    res = runner.invoke(gen_app, ["seed", "--sink", "redis", "--resources", "5", "--batch", "3"])
+    res = runner.invoke(
+        gen_cli_mod.app, ["seed", "--sink", "redis", "--resources", "5", "--batch", "3"]
+    )
     assert res.exit_code == 0
     assert emitted and len({m.resource_id for m in emitted}) == len(emitted)
 
@@ -279,7 +282,7 @@ def test_rebuild_parses_at_and_prints_result(monkeypatch, tmp_path):
         seen["at"] = at
         return {"nodes": 3, "edges": 1}
 
-    monkeypatch.setattr(store_mod, "get_catalog", lambda *a, **k: object())
+    monkeypatch.setattr(cold_store, "get_catalog", lambda *a, **k: object())
     monkeypatch.setattr(rebuild_mod, "rebuild", fake_rebuild)
     monkeypatch.setattr(main_cli, "_session", _FakeSession)
     res = runner.invoke(main_cli.app, ["rebuild", "--at", "2026-01-03T00:00:00+00:00"])
@@ -332,7 +335,7 @@ def test_reconcile_exit_codes_and_oracle_loading(monkeypatch, tmp_path):
         state["oracle"] = oracle
         return {"ok": state["verdict"]}
 
-    monkeypatch.setattr(store_mod, "get_catalog", lambda *a, **k: object())
+    monkeypatch.setattr(cold_store, "get_catalog", lambda *a, **k: object())
     monkeypatch.setattr(rec_mod, "reconcile", fake_reconcile)
     monkeypatch.setattr(main_cli, "_session", _FakeSession)
 

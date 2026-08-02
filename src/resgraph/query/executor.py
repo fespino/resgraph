@@ -73,8 +73,8 @@ def _matches(row: dict[str, Any], p: Predicate) -> bool:
             if p.op == ">":
                 return value > p.value
             return value >= p.value
-        case _:
-            return assert_never(p.op)
+    # a new Op member un-narrows p.op and pyright fails here
+    return assert_never(p.op)
 
 
 def _residual_filter(rows: list[dict[str, Any]], residual: list[Predicate]) -> list[dict[str, Any]]:

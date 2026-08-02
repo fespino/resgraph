@@ -5,6 +5,7 @@ reads — no session state, no handles — which is the stateless-
 compatible shape that revision asks for.
 """
 
+import threading
 from collections.abc import Callable
 from inspect import Parameter, Signature
 from pathlib import Path
@@ -28,19 +29,24 @@ CARD_PATH = Path(__file__).with_name("CARD.md")
 
 _driver: Any = None
 _catalog: Any = None
+# parallel tool calls are the intended usage; the lazy init must not
+# race two drivers into existence on the first concurrent pair
+_init_lock = threading.Lock()
 
 
 def _query_context() -> QueryContext:
     def hot_session() -> Any:
         global _driver
-        if _driver is None:
-            _driver = hot_client.get_driver()
+        with _init_lock:
+            if _driver is None:
+                _driver = hot_client.get_driver()
         return _driver.session()
 
     def cold_catalog() -> Any:
         global _catalog
-        if _catalog is None:
-            _catalog = cold_store.get_catalog()
+        with _init_lock:
+            if _catalog is None:
+                _catalog = cold_store.get_catalog()
         return _catalog
 
     return QueryContext(session_factory=hot_session, catalog_factory=cold_catalog)

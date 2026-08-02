@@ -6,10 +6,20 @@ import sys
 import types
 
 import pytest
+import uvicorn
 from typer.testing import CliRunner
 
+import resgraph.cli as main_cli
+import resgraph.cold.cli as cold_cli_mod
+import resgraph.cold.rebuild as rebuild_mod
+import resgraph.cold.store as store_mod
+import resgraph.gen.cli as gen_cli_mod
+import resgraph.reconcile as rec_mod
+from resgraph.cold import store as cold_store
+from resgraph.gen.churn import Churn
 from resgraph.gen.cli import app as gen_app
 from resgraph.gen.sinks import RedisSink, StdoutSink
+from resgraph.gen.world import World
 from resgraph.schema import Op, UpdateMessage
 
 runner = CliRunner()
@@ -159,8 +169,6 @@ def test_gen_run_throttled_emits_exact_count():
 
 
 def test_gen_seed_routes_through_the_redis_sink(monkeypatch):
-    import resgraph.gen.cli as gen_cli_mod
-
     emitted = []
 
     class StubSink:
@@ -184,10 +192,6 @@ def test_gen_seed_routes_through_the_redis_sink(monkeypatch):
 
 @pytest.fixture()
 def cold_env(tmp_path, monkeypatch):
-    from resgraph.cold import store as cold_store
-    from resgraph.gen.churn import Churn
-    from resgraph.gen.world import World
-
     monkeypatch.setenv("RESGRAPH_COLD_DIR", str(tmp_path))
     churn = Churn(World(7, 15))
     msgs = list(churn.snapshot()) + [churn.next_message() for _ in range(50)]
@@ -198,45 +202,37 @@ def cold_env(tmp_path, monkeypatch):
 
 
 def test_cold_init_is_idempotent(tmp_path, monkeypatch):
-    from resgraph.cold.cli import app as cold_app
-
     monkeypatch.setenv("RESGRAPH_COLD_DIR", str(tmp_path))
     for _ in range(2):
-        res = runner.invoke(cold_app, ["init"])
+        res = runner.invoke(cold_cli_mod.app, ["init"])
         assert res.exit_code == 0 and "cold store ok" in res.stdout
 
 
 def test_cold_as_of_summary_matches_pure_replay(cold_env):
-    from resgraph.cold.cli import app as cold_app
-
     at = max(m.event_time for m in cold_env).isoformat()
-    summary = runner.invoke(cold_app, ["as-of", "--at", at, "--summary"])
+    summary = runner.invoke(cold_cli_mod.app, ["as-of", "--at", at, "--summary"])
     assert summary.exit_code == 0
     s = json.loads(summary.stdout)
     assert s["resources"] == sum(s["by_type"].values())
-    replay = runner.invoke(cold_app, ["as-of", "--at", at, "--summary", "--no-snapshots"])
+    replay = runner.invoke(cold_cli_mod.app, ["as-of", "--at", at, "--summary", "--no-snapshots"])
     assert json.loads(replay.stdout) == s  # snapshots are an optimization, never an answer
-    rows = runner.invoke(cold_app, ["as-of", "--at", at])
+    rows = runner.invoke(cold_cli_mod.app, ["as-of", "--at", at])
     assert rows.exit_code == 0 and len(json.loads(rows.stdout)) == s["resources"]
 
 
 def test_cold_history_diff_snapshot_maintain(cold_env):
-    from resgraph.cold.cli import app as cold_app
-
     rid = cold_env[0].resource_id
-    hist = runner.invoke(cold_app, ["history", "--id", rid, "--limit", "10"])
+    hist = runner.invoke(cold_cli_mod.app, ["history", "--id", rid, "--limit", "10"])
     assert hist.exit_code == 0 and json.loads(hist.stdout)
     t0 = min(m.event_time for m in cold_env).isoformat()
     t1 = max(m.event_time for m in cold_env).isoformat()
-    diff = runner.invoke(cold_app, ["diff", "--from", t0, "--to", t1])
+    diff = runner.invoke(cold_cli_mod.app, ["diff", "--from", t0, "--to", t1])
     assert diff.exit_code == 0 and isinstance(json.loads(diff.stdout), dict)
-    assert runner.invoke(cold_app, ["snapshot", "--at", t1]).exit_code == 0
-    assert runner.invoke(cold_app, ["maintain"]).exit_code == 0
+    assert runner.invoke(cold_cli_mod.app, ["snapshot", "--at", t1]).exit_code == 0
+    assert runner.invoke(cold_cli_mod.app, ["maintain"]).exit_code == 0
 
 
 def test_cold_ingest_body_with_stubbed_stream(tmp_path, monkeypatch):
-    import resgraph.cold.cli as cold_cli_mod
-
     monkeypatch.setenv("RESGRAPH_COLD_DIR", str(tmp_path))
 
     class StubConsumer:
@@ -270,19 +266,13 @@ class _FakeSession:
 
 
 def test_schema_init_prints_ok(monkeypatch):
-    import resgraph.cli as main_cli
-
-    monkeypatch.setattr(main_cli, "_session", lambda: _FakeSession())
+    monkeypatch.setattr(main_cli, "_session", _FakeSession)
     monkeypatch.setattr(main_cli, "init_schema", lambda s: None)
     res = runner.invoke(main_cli.app, ["schema-init"])
     assert res.exit_code == 0 and "schema ok" in res.stdout
 
 
 def test_rebuild_parses_at_and_prints_result(monkeypatch, tmp_path):
-    import resgraph.cli as main_cli
-    import resgraph.cold.rebuild as rebuild_mod
-    import resgraph.cold.store as store_mod
-
     seen = {}
 
     def fake_rebuild(session, catalog, at):
@@ -291,7 +281,7 @@ def test_rebuild_parses_at_and_prints_result(monkeypatch, tmp_path):
 
     monkeypatch.setattr(store_mod, "get_catalog", lambda *a, **k: object())
     monkeypatch.setattr(rebuild_mod, "rebuild", fake_rebuild)
-    monkeypatch.setattr(main_cli, "_session", lambda: _FakeSession())
+    monkeypatch.setattr(main_cli, "_session", _FakeSession)
     res = runner.invoke(main_cli.app, ["rebuild", "--at", "2026-01-03T00:00:00+00:00"])
     assert res.exit_code == 0
     assert json.loads(res.stdout) == {"nodes": 3, "edges": 1}
@@ -299,8 +289,6 @@ def test_rebuild_parses_at_and_prints_result(monkeypatch, tmp_path):
 
 
 def test_ingest_body_with_stubbed_consumer(monkeypatch):
-    import resgraph.cli as main_cli
-
     class StubConsumer:
         def __init__(self, *a, **kw):
             pass
@@ -313,19 +301,13 @@ def test_ingest_body_with_stubbed_consumer(monkeypatch):
 
     monkeypatch.setattr(main_cli, "Consumer", StubConsumer)
     monkeypatch.setattr(main_cli, "init_schema", lambda s: None)
-    monkeypatch.setattr(main_cli, "_session", lambda: _FakeSession())
+    monkeypatch.setattr(main_cli, "_session", _FakeSession)
     res = runner.invoke(main_cli.app, ["ingest", "--max-messages", "5", "--metrics-port", "9198"])
     assert res.exit_code == 0
     assert json.loads(res.stdout) == {"read": 5, "applied": 5}
 
 
 def test_reconcile_exit_codes_and_oracle_loading(monkeypatch, tmp_path):
-    import resgraph.cli as main_cli
-    import resgraph.cold.store as store_mod
-    import resgraph.reconcile as rec_mod
-    from resgraph.gen.churn import Churn
-    from resgraph.gen.world import World
-
     msgs = list(Churn(World(7, 5)).snapshot())
     oracle_path = tmp_path / "oracle.jsonl"
     lines = [
@@ -352,7 +334,7 @@ def test_reconcile_exit_codes_and_oracle_loading(monkeypatch, tmp_path):
 
     monkeypatch.setattr(store_mod, "get_catalog", lambda *a, **k: object())
     monkeypatch.setattr(rec_mod, "reconcile", fake_reconcile)
-    monkeypatch.setattr(main_cli, "_session", lambda: _FakeSession())
+    monkeypatch.setattr(main_cli, "_session", _FakeSession)
 
     state["verdict"] = True
     ok = runner.invoke(main_cli.app, ["reconcile", "--oracle", str(oracle_path)])
@@ -364,10 +346,6 @@ def test_reconcile_exit_codes_and_oracle_loading(monkeypatch, tmp_path):
 
 
 def test_serve_hands_off_to_uvicorn(monkeypatch):
-    import uvicorn
-
-    import resgraph.cli as main_cli
-
     called = {}
     monkeypatch.setattr(uvicorn, "run", lambda app, host, port: called.update(host=host, port=port))
     res = runner.invoke(main_cli.app, ["serve", "--host", "127.0.0.1", "--port", "8123"])

@@ -71,7 +71,9 @@ def place(predicates: list[Predicate]) -> tuple[list[Predicate], list[Predicate]
     for p in claimable:
         if p.field == "type":
             if p.op not in ("=", "!="):
-                raise ValueError(f"type only supports = and !=: {p} — filter on a numeric attr instead")
+                raise ValueError(
+                    f"type only supports = and !=: {p} — filter on a numeric attr instead"
+                )
             if p.value not in _TYPES:
                 raise ValueError(f"unknown type {p.value!r}")
     return claimable, residual

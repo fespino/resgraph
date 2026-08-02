@@ -14,7 +14,6 @@ from resgraph.query.planner import plan as make_plan
 from resgraph.tools.budgets import ResourceRef, paginate_refs
 from resgraph.tools.context import CallerContext
 
-
 FILTER_GRAMMAR = (
     "AND-chain of comparisons, nothing else. Terms: type=vm, "
     "attrs.<key><op><value> with ops = != < <= > >=. Ordering ops need "

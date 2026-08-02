@@ -4,7 +4,7 @@ import json
 from datetime import UTC, datetime
 from pathlib import Path
 
-from resgraph.analyst.harness import MAX_RUN_TOKENS, MAX_TOOL_CALLS
+from resgraph.analyst.harness import MAX_RUN_TOKENS, MAX_TOOL_CALLS, cache_fingerprint
 from resgraph.analyst.prompts import (
     AUDITED_SECTIONS,
     WorldSummary,
@@ -93,3 +93,20 @@ def test_audit_table_covers_every_section():
     doc = AUDIT_DOC.read_text()
     for section in AUDITED_SECTIONS:
         assert section in doc, f"docs/prompt-audit.md is missing a verdict for {section!r}"
+
+
+def test_cache_fingerprint_stable_across_runs():
+    class Tools:
+        def __init__(self, description="d"):
+            self._description = description
+
+        def blocks(self):
+            return [{"name": "fetch_resource", "description": self._description}]
+
+        def execute(self, name, args):
+            raise AssertionError("fingerprint must not execute tools")
+
+    a = cache_fingerprint(prompt(), Tools())
+    b = cache_fingerprint(prompt(OTHER_SUMMARY, rid="db-000001"), Tools())
+    assert a == b
+    assert cache_fingerprint(prompt(), Tools(description="edited")) != a

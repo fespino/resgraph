@@ -1203,8 +1203,11 @@ change, the predicted per-slice effect, and what result would
 invalidate the hypothesis — declared-then-measured, never measured-
 then-rationalized. Model, agent host, and harness stay fixed within a
 comparison; a model or thinking-config upgrade opens a new EPOCH:
-prior harness assumptions reset and the baseline is re-established
-rather than assumed to transfer.
+prior harness assumptions reset, the baseline is re-established rather
+than assumed to transfer, and requalification probes progressively
+LARGER outcomes rather than preserving old task boundaries by habit —
+capability neither transfers nor improves monotonically, so the epoch
+discovers its own boundaries in both directions.
 
 Run artifacts pin the full verdict environment: run_id, git_ref,
 model, thinking configuration, environment (cpu/mem limits, store

@@ -31,6 +31,14 @@ session state, no handles).
   `composite`). If the world churns, a stale answer is a wrong answer:
   re-fetch rather than reasoning over old payloads.
 
+## Filter grammar
+
+`blast_radius` accepts `filter`: an AND-chain of comparisons — `type=vm
+AND attrs.zone=z1 AND attrs.cpu>=4`. Ops `= != < <= > >=`; ordering ops
+need numeric values; `type` supports only `=`/`!=`; no OR, no
+parentheses. Malformed filters answer with the correction in the error
+message.
+
 ## Scopes and risk
 
 All five tools declare `resgraph:read`; annotations on every tool:

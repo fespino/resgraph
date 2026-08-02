@@ -9,7 +9,7 @@ from resgraph.schema import RESERVED_ATTR_KEYS, Op, UpdateMessage
 
 def test_spec_example_parses():
     spec = Path(__file__).parents[1].joinpath("SPEC.md").read_text()
-    block = spec.split("### D2")[1].split("```json")[1].split("```")[0]
+    block = spec.split("\n## D2")[1].split("```json")[1].split("```")[0]
     msg = UpdateMessage.model_validate_json(block)
     assert msg.op is Op.UPSERT and msg.sequence == 184467
 

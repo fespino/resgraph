@@ -3,9 +3,26 @@
 Decision log + phase contracts. Locked decisions carry D-NN ids; changing
 one requires a new decision superseding it, not an edit.
 
-## Phase 0 — foundations
+Decisions are ordered by D-number, not by phase: the decision is the
+entity, the phase is when events on it happened. Each decision's heading
+names the phase that made it, and its amendments live inside its own
+section as dated, phase-stamped blocks in event order. The index below
+maps each phase to its events.
 
-### D0 — Toolchain: typed Python, with the types enforced
+## Phase index
+
+| Phase | Decided | Amended |
+|---|---|---|
+| 0 — foundations | D0–D4 | — |
+| 1 — world generator | D5–D7 | D4 (emit budget) |
+| 2 — graph hot store | D8–D9 | — |
+| 3 — streaming ingest | D10, D14 | D4 (ingest budget) |
+| 4 — cold store | D11–D13 | D2 (parse tightening), D11 (honesty pass), D4 (cold budgets) |
+| 5 — query layer | D15–D16 | D4 (query-layer budgets) |
+| 6 — observability | D17–D18 | D14 (outage is not poison) |
+| post-6 (2026-08-02) | — | D0 (pyright strict gate, #68) |
+
+## D0 — Toolchain: typed Python, with the types enforced (phase 0)
 
 Python 3.13 + uv + ruff from day one; **pyright in strict mode joined
 as a required CI gate** (2026-08-02, #68) once the codebase's
@@ -31,7 +48,7 @@ a beta).
 Astral's `ty` ships stable — same config surface, faster; the gate
 itself only tightens.
 
-### D1 — Graph hot store: Memgraph (Community)
+## D1 — Graph hot store: Memgraph (Community) (phase 0)
 
 | Criterion | Memgraph | Neo4j Community |
 |---|---|---|
@@ -51,7 +68,7 @@ Neo4j unchanged.
 more than a day, or traversal benchmarks disqualify Memgraph, switch —
 the Bolt driver and Cypher carry over; only Compose + index DDL change.
 
-### D2 — Update message schema (verbatim; the generator/ingest contract)
+## D2 — Update message schema (verbatim; the generator/ingest contract) (phase 0)
 
 ```json
 {
@@ -120,7 +137,7 @@ schema: an invariant a consumer relies on belongs in the type, not in
 the consumer — `label_for()` remains the parse point for the one
 boundary raw strings still cross (user-supplied query ids).
 
-### D3 — Idempotency: per-resource applied-sequence watermark
+## D3 — Idempotency: per-resource applied-sequence watermark (phase 0)
 
 Each resource node in the hot store carries `applied_seq` (uint64). The
 ingest applies a message iff `msg.sequence > node.applied_seq`, in the
@@ -139,7 +156,7 @@ the node we're touching anyway.
 effects* beyond the store (e.g., notifications), add an outbox — do not
 weaken the watermark.
 
-### D4 — Performance budgets (provisional until ingest baselines exist)
+## D4 — Performance budgets (provisional until ingest baselines exist) (phase 0)
 
 | Budget | Target | Measured |
 |---|---|---|
@@ -180,9 +197,30 @@ Consumer-group parallelism is the recorded scale-out lever if a
 future phase needs more than the amended figure (untested —
 validation is #32). The 20k figure is retired, not edited away.
 
-## Phase 1 — the world generator
+#### D4 addendum (phase 4) — cold budgets
 
-### D5 — World topology (allowed edges)
+| Budget | Target | Measured |
+|---|---|---|
+| Cold append throughput, batched | ≥ 10k events/s | **136.5k** @ batch 8192 (BENCHMARKS.md) |
+| `state_at(T)` p50, 1M-event history, snapshots on | < 2 s | **0.39 s** (95% mark, BENCHMARKS.md) |
+| Storage, 1M events | < 500 MB | **25 MB** @ batch 8192 (366 MB at batch 1024 — commit granularity is a storage decision; BENCHMARKS.md) |
+
+All three validated with margin; no supersession needed.
+
+#### D4 addendum (phase 5) — query-layer budgets (provisional)
+
+| Budget | Target | Measured |
+|---|---|---|
+| live endpoints (hot), p50 server-side | < 100 ms | **2.5 ms** end-to-end (BENCHMARKS.md) |
+| composite as-of blast radius, 1M-event history, p50 | < 2 s | **0.250 s** after projection push-down; 0.371 s before (BENCHMARKS.md) |
+| `explain=true`, any endpoint | < 50 ms, zero store contact | **0.012 ms**; zero-contact asserted by test |
+| residual-filter delta | measured and reported, no target — it is the push-down argument's evidence | **2.5× at 1M events** — and it grows with scale (BENCHMARKS.md) |
+
+The composite budget rides on the D4 cold budget (`state_at` 0.39 s
+at the 95% mark): reconstruction dominates, traverse and serialization
+must fit in the remainder.
+
+## D5 — World topology (allowed edges) (phase 1)
 
 | Source | Relationship | Target | Cardinality |
 |---|---|---|---|
@@ -199,7 +237,7 @@ Default type mix for `--resources N`: hosts 5%, vms 30%, containers
 **Rejected:** free-form random edges — traversals become meaningless;
 blast-radius queries need real directionality.
 
-### D6 — Determinism contract
+## D6 — Determinism contract (phase 1)
 
 Given identical (seed, flags, message count), the generator emits a
 byte-identical stream. Consequences:
@@ -213,7 +251,7 @@ byte-identical stream. Consequences:
 **Rejected:** wall-clock event_time — kills reproducible benchmarks
 and byte-identical test fixtures.
 
-### D7 — Churn model
+## D7 — Churn model (phase 1)
 
 - **Pareto skew:** 5% of resources ("hot set", chosen at seed time)
   receive 80% of updates. Real inventories are skewed; uniform churn
@@ -232,9 +270,7 @@ generator's own invariant (targets alive at emit) would be false,
 and ground-truth reconciliation against world state would be
 impossible.
 
-## Phase 2 — the graph hot store
-
-### D8 — Graph modeling
+## D8 — Graph modeling (phase 2)
 
 - **One label per resource type** (`:vm`, `:host`, …) — enables
   per-type indexes and readable queries. **Rejected:** generic
@@ -255,7 +291,7 @@ impossible.
   else until a measured query needs it — indexes are write-cost
   budgets, not decorations.
 
-### D9 — Dangling edges: phantom nodes
+## D9 — Dangling edges: phantom nodes (phase 2)
 
 When a message references a target that doesn't exist yet (D2 permits
 this after transport), create the target as a **phantom**:
@@ -269,9 +305,7 @@ Phantom count is a health metric: a rising phantom rate means the
 stream is delivering topology faster than existence — or the ingest
 has a bug.
 
-## Phase 3 — the streaming ingest
-
-### D10 — Apply-time state semantics
+## D10 — Apply-time state semantics (phase 3)
 
 The D3 watermark makes ordering not matter only if the final state is a
 pure function of the highest-sequence message per resource. That requires
@@ -309,7 +343,178 @@ attr updates (a diff, not a statement), this decision is superseded and
 the watermark alone no longer guarantees convergence — a per-field
 version would be needed.
 
-### D14 — Stream consumption model (recorded retroactively)
+## D11 — Cold store engine: Iceberg via pyiceberg, queried through DuckDB (phase 4)
+
+Apache Iceberg tables on the local filesystem (SQLite-backed SQL
+catalog), written with pyiceberg batch appends, read by scanning to
+Arrow and querying in DuckDB. Zero new containers.
+
+**Decision drivers:** a real table format buys atomic commits, schema
+evolution, and snapshot isolation — the things a directory of Parquet
+files reinvents badly — while pyiceberg + DuckDB keep the whole cold
+path in-process at laptop scale. The skills (Iceberg semantics, Arrow,
+DuckDB) transfer to any lakehouse stack.
+**Rejected:** plain Parquet directories — no atomic visibility, no
+manifest pruning; every consumer reimplements a catalog.
+**Rejected:** Delta Lake — write path outside Spark is thinner than
+pyiceberg's, and Iceberg's catalog story fits the later REST-catalog
+exit better.
+**Rejected:** Spark — a JVM cluster framework to write files a laptop
+process can write.
+**Reversal condition:** if pyiceberg's write path can't hold the D4
+cold-append budget after profiling, swap the writer (e.g. append via
+DuckDB's Iceberg support or a Rust writer) — the table format and
+layout (D12) survive; only the writer changes.
+
+**D11 amendment (phase 4, honesty pass):** with the phase built and
+measured, the challenge "is Iceberg justified for an append-only log?"
+gets its answer on the record: **not by current technical need.** Every
+capability the queries exercise — atomic per-batch visibility (one file
+per batch; a rename is equivalent), stats-based file pruning (DuckDB
+does it from parquet footers), schema stability (engineered via JSON
+strings, sidestepping evolution) — a plain parquet directory would
+match, without the measured Iceberg-specific costs (metadata
+amplification, compounding commit overhead). Native time travel is
+explicitly rejected (D13). The decision stands on the D1-shaped
+grounds: catalog/engine interop as the production exit path, latent
+rollback/branching, and deliberate skill-building — named plainly, not
+dressed as engineering necessity. The roadmap deepens *cold-store*
+usage (as-of serving, trigger replay, dashboard time travel, DR
+runbook) but all of it binds to the event-time layer, which is
+format-agnostic; one future phase measures Iceberg commit I/O as a
+*specimen*.
+**Sharpened reversal condition:** if by the end of the serving-layer
+phase no Iceberg-exclusive capability has been exercised — a second
+engine reading the table, a rollback used in an ops drill, or schema
+evolution via a `schema_version` bump — the format is decoration:
+either exercise one deliberately or swap to plain parquet and record
+the simplification.
+
+**Resolution (phase 5, on deadline):** the serving-layer phase
+exercised the first Iceberg-exclusive capability — a **second engine
+reading the table**: DuckDB's iceberg extension (its own Iceberg
+implementation, no pyiceberg) reads the events table from the metadata
+file alone, and with `sql/cold_semantics.sql` loaded reproduces
+`state_at(T)` exactly (test_second_engine.py). The exit-path claim is
+now a passing test, not prose; the format stays. The remaining
+candidates below stand for their own phases.
+
+**Likely resolutions, identified in advance** (so the serving-layer
+phase inherits a checklist, not a threat): (1) snapshot-pinned
+pagination cursors in the API phase — a frozen view across pages of a
+growing table is Iceberg-exclusive; (2) agent forensics — "what did
+the system know when the agent acted" is a *commit-time* question
+(D13's rejection covers world-time questions only), answered by
+pinning the snapshot ID in the agent's run record; (3) a rollback
+drill in the incident-runbook phase (bad batch → roll back →
+re-consume → reconcile); (4) write-audit-publish if D12's compaction
+trigger ever fires; (5) incremental snapshot scans as an
+eviction-proof tail for slow subscribers (heals D12's maxlen
+limitation for table-tailing consumers) — **with the coupling this
+creates recorded now: `cold maintain` currently expires all
+non-current snapshots, which would strand an incremental tailer;
+retention must become subscriber-aware (expire nothing newer than the
+slowest tailer's resume point) before (5) ships**; (6) the snapshot
+log as change-management evidence in the compliance phase.
+
+## D12 — Cold layout: an append-only event log plus derived snapshots (phase 4)
+
+Two tables:
+
+- **`events`** — every D2 message, append-only, one row per message:
+  the D2 fields flattened, `attrs` and `relationships` as JSON strings
+  (arbitrary keys stay schema-stable), partitioned by `day(event_time)`.
+  *Recorded limitation (phase 4):* the day partition is **inert for
+  fixture data** — simulated world time advances ~100 µs per event, so
+  a million events span minutes and land in one partition. It costs
+  nothing and becomes real when event time spans days; kept, with the
+  admission that today it is decoration by the repo's own
+  indexes-are-budgets rule.
+- **`state_snapshots`** — periodic full world state (one row per
+  alive resource) tagged with `as_of_time` + the max `sequence`
+  included. Derived **from the events table**, never from the hot
+  store: the cold store must be able to answer alone, and deriving
+  from Memgraph would silently couple the two stores' bugs.
+
+At-least-once delivery means duplicate appends are allowed; readers
+dedupe on `(resource_id, sequence)` — duplicate rows are identical by
+D2, so any survivor is correct. The writer stays dumb and fast.
+**Rejected:** merge-on-write current-state table — destroys history,
+which is the entire point of the cold half.
+**Rejected:** dedupe-at-write (equality deletes) — write amplification
+and thin pyiceberg support, to save readers a `DISTINCT` they can do
+in one window function.
+**Rejected:** teeing to Iceberg from inside the hot ingest worker
+(buffered background writer, backpressure on the hot path) — couples
+the stores' failure modes and progress; a second consumer group gives
+each store independent position, replay, and crash recovery for free.
+The trade accepted with that choice: the stream is bounded
+(`maxlen~`), so a cold consumer lagging behind eviction loses history
+**silently** — where the tee would have slowed the hot path instead.
+Recorded limitation; gap detection (group position vs stream head) is
+the mitigation if lag is ever plausible.
+**Rejected:** an `ingested_at` lineage column — commit-time lineage
+already lives in Iceberg snapshot metadata, and a per-row wall-clock
+would make duplicate rows non-identical, breaking the cheap
+DISTINCT dedupe.
+**Rejected:** partitioning by `resource_id` — high cardinality means a
+file explosion per partition; hidden partitioning does not save a bad
+spec. (`resource_type` as a second partition dimension is deferred
+until a measured query wants the pruning.)
+**Rejected:** log compaction as the stream-retention strategy (retain
+the latest record per key — keyspace-bounded, and a compacted log can
+bootstrap subscribers forever) — Redis Streams has no native
+compaction, and in this design the cold store plays that role:
+`state_snapshots` is the compacted view, `events` is the full log,
+and the stream stays transport.
+**Reversal condition:** if the benchmark shows read-side dedupe
+dominating as-of latency at target scale, add a compaction job that
+rewrites deduped partitions — the read semantics stay identical.
+
+## D13 — Time travel is event time, not commit time (phase 4)
+
+`state_at(T)`: for each resource, the highest-sequence event with
+`event_time <= T`; upsert rows become state, delete rows mean absent
+(tombstone semantics per D10). Implementation: nearest snapshot with
+`as_of_time <= T`, then replay events in `(snapshot.max_seq, T]` —
+the same checkpoint-plus-log shape the hot store's bootstrap uses.
+
+Iceberg has native time travel (query a table as of a past commit),
+and it is deliberately **not** the user-facing mechanism: commit time
+is when the *ingest* ran, event time is when the *world* changed, and
+the two drift apart under backfill, replay, or consumer lag. Iceberg
+snapshots remain what they are — physical isolation and rollback —
+while `AS OF` questions are answered from the data.
+**Rejected:** exposing Iceberg snapshot time travel as the as-of API —
+correct only while ingestion is perfectly live; silently wrong the
+first time history is replayed.
+**Reversal condition:** none foreseen for the semantics; if the
+checkpoint-plus-log implementation misses the D4 as-of budget, tune
+snapshot cadence or add partition pruning before touching semantics.
+
+**D12/D13 addendum (reviewed against Kreps' "The Log"):** this design
+splits what Kafka unifies — the *subscribable* log (Redis stream,
+ephemeral) and the *durable* log (the events table). Two consequences,
+named so they stop being implicit:
+
+- **New subscribers cannot bootstrap from the stream.** The platform's
+  onboarding pattern is state-transfer-plus-tail: bootstrap from the
+  cold store (`state_at`, or a full events replay for
+  history-dependent consumers), then tail the stream — replayed
+  overlap is absorbed by the consumer's own idempotency/dedupe.
+  `rebuild` is this pattern's first instance, not a special case.
+- **Reprocessing (projection evolution) is replay from the events
+  table.** Today, state-at-T rebuild is provably equivalent to a full
+  replay for the hot store: convergence (D10) makes final state a pure
+  function of each resource's highest-sequence message, so both paths
+  land identically. That equivalence **breaks for history-dependent
+  projections** (change counters, churn rates, edge history).
+  **Trigger:** when the first such projection arrives, build
+  replay-from-cold (events scanned in sequence order, fed through the
+  consumer's apply); until then, rebuild suffices and the property
+  suite carries the proof.
+
+## D14 — Stream consumption model (phase 3, recorded retroactively)
 
 Made during phase 3, written down during phase 4 — the gap between
 doing and recording is itself a lesson; the choices were in docstrings
@@ -397,192 +602,7 @@ Acceptance: store down for minutes under load → DLQ stays flat
 liveness, more state; the blocked apply already provides backpressure
 by construction (the consumer reads nothing while holding a batch).
 
-## Phase 4 — the cold store
-
-### D11 — Cold store engine: Iceberg via pyiceberg, queried through DuckDB
-
-Apache Iceberg tables on the local filesystem (SQLite-backed SQL
-catalog), written with pyiceberg batch appends, read by scanning to
-Arrow and querying in DuckDB. Zero new containers.
-
-**Decision drivers:** a real table format buys atomic commits, schema
-evolution, and snapshot isolation — the things a directory of Parquet
-files reinvents badly — while pyiceberg + DuckDB keep the whole cold
-path in-process at laptop scale. The skills (Iceberg semantics, Arrow,
-DuckDB) transfer to any lakehouse stack.
-**Rejected:** plain Parquet directories — no atomic visibility, no
-manifest pruning; every consumer reimplements a catalog.
-**Rejected:** Delta Lake — write path outside Spark is thinner than
-pyiceberg's, and Iceberg's catalog story fits the later REST-catalog
-exit better.
-**Rejected:** Spark — a JVM cluster framework to write files a laptop
-process can write.
-**Reversal condition:** if pyiceberg's write path can't hold the D4
-cold-append budget after profiling, swap the writer (e.g. append via
-DuckDB's Iceberg support or a Rust writer) — the table format and
-layout (D12) survive; only the writer changes.
-
-**D11 amendment (phase 4, honesty pass):** with the phase built and
-measured, the challenge "is Iceberg justified for an append-only log?"
-gets its answer on the record: **not by current technical need.** Every
-capability the queries exercise — atomic per-batch visibility (one file
-per batch; a rename is equivalent), stats-based file pruning (DuckDB
-does it from parquet footers), schema stability (engineered via JSON
-strings, sidestepping evolution) — a plain parquet directory would
-match, without the measured Iceberg-specific costs (metadata
-amplification, compounding commit overhead). Native time travel is
-explicitly rejected (D13). The decision stands on the D1-shaped
-grounds: catalog/engine interop as the production exit path, latent
-rollback/branching, and deliberate skill-building — named plainly, not
-dressed as engineering necessity. The roadmap deepens *cold-store*
-usage (as-of serving, trigger replay, dashboard time travel, DR
-runbook) but all of it binds to the event-time layer, which is
-format-agnostic; one future phase measures Iceberg commit I/O as a
-*specimen*.
-**Sharpened reversal condition:** if by the end of the serving-layer
-phase no Iceberg-exclusive capability has been exercised — a second
-engine reading the table, a rollback used in an ops drill, or schema
-evolution via a `schema_version` bump — the format is decoration:
-either exercise one deliberately or swap to plain parquet and record
-the simplification.
-
-**Resolution (phase 5, on deadline):** the serving-layer phase
-exercised the first Iceberg-exclusive capability — a **second engine
-reading the table**: DuckDB's iceberg extension (its own Iceberg
-implementation, no pyiceberg) reads the events table from the metadata
-file alone, and with `sql/cold_semantics.sql` loaded reproduces
-`state_at(T)` exactly (test_second_engine.py). The exit-path claim is
-now a passing test, not prose; the format stays. The remaining
-candidates below stand for their own phases.
-
-**Likely resolutions, identified in advance** (so the serving-layer
-phase inherits a checklist, not a threat): (1) snapshot-pinned
-pagination cursors in the API phase — a frozen view across pages of a
-growing table is Iceberg-exclusive; (2) agent forensics — "what did
-the system know when the agent acted" is a *commit-time* question
-(D13's rejection covers world-time questions only), answered by
-pinning the snapshot ID in the agent's run record; (3) a rollback
-drill in the incident-runbook phase (bad batch → roll back →
-re-consume → reconcile); (4) write-audit-publish if D12's compaction
-trigger ever fires; (5) incremental snapshot scans as an
-eviction-proof tail for slow subscribers (heals D12's maxlen
-limitation for table-tailing consumers) — **with the coupling this
-creates recorded now: `cold maintain` currently expires all
-non-current snapshots, which would strand an incremental tailer;
-retention must become subscriber-aware (expire nothing newer than the
-slowest tailer's resume point) before (5) ships**; (6) the snapshot
-log as change-management evidence in the compliance phase.
-
-### D12 — Cold layout: an append-only event log plus derived snapshots
-
-Two tables:
-
-- **`events`** — every D2 message, append-only, one row per message:
-  the D2 fields flattened, `attrs` and `relationships` as JSON strings
-  (arbitrary keys stay schema-stable), partitioned by `day(event_time)`.
-  *Recorded limitation (phase 4):* the day partition is **inert for
-  fixture data** — simulated world time advances ~100 µs per event, so
-  a million events span minutes and land in one partition. It costs
-  nothing and becomes real when event time spans days; kept, with the
-  admission that today it is decoration by the repo's own
-  indexes-are-budgets rule.
-- **`state_snapshots`** — periodic full world state (one row per
-  alive resource) tagged with `as_of_time` + the max `sequence`
-  included. Derived **from the events table**, never from the hot
-  store: the cold store must be able to answer alone, and deriving
-  from Memgraph would silently couple the two stores' bugs.
-
-At-least-once delivery means duplicate appends are allowed; readers
-dedupe on `(resource_id, sequence)` — duplicate rows are identical by
-D2, so any survivor is correct. The writer stays dumb and fast.
-**Rejected:** merge-on-write current-state table — destroys history,
-which is the entire point of the cold half.
-**Rejected:** dedupe-at-write (equality deletes) — write amplification
-and thin pyiceberg support, to save readers a `DISTINCT` they can do
-in one window function.
-**Rejected:** teeing to Iceberg from inside the hot ingest worker
-(buffered background writer, backpressure on the hot path) — couples
-the stores' failure modes and progress; a second consumer group gives
-each store independent position, replay, and crash recovery for free.
-The trade accepted with that choice: the stream is bounded
-(`maxlen~`), so a cold consumer lagging behind eviction loses history
-**silently** — where the tee would have slowed the hot path instead.
-Recorded limitation; gap detection (group position vs stream head) is
-the mitigation if lag is ever plausible.
-**Rejected:** an `ingested_at` lineage column — commit-time lineage
-already lives in Iceberg snapshot metadata, and a per-row wall-clock
-would make duplicate rows non-identical, breaking the cheap
-DISTINCT dedupe.
-**Rejected:** partitioning by `resource_id` — high cardinality means a
-file explosion per partition; hidden partitioning does not save a bad
-spec. (`resource_type` as a second partition dimension is deferred
-until a measured query wants the pruning.)
-**Rejected:** log compaction as the stream-retention strategy (retain
-the latest record per key — keyspace-bounded, and a compacted log can
-bootstrap subscribers forever) — Redis Streams has no native
-compaction, and in this design the cold store plays that role:
-`state_snapshots` is the compacted view, `events` is the full log,
-and the stream stays transport.
-**Reversal condition:** if the benchmark shows read-side dedupe
-dominating as-of latency at target scale, add a compaction job that
-rewrites deduped partitions — the read semantics stay identical.
-
-### D13 — Time travel is event time, not commit time
-
-`state_at(T)`: for each resource, the highest-sequence event with
-`event_time <= T`; upsert rows become state, delete rows mean absent
-(tombstone semantics per D10). Implementation: nearest snapshot with
-`as_of_time <= T`, then replay events in `(snapshot.max_seq, T]` —
-the same checkpoint-plus-log shape the hot store's bootstrap uses.
-
-Iceberg has native time travel (query a table as of a past commit),
-and it is deliberately **not** the user-facing mechanism: commit time
-is when the *ingest* ran, event time is when the *world* changed, and
-the two drift apart under backfill, replay, or consumer lag. Iceberg
-snapshots remain what they are — physical isolation and rollback —
-while `AS OF` questions are answered from the data.
-**Rejected:** exposing Iceberg snapshot time travel as the as-of API —
-correct only while ingestion is perfectly live; silently wrong the
-first time history is replayed.
-**Reversal condition:** none foreseen for the semantics; if the
-checkpoint-plus-log implementation misses the D4 as-of budget, tune
-snapshot cadence or add partition pruning before touching semantics.
-
-**D12/D13 addendum (reviewed against Kreps' "The Log"):** this design
-splits what Kafka unifies — the *subscribable* log (Redis stream,
-ephemeral) and the *durable* log (the events table). Two consequences,
-named so they stop being implicit:
-
-- **New subscribers cannot bootstrap from the stream.** The platform's
-  onboarding pattern is state-transfer-plus-tail: bootstrap from the
-  cold store (`state_at`, or a full events replay for
-  history-dependent consumers), then tail the stream — replayed
-  overlap is absorbed by the consumer's own idempotency/dedupe.
-  `rebuild` is this pattern's first instance, not a special case.
-- **Reprocessing (projection evolution) is replay from the events
-  table.** Today, state-at-T rebuild is provably equivalent to a full
-  replay for the hot store: convergence (D10) makes final state a pure
-  function of each resource's highest-sequence message, so both paths
-  land identically. That equivalence **breaks for history-dependent
-  projections** (change counters, churn rates, edge history).
-  **Trigger:** when the first such projection arrives, build
-  replay-from-cold (events scanned in sequence order, fed through the
-  consumer's apply); until then, rebuild suffices and the property
-  suite carries the proof.
-
-### D4 addendum — cold budgets
-
-| Budget | Target | Measured |
-|---|---|---|
-| Cold append throughput, batched | ≥ 10k events/s | **136.5k** @ batch 8192 (BENCHMARKS.md) |
-| `state_at(T)` p50, 1M-event history, snapshots on | < 2 s | **0.39 s** (95% mark, BENCHMARKS.md) |
-| Storage, 1M events | < 500 MB | **25 MB** @ batch 8192 (366 MB at batch 1024 — commit granularity is a storage decision; BENCHMARKS.md) |
-
-All three validated with margin; no supersession needed.
-
-## Phase 5 — the query layer
-
-### D15 — API surface: one thin HTTP layer over both stores
+## D15 — API surface: one thin HTTP layer over both stores (phase 5)
 
 FastAPI service (`resgraph.api`), read-only. The endpoint set is the
 contract the agent phase will wrap as tools, so it is small and fixed:
@@ -650,7 +670,7 @@ work. Recorded answer:
   D16's adopt-line has fired by then) and load the shipped semantic
   views into it. Do not teach the HTTP API to speak SQL.
 
-### D16 — Mini planner: predicate push-down across two stores
+## D16 — Mini planner: predicate push-down across two stores (phase 5)
 
 Scope: a filter DSL of **conjunctions only** —
 `type=vm AND attrs.zone=z1` (equality + numeric comparison; no OR, no
@@ -718,22 +738,7 @@ the book this phase's vocabulary doc cites.
   physical choices; the separation is pedagogy until there are real
   alternatives to choose between.
 
-### D4 addendum — query-layer budgets (provisional)
-
-| Budget | Target | Measured |
-|---|---|---|
-| live endpoints (hot), p50 server-side | < 100 ms | **2.5 ms** end-to-end (BENCHMARKS.md) |
-| composite as-of blast radius, 1M-event history, p50 | < 2 s | **0.250 s** after projection push-down; 0.371 s before (BENCHMARKS.md) |
-| `explain=true`, any endpoint | < 50 ms, zero store contact | **0.012 ms**; zero-contact asserted by test |
-| residual-filter delta | measured and reported, no target — it is the push-down argument's evidence | **2.5× at 1M events** — and it grows with scale (BENCHMARKS.md) |
-
-The composite budget rides on the D4 cold budget (`state_at` 0.39 s
-at the 95% mark): reconstruction dominates, traverse and serialization
-must fit in the remainder.
-
-## Phase 6 — observability
-
-### D17 — Telemetry: wide events are the log, metrics are a view
+## D17 — Telemetry: wide events are the log, metrics are a view (phase 6)
 
 The repo's thesis applied to its own telemetry: a pre-aggregated
 counter is state *without* a log — once incremented, the event that
@@ -816,7 +821,7 @@ recorded decision; this addendum is that decision.
   Reopen trigger: the first cold-path incident the existing signals
   miss.
 
-### D18 — Two per-run SLOs, ratio SLIs, thresholds derived not invented
+## D18 — Two per-run SLOs, ratio SLIs, thresholds derived not invented (phase 6)
 
 Method per the SRE Workbook's SLO-implementation chapter. SLO
 document fields: author F. Espino (solo — the gates are the

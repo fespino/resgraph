@@ -48,19 +48,34 @@ def parse_filter(text: str | None) -> list[Predicate]:
     if not text or not text.strip():
         return []
     if len(text) > MAX_FILTER_LEN:
-        raise ValueError(f"filter longer than {MAX_FILTER_LEN} chars")
+        raise ValueError(
+            f"filter longer than {MAX_FILTER_LEN} chars — drop redundant terms "
+            "or split into separate calls"
+        )
     if re.search(r"\bOR\b", text, re.IGNORECASE):
-        raise ValueError("OR is not supported (D16: conjunctions only)")
+        raise ValueError(
+            "OR is not supported — make one call per branch and merge the "
+            "results, or use a single AND chain: type=vm AND attrs.zone=z1"
+        )
     if "(" in text or ")" in text:
-        raise ValueError("grouping is not supported (D16: conjunctions only)")
+        raise ValueError(
+            "parentheses are not supported — write a flat AND chain: "
+            "type=vm AND attrs.zone=z1"
+        )
     preds = []
     for term in (t.strip() for t in _AND.split(text.strip())):
         m = _TERM.match(term)
         if not m:
-            raise ValueError(f"cannot parse filter term: {term!r}")
+            raise ValueError(
+                f"cannot parse filter term: {term!r} — terms look like "
+                "type=vm or attrs.cpu>=4, joined with AND"
+            )
         value = _coerce(m["value"])
         op = cast(Op, m["op"])  # _TERM's op group closes exactly this set
         if op in ("<", "<=", ">", ">=") and isinstance(value, str):
-            raise ValueError(f"ordering comparison needs a numeric value: {term!r}")
+            raise ValueError(
+                f"ordering comparison needs a numeric value: {term!r} — use = "
+                "or != for strings, or compare a numeric attr like attrs.cpu>=4"
+            )
         preds.append(Predicate(m["field"], op, value))
     return preds

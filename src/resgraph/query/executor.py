@@ -108,7 +108,7 @@ def execute_plan(plan: Plan, ctx: QueryContext) -> list[dict[str, Any]]:
 
     if q.at is None:
         if q.root is None:
-            raise ValueError("live plan without a root (D16: only blast_radius runs live)")
+            raise ValueError("live plan without a root — only blast_radius runs live")
         session = ctx.require("hot")
         affected = hot_queries.blast_radius(
             session,
@@ -149,7 +149,7 @@ def execute_plan(plan: Plan, ctx: QueryContext) -> list[dict[str, Any]]:
         return _residual_filter(rows, plan.residual)
 
     if q.root is None:
-        raise ValueError("composite plan without a root (D16)")
+        raise ValueError("composite plan without a root")
     state = cold_queries.state_at(
         catalog,
         q.at,

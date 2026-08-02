@@ -3,7 +3,7 @@
 from datetime import UTC, datetime
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from resgraph.graph import queries as hot_queries
 from resgraph.graph.queries import MAX_DEPTH
@@ -15,11 +15,21 @@ from resgraph.tools.budgets import ResourceRef, paginate_refs
 from resgraph.tools.context import CallerContext
 
 
+FILTER_GRAMMAR = (
+    "AND-chain of comparisons, nothing else. Terms: type=vm, "
+    "attrs.<key><op><value> with ops = != < <= > >=. Ordering ops need "
+    "numeric values; type supports only = and !=. No OR, no parentheses. "
+    "Example: type=container AND attrs.zone=z1 AND attrs.restarts>=2"
+)
+
+
 class BlastRadiusIn(BaseModel):
     resource_id: str
     depth: int = 3
-    at: datetime | None = None
-    filter: str | None = None
+    at: datetime | None = Field(
+        default=None, description="ISO-8601 UTC; None = live graph, set = reconstructed moment"
+    )
+    filter: str | None = Field(default=None, description=FILTER_GRAMMAR)
     offset: int = 0
 
 

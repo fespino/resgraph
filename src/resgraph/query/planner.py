@@ -71,7 +71,7 @@ def place(predicates: list[Predicate]) -> tuple[list[Predicate], list[Predicate]
     for p in claimable:
         if p.field == "type":
             if p.op not in ("=", "!="):
-                raise ValueError(f"type only supports = and !=: {p}")
+                raise ValueError(f"type only supports = and !=: {p} — filter on a numeric attr instead")
             if p.value not in _TYPES:
                 raise ValueError(f"unknown type {p.value!r}")
     return claimable, residual
@@ -112,7 +112,7 @@ def plan(query: Query) -> Plan:
     steps: list[Step] = []
     if query.at is None:
         if query.kind == "world":
-            raise ValueError("live /world is not an endpoint; use ?at=T (D15)")
+            raise ValueError("live /world is not an endpoint; pass at=T for a reconstructed moment")
         where = cypher_where(claimable)
         steps.append(
             Step(

@@ -902,4 +902,52 @@ edit.
   explain without executing (D16).
 - Any increment touching these contracts cites the D-number in its PR.
 
+## Roadmap sequencing
+
+Phase order is the largest standing decision in this repo, and until
+now the only one carrying no rationale. Two questions decide an order,
+and they are different questions:
+
+- **Dependency** — what must exist before X is buildable at all.
+- **Impact** — of the things buildable now, which teaches or unlocks
+  the most.
+
+Dependency-first alone produces months of plumbing with nothing
+demonstrable; impact-first alone builds towers on sand. Every planned
+phase below states its position on both axes. When a phase jumps the
+queue, this section gets a dated amendment saying why — the same
+supersession discipline as a D-number.
+
+**Locked rule: evaluation work is exempt from impact ranking.** Evals
+measure everything else, so ranking them by impact is circular — they
+look low-impact right up until they were needed last month. The
+instrument is built in the same phase as its subject, never deferred
+for something shinier.
+
+### Phases 0–6, reconstructed
+
+The completed order was dependency-driven end to end: a world to emit
+traffic (1), a store to receive it (2), the stream between them (3),
+history (4), one query surface over both stores (5). The single
+impact-driven call was holding observability to 6 rather than
+sprinkling it per-phase: one dedicated phase instrumented the whole
+pipeline at once, so everything built on top starts on a measured
+platform instead of a dark one.
+
+### The next stretch
+
+| Phase | What | Dependency | Impact |
+|---|---|---|---|
+| 7 | MCP server over the query layer | wraps the D15 surface and D16 planner — buildable only now that both exist | converts every endpoint into agent-callable tools; everything agentic sits on it |
+| 8 | analyst agent + its evaluation harness | needs the phase-7 tools | first end-to-end consumer of the whole platform; the evals land in-phase, per the locked rule |
+| 9 | runtime hardening: bounding what the agent may do | needs an agent worth bounding | the difference between a demo and something left running unattended |
+| 10 | cost accounting on the token path | needs real agent traffic to meter | turns "the agent works" into "the agent is worth running" |
+
+Beyond 10 the themes are named but deliberately unordered: misuse
+detection, API platformization, a serving dashboard, sandboxing,
+compliance-as-code, agent memory, ambient and reactive automation,
+retrieval. Ranking them today would repeat the mistake this section
+exists to prevent; each gets its two-axis line here when the horizon
+reaches it, under a dated amendment.
+
 

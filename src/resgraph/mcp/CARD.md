@@ -25,6 +25,9 @@ session state, no handles).
   `truncated: true`, keeps `total_count` honest, and puts the next move
   in `pagination_hint` prose ("call again with offset=N"). A truncated
   radius is "at least N", never "N".
+- Pages are **independent reads of a churning world**, not a snapshot:
+  each offset call re-runs the query. Compare `fetched_at` across pages
+  before treating their union as one moment.
 - `depth` beyond the platform cap is **clamped, not rejected** —
   `depth_clamped: true` says so.
 - Every response carries `fetched_at` and `source` (`hot` | `cold` |

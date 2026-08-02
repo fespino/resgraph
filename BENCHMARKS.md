@@ -330,3 +330,41 @@ test, not just timed). Second consecutive phase with every budget
 holding; the margins stay large, which now reads less like timidity
 and more like laptop-scale queries simply being cheap — the budgets
 exist for the day they stop being.
+
+## Tool payloads — refs+cap vs fat responses (D19–D20)
+
+Method: `benchmarks/tool_payload_bench.py`. Per world size (1k / 10k /
+100k resources, seed 42, churn = world size): seed memgraph, sample 30
+live roots, measure the canonical `blast_radius` response (refs, token
+cap) against the same traversal serialized fat (full attrs via
+`with_attrs=True` — the route-shaped payload the tool refuses to be).
+Tokens = len(json)/4, the same estimate the cap enforces. Cold-backed
+tools measured at 10k via a temp catalog fed the identical stream.
+Hub row: a constructed 900-dependent host appended to the 100k world —
+seed-42 radii top out at ~30 nodes, so the natural worlds never stress
+the cap; the hub is what the cap is FOR. Run 2026-08-02.
+
+| Measure | 1k world | 10k | 100k |
+|---|---|---|---|
+| `blast_radius` refs, p50 / p95 / p100 tokens | 54 / 292 / 676 | 41 / 186 / 493 | 47 / 162 / 544 |
+| `blast_radius` fat, p50 / p95 / p100 tokens | 48 / 836 / 2,030 | 0 / 462 / 1,448 | 25 / 392 / 1,610 |
+| `fetch_resource` p50 / p100 | 70 / 115 | 70 / 114 | 70 / 114 |
+
+| Hub (900 dependents, in the 100k world) | tokens |
+|---|---|
+| refs response (379-ref page, `truncated: true`, `total_count: 900`) | **7,172** — under the 8,000 cap |
+| fat response (all 900 nodes, full attrs) | **53,775** — 6.7× the cap, linear in fan-out |
+
+Two findings. **The cap only earns its keep on hubs** — at seed-42's
+natural radii (≤ ~30 nodes) refs vs fat is a 3–4× constant factor at
+p95+ and both fit any context window; the flat-p100 claim is really a
+claim about the hub row, where fat is unbounded (linear in fan-out)
+and the refs response is capped by construction, with pagination
+picking up the remainder. **Detail is flat everywhere** —
+`fetch_resource` p100 ≈ 114 tokens at every world size, which is what
+makes the refs+fetch contract work: following a ref costs the same in
+a 1k world and a 100k one.
+
+Latency note: the canonical layer adds shaping + validation over the
+phase-5 query path; measured overhead is sub-millisecond against the
+2.5 ms live endpoint p50 above — not separately tabled.

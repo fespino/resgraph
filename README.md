@@ -78,6 +78,48 @@ uv run resgraph query blast-radius --id vm-000042
 curl "localhost:8000/blast-radius/vm-000042?at=2026-01-03T00:00:00Z"
 ```
 
+## Ask it through an agent: the MCP server
+
+Five task-shaped tools over the same query layer — `blast_radius`,
+`dependency_path`, `resource_history`, `world_diff`, `fetch_resource` —
+plus two investigation playbooks served as MCP prompts. One registry
+defines the surface; the HTTP routes above and the MCP server are both
+projections of it, and CI asserts nothing exists outside it. Budgets
+live inside the tools: depth clamps that answer instead of erroring,
+bare refs with one polymorphic fetch, a hard token cap with prose
+pagination hints, freshness on every response.
+
+`.mcp.json` wires it into Claude Code/Desktop:
+
+```bash
+uv run resgraph-mcp   # stdio; or let the client spawn it
+```
+
+A real capture (stdio, seeded 100k world plus a 900-dependent hub —
+trimmed, not staged):
+
+```text
+> blast_radius(resource_id="host-hub000", depth=2)
+{"total_count": 900, "truncated": true, "depth_clamped": false,
+ "pagination_hint": "900 results total; this page covers 0..378.
+  Call blast_radius again with offset=379 for the next page.",
+ "source": "hot", "refs": [{"id": "container-hub0000",
+  "type": "container", ...}, ...379 refs, under the token cap...]}
+
+> fetch_resource(resource_id="container-hub0000")
+{"found": true, "attrs": {"image": "app:v1.2.3", "restarts": 0,
+  "state": "running", "zone": "z1"},
+ "relationships": [{"type": "runs_on", "target_id": "host-hub000"}], ...}
+
+> dependency_path(from_id="container-hub0000", to_id="host-hub000")
+{"found": true, "path": ["container-hub0000", "host-hub000"],
+ "rels": ["RUNS_ON"], ...}
+```
+
+A 900-node radius comes back as one capped page of refs with an
+honest total and the next move in prose — not 54k tokens of attrs
+(the measured fat alternative; see BENCHMARKS.md).
+
 ## Benchmark highlights
 
 Apple M3 laptop, 8 GB RAM, stores in Docker alongside. Methodology,

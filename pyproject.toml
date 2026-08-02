@@ -60,7 +60,24 @@ dev = [
     "httpx>=0.28.1",
     "hypothesis>=6.163.0",
     "psycopg[binary]>=3.3.4",
+    "pyarrow-stubs>=20.0.0.20260625",
+    "pyright[nodejs]>=1.1.411",
     "pytest>=9.1.1",
     "pytest-cov>=7.1.0",
     "ruff>=0.16.0",
 ]
+
+[tool.pyright]
+pythonVersion = "3.13"
+typeCheckingMode = "strict"
+include = ["src"]
+# The reportUnknown* family is off: it measures third-party stub quality
+# (neo4j, pyiceberg, duckdb, redis all ship partial or no types) and at
+# error level it buries our own defects under ~700 cascade diagnostics.
+# Reversal: re-enable per rule as those stubs complete. Everything else
+# stays at strict defaults; per-module downgrades require a reason here.
+reportUnknownMemberType = "none"
+reportUnknownVariableType = "none"
+reportUnknownArgumentType = "none"
+reportUnknownParameterType = "none"
+reportUnknownLambdaType = "none"

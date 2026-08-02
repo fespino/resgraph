@@ -51,6 +51,10 @@ jobs:
         name: bandit
         run: uv run bandit -c pyproject.toml -r src/ -q
         continue-on-error: true
+      - id: typecheck
+        name: pyright (strict)
+        run: uv run pyright
+        continue-on-error: true
       - id: promtool
         name: promtool (SLO rules)
         # rules checked AND unit-tested (synthetic series -> alert must
@@ -86,6 +90,7 @@ jobs:
             echo "| ruff check | $(s "${{ steps.lint.outcome }}") |"
             echo "| ruff format | $(s "${{ steps.format.outcome }}") |"
             echo "| bandit | $(s "${{ steps.bandit.outcome }}") |"
+            echo "| pyright (strict) | $(s "${{ steps.typecheck.outcome }}") |"
             echo "| promtool | $(s "${{ steps.promtool.outcome }}") |"
             echo "| pytest | $(s "${{ steps.tests.outcome }}") — $(tail -1 pytest.out) |"
           } > ci-summary.md
@@ -108,5 +113,5 @@ jobs:
           name: python-coverage-comment-action
           path: python-coverage-comment-action.txt
       - name: Gate
-        if: steps.lint.outcome == 'failure' || steps.format.outcome == 'failure' || steps.bandit.outcome == 'failure' || steps.promtool.outcome == 'failure' || steps.tests.outcome == 'failure'
+        if: steps.lint.outcome == 'failure' || steps.format.outcome == 'failure' || steps.bandit.outcome == 'failure' || steps.typecheck.outcome == 'failure' || steps.promtool.outcome == 'failure' || steps.tests.outcome == 'failure'
         run: exit 1

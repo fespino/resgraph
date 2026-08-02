@@ -9,8 +9,10 @@ import contextlib
 import json
 import os
 from pathlib import Path
+from typing import Any
 
 import pyarrow as pa
+from pyiceberg.catalog import Catalog
 from pyiceberg.catalog.sql import SqlCatalog
 from pyiceberg.exceptions import NamespaceAlreadyExistsError, TableAlreadyExistsError
 from pyiceberg.partitioning import PartitionField, PartitionSpec
@@ -123,7 +125,7 @@ def append_events(catalog: SqlCatalog, msgs: list[UpdateMessage]) -> int:
     return len(msgs)
 
 
-def maintain(catalog, directory: Path | None = None) -> dict:
+def maintain(catalog: Catalog, directory: Path | None = None) -> dict[str, Any]:
     """Expire non-current Iceberg snapshots on both tables.
 
     Every append commit is a snapshot; the unexpired snapshot log is
@@ -140,7 +142,7 @@ def maintain(catalog, directory: Path | None = None) -> dict:
         return sum(f.stat().st_size for f in d.rglob("*") if f.is_file()) / 1024**2
 
     before_mb = disk()
-    result: dict = {}
+    result: dict[str, Any] = {}
     for name in (EVENTS, SNAPSHOTS):
         table = catalog.load_table(name)
         before = len(table.metadata.snapshots)

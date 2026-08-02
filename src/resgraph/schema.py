@@ -29,10 +29,13 @@ class ResourceType(StrEnum):
 _TYPE_PREFIXES = frozenset(t.value for t in ResourceType)
 
 
+RelType = Literal["runs_on", "attached_to", "routes_to", "member_of"]
+
+
 class Relationship(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
-    type: Literal["runs_on", "attached_to", "routes_to", "member_of"]
+    type: RelType
     target_id: str = Field(min_length=1)
 
     @model_validator(mode="after")

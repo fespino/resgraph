@@ -6,6 +6,9 @@ ack-after-apply, poison handling) live in resgraph.consumer; this
 wrapper binds them to a Bolt session.
 """
 
+from typing import Any
+
+from neo4j import Session
 from neo4j.exceptions import ServiceUnavailable, SessionExpired, TransientError
 
 from resgraph.consumer import DEFAULT_STREAM, StreamConsumer
@@ -22,7 +25,7 @@ RETRYABLE = (ServiceUnavailable, SessionExpired, TransientError, ConnectionError
 
 
 class Consumer(StreamConsumer):
-    def __init__(self, redis_url: str, session, **kwargs) -> None:
+    def __init__(self, redis_url: str, session: Session, **kwargs: Any) -> None:
         def apply(msgs: list[UpdateMessage]) -> tuple[int, int]:
             return apply_batch(session, msgs)
 

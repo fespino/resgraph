@@ -150,3 +150,24 @@ artifact.
 Next post: the decision log — why every locked decision in this project
 carries a recorded rejection and a reversal condition, and the test that
 makes the specification executable.
+
+---
+
+**Update (2026-08-02):** the pre-merge gate family grew a member —
+**pyright in strict mode** is now a required check (D0 in the spec,
+issue #68). It earns its place in this post because it's the same
+claim the other gates make, aimed at a different failure class: the
+codebase was already written in the constructive style Alexis King
+describes in her [constructive data modeling
+talk](https://www.youtube.com/watch?v=0BXuYlNrUmE) — closed `Literal`
+sets for operators and relationship types, frozen models, positive-
+space types that can't represent invalid states — but nothing
+*enforced* the style's payoff. Now the closed types dispatch through
+`match` statements with `typing.assert_never` on the fall-through, so
+adding a message operation or a relationship type is a compile-time
+obligation on every consumer: the checker names each site that must
+handle the new case, before any test runs. Adopting it also paid
+immediately: the checker found two API routes that would accept an
+empty-string timestamp and pass `None` into a SQL layer — now both
+are 400s with tests. Enforced, not claimed, same as everything else
+on this page.

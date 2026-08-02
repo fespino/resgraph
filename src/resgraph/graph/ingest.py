@@ -34,9 +34,14 @@ per resource the watermark can't arbitrate — sequence assignment needs
 epochs/fencing. Second iteration, tracked in issue #31.
 """
 
+from typing import Any, assert_never
+
+from neo4j import ManagedTransaction, Session
+
 from resgraph import obs
 from resgraph.schema import RESERVED_ATTR_KEYS, Op, UpdateMessage
 
+from .client import lit
 from .schema import label_for
 
 # Outbound edge types the ingest owns; an upsert replaces exactly these —
@@ -49,7 +54,7 @@ DEP_REL_TYPES = ("RUNS_ON", "ATTACHED_TO", "ROUTES_TO", "MEMBER_OF")
 SYSTEM_PROPS = RESERVED_ATTR_KEYS
 
 
-def apply_message(session, msg: UpdateMessage) -> bool:
+def apply_message(session: Session, msg: UpdateMessage) -> bool:
     """Apply one message idempotently. Returns ``True`` if it was applied,
     ``False`` if the watermark skipped it as stale/replayed.
 
@@ -60,37 +65,40 @@ def apply_message(session, msg: UpdateMessage) -> bool:
     return session.execute_write(_apply, msg, label)
 
 
-def _apply(tx, msg: UpdateMessage, label: str) -> bool:
+def _apply(tx: ManagedTransaction, msg: UpdateMessage, label: str) -> bool:
     rec = tx.run(
-        f"MATCH (n:{label} {{id: $id}}) RETURN n.applied_seq AS s", id=msg.resource_id
+        lit(f"MATCH (n:{label} {{id: $id}}) RETURN n.applied_seq AS s"), id=msg.resource_id
     ).single()
     current = rec["s"] if rec and rec["s"] is not None else -1
     if msg.sequence <= current:  # strict watermark: stale or replayed
         return False
-    if msg.op is Op.UPSERT:
-        _write_upsert(tx, msg, label)
-    else:
-        _write_tombstone(tx, msg, label)
+    match msg.op:
+        case Op.UPSERT:
+            _write_upsert(tx, msg, label)
+        case Op.DELETE:
+            _write_tombstone(tx, msg, label)
+        case _:
+            assert_never(msg.op)
     return True
 
 
-def _write_upsert(tx, msg: UpdateMessage, label: str) -> None:
+def _write_upsert(tx: ManagedTransaction, msg: UpdateMessage, label: str) -> None:
     # Replace the property bag wholesale (the message is a full statement),
     # then re-assert the system fields so they win regardless of attr keys.
     tx.run(
-        f"""
+        lit(f"""
         MERGE (n:{label} {{id: $id}})
         SET n = $attrs
         SET n.id = $id, n.applied_seq = $seq,
             n.deleted = false, n.deleted_seq = null, n.phantom = false
-        """,
+        """),
         id=msg.resource_id,
         seq=msg.sequence,
         attrs=dict(msg.attrs),
     ).consume()
     # Relationships replace-on-upsert: clear the owned edge types, re-create.
     tx.run(
-        f"MATCH (:{label} {{id: $id}})-[r]->() WHERE type(r) IN $deps DELETE r",
+        lit(f"MATCH (:{label} {{id: $id}})-[r]->() WHERE type(r) IN $deps DELETE r"),
         id=msg.resource_id,
         deps=list(DEP_REL_TYPES),
     ).consume()
@@ -101,12 +109,12 @@ def _write_upsert(tx, msg: UpdateMessage, label: str) -> None:
         if rel_type not in DEP_REL_TYPES:
             raise ValueError(f"unknown relationship type: {rel.type!r}")
         summary = tx.run(
-            f"""
+            lit(f"""
             MATCH (s:{label} {{id: $sid}})
             MERGE (t:{label_for(rel.target_id)} {{id: $tid}})
               ON CREATE SET t.phantom = true
             MERGE (s)-[:{rel_type}]->(t)
-            """,
+            """),
             sid=msg.resource_id,
             tid=rel.target_id,
         ).consume()
@@ -116,28 +124,28 @@ def _write_upsert(tx, msg: UpdateMessage, label: str) -> None:
         obs.PHANTOMS_CREATED.add(phantoms)
 
 
-def _write_tombstone(tx, msg: UpdateMessage, label: str) -> None:
+def _write_tombstone(tx: ManagedTransaction, msg: UpdateMessage, label: str) -> None:
     # A tombstone carries no payload — clear props and drop outbound edges —
     # which is what makes a highest-sequence delete order-independent. The
     # node stays so a later higher-sequence upsert can revive it.
     tx.run(
-        f"""
+        lit(f"""
         MERGE (n:{label} {{id: $id}})
         SET n = {{}}
         SET n.id = $id, n.applied_seq = $seq,
             n.deleted = true, n.deleted_seq = $seq, n.phantom = false
-        """,
+        """),
         id=msg.resource_id,
         seq=msg.sequence,
     ).consume()
     tx.run(
-        f"MATCH (:{label} {{id: $id}})-[r]->() WHERE type(r) IN $deps DELETE r",
+        lit(f"MATCH (:{label} {{id: $id}})-[r]->() WHERE type(r) IN $deps DELETE r"),
         id=msg.resource_id,
         deps=list(DEP_REL_TYPES),
     ).consume()
 
 
-def apply_batch(session, msgs: list[UpdateMessage]) -> tuple[int, int]:
+def apply_batch(session: Session, msgs: list[UpdateMessage]) -> tuple[int, int]:
     """Apply a batch of messages in ONE transaction. Returns
     ``(applied, skipped)``. Semantically identical to calling
     ``apply_message`` per message — pinned by a property test — but
@@ -159,7 +167,7 @@ def apply_batch(session, msgs: list[UpdateMessage]) -> tuple[int, int]:
     return session.execute_write(_apply_batch_tx, list(msgs))
 
 
-def _apply_batch_tx(tx, msgs: list[UpdateMessage]) -> tuple[int, int]:
+def _apply_batch_tx(tx: ManagedTransaction, msgs: list[UpdateMessage]) -> tuple[int, int]:
     # Highest sequence per resource wins — the watermark's verdict for
     # intra-batch siblings, computed in Python (convergence makes the
     # outcome identical to applying them one by one).
@@ -177,7 +185,7 @@ def _apply_batch_tx(tx, msgs: list[UpdateMessage]) -> tuple[int, int]:
     current: dict[str, int] = {}
     for label, group in sorted(by_label.items()):
         rows = tx.run(
-            f"UNWIND $ids AS id MATCH (n:{label} {{id: id}}) RETURN id, n.applied_seq AS s",
+            lit(f"UNWIND $ids AS id MATCH (n:{label} {{id: id}}) RETURN id, n.applied_seq AS s"),
             ids=[m.resource_id for m in group],
         )
         for rec in rows:
@@ -191,8 +199,8 @@ def _apply_batch_tx(tx, msgs: list[UpdateMessage]) -> tuple[int, int]:
     # Node writes, per label: upserts replace the property bag, deletes
     # write tombstones — same statements as the single-message path,
     # UNWIND-batched.
-    upserts: dict[str, list[dict]] = {}
-    tombstones: dict[str, list[dict]] = {}
+    upserts: dict[str, list[dict[str, Any]]] = {}
+    tombstones: dict[str, list[dict[str, Any]]] = {}
     for m in apply:
         label = label_for(m.resource_id)
         if m.op is Op.UPSERT:
@@ -203,24 +211,24 @@ def _apply_batch_tx(tx, msgs: list[UpdateMessage]) -> tuple[int, int]:
             tombstones.setdefault(label, []).append({"id": m.resource_id, "seq": m.sequence})
     for label, rows in sorted(upserts.items()):
         tx.run(
-            f"""
+            lit(f"""
             UNWIND $rows AS r
             MERGE (n:{label} {{id: r.id}})
             SET n = r.attrs
             SET n.id = r.id, n.applied_seq = r.seq,
                 n.deleted = false, n.deleted_seq = null, n.phantom = false
-            """,
+            """),
             rows=rows,
         ).consume()
     for label, rows in sorted(tombstones.items()):
         tx.run(
-            f"""
+            lit(f"""
             UNWIND $rows AS r
             MERGE (n:{label} {{id: r.id}})
             SET n = {{}}
             SET n.id = r.id, n.applied_seq = r.seq,
                 n.deleted = true, n.deleted_seq = r.seq, n.phantom = false
-            """,
+            """),
             rows=rows,
         ).consume()
 
@@ -233,14 +241,14 @@ def _apply_batch_tx(tx, msgs: list[UpdateMessage]) -> tuple[int, int]:
         clears.setdefault(label_for(m.resource_id), []).append(m.resource_id)
     for label, ids in sorted(clears.items()):
         tx.run(
-            f"""
+            lit(f"""
             UNWIND $ids AS id
             MATCH (:{label} {{id: id}})-[r]->() WHERE type(r) IN $deps DELETE r
-            """,
+            """),
             ids=ids,
             deps=list(DEP_REL_TYPES),
         ).consume()
-    edges: dict[tuple[str, str, str], list[dict]] = {}
+    edges: dict[tuple[str, str, str], list[dict[str, str]]] = {}
     for m in apply:
         if m.op is not Op.UPSERT:
             continue
@@ -255,13 +263,13 @@ def _apply_batch_tx(tx, msgs: list[UpdateMessage]) -> tuple[int, int]:
     phantoms = 0
     for (src_label, rel_type, dst_label), rows in sorted(edges.items()):
         summary = tx.run(
-            f"""
+            lit(f"""
             UNWIND $rows AS e
             MATCH (s:{src_label} {{id: e.src}})
             MERGE (t:{dst_label} {{id: e.dst}})
               ON CREATE SET t.phantom = true
             MERGE (s)-[:{rel_type}]->(t)
-            """,
+            """),
             rows=rows,
         ).consume()
         # sources are MATCHed, so anything this query created is a phantom
@@ -272,7 +280,7 @@ def _apply_batch_tx(tx, msgs: list[UpdateMessage]) -> tuple[int, int]:
     return (len(apply), skipped)
 
 
-def read_node(session, resource_id: str) -> dict | None:
+def read_node(session: Session, resource_id: str) -> dict[str, Any] | None:
     """Normalized node state for assertions and the CLI, or ``None`` if
     the node is absent.
 
@@ -282,12 +290,12 @@ def read_node(session, resource_id: str) -> dict | None:
     """
     label = label_for(resource_id)
     rec = session.run(
-        f"""
+        lit(f"""
         MATCH (n:{label} {{id: $id}})
         OPTIONAL MATCH (n)-[r]->(t)
         RETURN properties(n) AS props,
                collect({{type: type(r), target: t.id}}) AS rels
-        """,
+        """),
         id=resource_id,
     ).single()
     if rec is None or rec["props"] is None:

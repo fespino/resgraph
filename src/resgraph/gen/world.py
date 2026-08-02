@@ -4,7 +4,7 @@ from bisect import insort
 from dataclasses import dataclass, field
 from random import Random
 
-from resgraph.schema import Relationship, ResourceType
+from resgraph.schema import Relationship, RelType, ResourceType
 
 TYPE_MIX: dict[ResourceType, float] = {
     ResourceType.HOST: 0.05,
@@ -17,7 +17,7 @@ TYPE_MIX: dict[ResourceType, float] = {
 }
 
 # D5 verbatim: (source type, relationship) -> (allowed target types, lo, hi)
-TOPOLOGY: dict[tuple[ResourceType, str], tuple[tuple[ResourceType, ...], int, int]] = {
+TOPOLOGY: dict[tuple[ResourceType, RelType], tuple[tuple[ResourceType, ...], int, int]] = {
     (ResourceType.VM, "runs_on"): ((ResourceType.HOST,), 1, 1),
     (ResourceType.VM, "member_of"): ((ResourceType.ASG,), 0, 1),
     (ResourceType.VM, "attached_to"): ((ResourceType.SG,), 1, 3),
@@ -155,7 +155,9 @@ class World:
     def create(self, t: ResourceType, resource_id: str | None = None) -> Resource:
         revived = resource_id is not None and resource_id in self.resources
         rid = resource_id or self._mint_id(t)
-        attrs = {k: self.rng.choice(v) for k, v in sorted(ATTR_POOLS[t].items())}
+        attrs: dict[str, str | int | float | bool] = {
+            k: self.rng.choice(v) for k, v in sorted(ATTR_POOLS[t].items())
+        }
         res = Resource(id=rid, type=t, attrs=attrs, relationships=self.roll_relationships(t))
         self.resources[rid] = res
         self._index_add(rid, res.relationships)

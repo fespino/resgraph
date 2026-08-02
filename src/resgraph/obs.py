@@ -1,3 +1,6 @@
+# pyright: reportConstantRedefinition=false
+# (the UPPER_CASE instruments are rebindable by design: _refresh_instruments
+# swaps them onto the real provider after init_metrics installs it)
 """Telemetry (D17): wide events are the log, OTel metrics are the view.
 
 Events: one JSON line per unit of work, appended under
@@ -30,15 +33,19 @@ BATCH_BUCKETS = (0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0)
 class EventSink:
     """Append-only NDJSON writer, one file per component."""
 
-    def __init__(self, component: str, directory: str | os.PathLike | None = None) -> None:
+    def __init__(self, component: str, directory: str | os.PathLike[str] | None = None) -> None:
         d = Path(directory or os.environ.get("RESGRAPH_TELEMETRY_DIR", DEFAULT_TELEMETRY_DIR))
         d.mkdir(parents=True, exist_ok=True)
         self.component = component
         self.path = d / f"{component}.ndjson"
         self._lock = threading.Lock()
 
-    def emit(self, kind: str, **fields) -> None:
-        event = {"ts": datetime.now(UTC).isoformat(), "component": self.component, "kind": kind}
+    def emit(self, kind: str, **fields: object) -> None:
+        event: dict[str, object] = {
+            "ts": datetime.now(UTC).isoformat(),
+            "component": self.component,
+            "kind": kind,
+        }
         event.update(fields)
         line = json.dumps(event, default=str)
         with self._lock, self.path.open("a") as f:

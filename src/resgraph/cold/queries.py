@@ -9,9 +9,11 @@ legal and identical (D12).
 
 import json
 from datetime import UTC, datetime
+from typing import Any
 
 import duckdb
 import pyarrow as pa
+from pyiceberg.catalog import Catalog
 
 from .store import EVENTS, SNAPSHOTS
 
@@ -60,15 +62,17 @@ _EMPTY_BASE = pa.table(
 )
 
 
-def _events_arrow(catalog, min_sequence: int = -1, fields: tuple[str, ...] = ()) -> pa.Table:
+def _events_arrow(
+    catalog: Catalog, min_sequence: int = -1, fields: tuple[str, ...] = ()
+) -> pa.Table:
     table = catalog.load_table(EVENTS)
-    kwargs = {"selected_fields": fields} if fields else {}
+    kwargs: dict[str, Any] = {"selected_fields": fields} if fields else {}
     if min_sequence >= 0:
         return table.scan(row_filter=f"sequence > {min_sequence}", **kwargs).to_arrow()
     return table.scan(**kwargs).to_arrow()
 
 
-def _latest_snapshot(catalog, t: datetime) -> tuple[pa.Table, int]:
+def _latest_snapshot(catalog: Catalog, t: datetime) -> tuple[pa.Table, int]:
     """Rows and watermark of the newest snapshot with as_of_time <= t."""
     snaps = catalog.load_table(SNAPSHOTS).scan().to_arrow()
     if snaps.num_rows == 0:
@@ -78,29 +82,33 @@ def _latest_snapshot(catalog, t: datetime) -> tuple[pa.Table, int]:
     row = con.execute(
         "SELECT max(watermark) FROM snaps WHERE as_of_time <= $t", {"t": t}
     ).fetchone()
-    if row[0] is None:
+    if row is None or row[0] is None:
         return _EMPTY_BASE, -1
     wm = int(row[0])
-    base = con.execute(
-        """
+    base = (
+        con.execute(
+            """
         SELECT resource_id, resource_type, attrs, relationships, sequence
         FROM snaps WHERE watermark = $wm
         """,
-        {"wm": wm},
-    ).arrow()
+            {"wm": wm},
+        )
+        .arrow()
+        .read_all()
+    )
     return base, wm
 
 
 def state_at(
-    catalog,
+    catalog: Catalog,
     t: datetime,
     use_snapshots: bool = True,
     where: str | None = None,
-    params: dict | None = None,
+    params: dict[str, Any] | None = None,
     annotate: bool = False,
     projection: tuple[str, ...] | None = None,
     where_cols: tuple[str, ...] = (),
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """World state at event time t — one dict per alive resource.
 
     `where` is a D16-planner-compiled predicate over the state columns.
@@ -146,7 +154,7 @@ def state_at(
     return rows
 
 
-def history(catalog, resource_id: str, limit: int = 100) -> list[dict]:
+def history(catalog: Catalog, resource_id: str, limit: int = 100) -> list[dict[str, Any]]:
     """A resource's message history, oldest first, deduped."""
     con = duckdb.connect()
     con.register("events", _events_arrow(catalog))
@@ -170,7 +178,7 @@ def history(catalog, resource_id: str, limit: int = 100) -> list[dict]:
     return rows
 
 
-def diff(catalog, t1: datetime, t2: datetime) -> dict:
+def diff(catalog: Catalog, t1: datetime, t2: datetime) -> dict[str, list[str]]:
     """What changed between two moments: created / deleted / changed ids."""
     a = {r["resource_id"]: r for r in state_at(catalog, t1)}
     b = {r["resource_id"]: r for r in state_at(catalog, t2)}
@@ -186,7 +194,7 @@ def diff(catalog, t1: datetime, t2: datetime) -> dict:
     }
 
 
-def tombstones_at(catalog, t: datetime) -> list[dict]:
+def tombstones_at(catalog: Catalog, t: datetime) -> list[dict[str, Any]]:
     """Resources whose last event at t is a delete — needed by rebuild:
     without them, redelivered pre-t upserts would resurrect the dead.
     Full event scan on purpose (no snapshot base): snapshots hold only
@@ -213,13 +221,14 @@ def tombstones_at(catalog, t: datetime) -> list[dict]:
     )
 
 
-def latest_event_time(catalog) -> datetime | None:
+def latest_event_time(catalog: Catalog) -> datetime | None:
     con = duckdb.connect()
     con.register("events", _events_arrow(catalog))
-    return con.execute("SELECT max(event_time) FROM events").fetchone()[0]
+    row = con.execute("SELECT max(event_time) FROM events").fetchone()
+    return row[0] if row else None
 
 
-def snapshot_at(catalog, t: datetime | None = None) -> dict:
+def snapshot_at(catalog: Catalog, t: datetime | None = None) -> dict[str, Any]:
     """Materialize state_at(t) into the snapshots table (t defaults to the
     newest event). The snapshot's watermark is the max sequence at or
     before t across ALL events — deletes included, so replay-from-snapshot
@@ -228,14 +237,16 @@ def snapshot_at(catalog, t: datetime | None = None) -> dict:
     events = _events_arrow(catalog)
     con.register("events", events)
     if t is None:
-        t = con.execute("SELECT max(event_time) FROM events").fetchone()[0]
+        row = con.execute("SELECT max(event_time) FROM events").fetchone()
+        t = row[0] if row else None
         if t is None:
             return {"rows": 0, "max_sequence": -1, "as_of_time": None}
     if t.tzinfo is None:
         t = t.replace(tzinfo=UTC)
-    wm = con.execute(
+    wm_row = con.execute(
         "SELECT max(sequence) FROM events WHERE event_time <= $t", {"t": t}
-    ).fetchone()[0]
+    ).fetchone()
+    wm = wm_row[0] if wm_row else None
     if wm is None:
         return {"rows": 0, "watermark": -1, "as_of_time": t.isoformat()}
     state = state_at(catalog, t)

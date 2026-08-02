@@ -4,7 +4,7 @@ from datetime import UTC, datetime, timedelta
 
 from resgraph.schema import Op, ResourceType, UpdateMessage
 
-from .world import ATTR_POOLS, CREATION_ORDER, TOPOLOGY, TYPE_MIX, World
+from .world import ATTR_POOLS, CREATION_ORDER, TOPOLOGY, TYPE_MIX, Resource, World
 
 WORLD_EPOCH = datetime(2026, 1, 1, tzinfo=UTC)
 
@@ -62,7 +62,7 @@ class Churn:
         for rid in list(self.world.alive_ids()):
             yield self._emit(self.world.resources[rid], Op.UPSERT)
 
-    def _emit(self, res, op: Op) -> UpdateMessage:
+    def _emit(self, res: Resource, op: Op) -> UpdateMessage:
         return UpdateMessage(
             sequence=self.seq,
             event_time=self.now,

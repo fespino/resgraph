@@ -4,6 +4,9 @@ Direction convention (D8): edges point dependent -> dependency, so the
 blast radius of X is everything with a directed path TO X.
 """
 
+from typing import Any
+
+from neo4j import Session
 from pydantic import BaseModel
 
 from resgraph.gen.world import TOPOLOGY
@@ -20,7 +23,7 @@ class Affected(BaseModel):
     id: str
     type: str
     phantom: bool | None = None
-    attrs: dict | None = None
+    attrs: dict[str, Any] | None = None
 
 
 class PathResult(BaseModel):
@@ -28,7 +31,7 @@ class PathResult(BaseModel):
     rels: list[str]
 
 
-def _check_depth(depth) -> int:
+def _check_depth(depth: int) -> int:
     # Cypher can't parametrize variable-length bounds, so depth lands in
     # the query string — int() + range check is the injection guard, and
     # the cap is a tool-level bound: callers must not be able to ask an
@@ -40,12 +43,12 @@ def _check_depth(depth) -> int:
 
 
 def blast_radius(
-    session,
+    session: Session,
     resource_id: str,
     depth: int = 3,
     include_deleted: bool = False,
     extra_where: str = "",
-    params: dict | None = None,
+    params: dict[str, Any] | None = None,
     with_attrs: bool = False,
 ) -> list[Affected]:
     """Everything affected if resource_id dies. BFS expansion: one
@@ -75,7 +78,7 @@ def blast_radius(
     return sorted((Affected(**r) for r in rows), key=lambda a: a.id)
 
 
-def dependency_path(session, from_id: str, to_id: str) -> PathResult | None:
+def dependency_path(session: Session, from_id: str, to_id: str) -> PathResult | None:
     """Why does A depend on B — one shortest dependency path."""
     la, lb = label_for(from_id), label_for(to_id)
     rows = cypher(
@@ -112,10 +115,10 @@ def _required_edges() -> list[tuple[str, str, str]]:
     )
 
 
-def orphans(session) -> list[dict]:
+def orphans(session: Session) -> list[dict[str, Any]]:
     """Live resources whose required (exactly-1) dependency is deleted or
     phantom."""
-    out: list[dict] = []
+    out: list[dict[str, Any]] = []
     for src_label, rel_type, dst_label in _required_edges():
         out.extend(
             cypher(
@@ -131,7 +134,7 @@ def orphans(session) -> list[dict]:
     return sorted(out, key=lambda r: r["id"])
 
 
-def stats(session) -> dict:
+def stats(session: Session) -> dict[str, Any]:
     nodes = cypher(
         session,
         """

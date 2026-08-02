@@ -5,6 +5,32 @@ one requires a new decision superseding it, not an edit.
 
 ## Phase 0 — foundations
 
+### D0 — Toolchain: typed Python, with the types enforced
+
+Python 3.13 + uv + ruff from day one; **pyright in strict mode joined
+as a required CI gate** (2026-08-02, #68) once the codebase's
+constructive style — closed `Literal` sets, frozen models, sum-type
+dispatch — had no machine checking it. What the gate enforces beyond
+annotations: exhaustiveness. Closed types (`Op`, `RelType`,
+`Predicate.op`, plan kinds) dispatch through `match` with
+`typing.assert_never` on the fall-through, so adding a variant is a
+compile-time obligation on every consumer, not a hope that a test
+looks. Config honesty: the `reportUnknown*` rule family is off — it
+measures third-party stub quality (neo4j, pyiceberg, duckdb, redis),
+not this repo's correctness; each is re-enabled as stubs complete.
+Composed Cypher goes through one `lit()` chokepoint whose docstring
+carries the injection argument (identifiers from closed sets, values
+as bound parameters).
+**Rejected:** mypy (weaker inference on the Pydantic/FastAPI/Typer
+patterns this repo lives in); gradual adoption with a suppression
+baseline (at ~1,500 statements, strict-in-one-PR is cheaper than a
+ratchet and hides nothing); `ty`/`pyrefly` (the Rust generation —
+right shape, pre-1.0 at adoption time; a merge gate does not pin to
+a beta).
+**Reversal condition:** re-evaluate the checker (not the gate) when
+Astral's `ty` ships stable — same config surface, faster; the gate
+itself only tightens.
+
 ### D1 — Graph hot store: Memgraph (Community)
 
 | Criterion | Memgraph | Neo4j Community |

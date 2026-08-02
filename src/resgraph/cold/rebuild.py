@@ -8,22 +8,26 @@ stream ingest skips everything at or below it.
 """
 
 from datetime import datetime
+from typing import Any
+
+from neo4j import Session
+from pyiceberg.catalog import Catalog
 
 from resgraph.graph.ingest import apply_batch
 from resgraph.graph.loader import load_snapshot
 from resgraph.graph.schema import init_schema
-from resgraph.schema import UpdateMessage
+from resgraph.schema import Op, UpdateMessage
 
 from . import queries
 
 
-def synthesize_upserts(state: list[dict], t: datetime) -> list[UpdateMessage]:
+def synthesize_upserts(state: list[dict[str, Any]], t: datetime) -> list[UpdateMessage]:
     """One full-statement upsert per alive resource, sequence preserved."""
     return [
         UpdateMessage(
             sequence=r["sequence"],
             event_time=t,
-            op="upsert",
+            op=Op.UPSERT,
             resource_type=r["resource_type"],
             resource_id=r["resource_id"],
             attrs=r["attrs"],
@@ -33,7 +37,7 @@ def synthesize_upserts(state: list[dict], t: datetime) -> list[UpdateMessage]:
     ]
 
 
-def rebuild(session, catalog, t: datetime | None = None) -> dict:
+def rebuild(session: Session, catalog: Catalog, t: datetime | None = None) -> dict[str, Any]:
     """Load state_at(t) into an EMPTY hot store (the loader enforces
     emptiness), then restore tombstones for everything dead at t.
 
@@ -53,7 +57,7 @@ def rebuild(session, catalog, t: datetime | None = None) -> dict:
         UpdateMessage(
             sequence=d["sequence"],
             event_time=t,
-            op="delete",
+            op=Op.DELETE,
             resource_type=d["resource_type"],
             resource_id=d["resource_id"],
         )

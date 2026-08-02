@@ -26,8 +26,8 @@ flowchart LR
 
 ## Status
 
-Part I — the data foundation — is complete, phases 0–6, each tagged at
-its end state:
+Part I — the data foundation — is complete (phases 0–6); Part II — the
+AI layer — is underway. Each phase is tagged at its end state:
 
 | Phase | What landed | Tag |
 |---|---|---|
@@ -38,10 +38,11 @@ its end state:
 | 4 | Iceberg cold store, event-time travel, DR rebuild | `phase-4-cold-store` |
 | 5 | Query layer: mini planner, push-down, one API over both stores | `phase-5-query-layer` |
 | 6 | Observability: wide events, SLOs, the chaos drill (INC-001) | `phase-6-observability` |
+| 7 | MCP server: 5 task-shaped tools from one registry, drift guard, skills-as-prompts | `phase-7-mcp-server` |
 
 Each increment lands via issue → PR, citing the SPEC decisions
-(D-numbers) it implements. Next: Part II — an MCP server and an agent
-over these endpoints.
+(D-numbers) it implements. Next: the analyst agent — incident triage
+against planted ground truth, with evals as the development loop.
 
 ## Quickstart: to a live dashboard
 

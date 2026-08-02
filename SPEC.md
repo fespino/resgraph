@@ -902,6 +902,39 @@ edit.
   explain without executing (D16).
 - Any increment touching these contracts cites the D-number in its PR.
 
+## Compatibility tally
+
+Every phase implicitly claims "built on the earlier layers without
+breaking them." This table is that claim, tallied — additive reuse and
+recorded supersession are both healthy; what this table refuses is a
+change that lives only in a PR description where it can't be summed.
+
+Counting rules: **consumed unchanged** = a public interface from an
+earlier phase that the new phase's modules import or call as-is;
+**changed** = a recorded amendment/supersession of an earlier phase's
+decision, or a public-signature change to an earlier phase's module.
+Private helpers and in-phase amendments don't count. One row per phase,
+added at closeout. The early warning this instrument exists for: a
+phase that changes more than it consumes is fighting the architecture.
+
+Rows 0–6 are back-filled from tag-to-tag diffs
+(`git diff phase-N..phase-N+1 -- src/`), not from memory.
+
+| Phase | Consumed unchanged | Changed |
+|---|---|---|
+| 0 | — (baseline: D0–D4) | — |
+| 1 | D2 message schema + `schema.py` closed types (emits the contract verbatim) | D4 emit budget (amended by supersession, phase 1) |
+| 2 | `UpdateMessage` parse, `ResourceType`, `TOPOLOGY` (D5) | — |
+| 3 | D2 models (`UpdateMessage`, `Op`), phase-2 graph client + DDL, the phase-1 stream sink contract | D2 parsing tightened — reserved-key rejection at parse time (D10); D4 ingest budget (amended by supersession, phase 3) |
+| 4 | the same stream via a second consumer group (D14 — ingest untouched), `apply_batch` (phase 3), `load_snapshot` + `init_schema` (phase 2), `UpdateMessage` | phase-3 consumer containment loop extracted into the shared `StreamConsumer` base, behavior preserved (#43) |
+| 5 | cold catalog + store readers, `ATTR_POOLS` (D5), hot client, `read_node` + `SYSTEM_PROPS` (phase 3), `ResourceType` | `state_at` grew push-down parameters and `blast_radius` grew filter parameters, both additive with defaults (D16, #50); D2 validation tightened — id/target prefix checks (#50) |
+| 6 | stores, planner, and query layer untouched; wide-event module imports nothing from the platform | D14 addendum superseded in part — outage is not poison (#54); consumer loop grew quarantine/dead-letter hooks, additive (#54) |
+
+Running total through phase 6: 18 interfaces consumed unchanged,
+8 changes — every one of the 8 recorded as a D-amendment, a
+supersession, or an additive extension in the phase's PR. No unrecorded
+break yet; the table exists so the first one has nowhere to hide.
+
 ## Roadmap sequencing
 
 Phase order is the largest standing decision in this repo, and until

@@ -3,10 +3,12 @@
 import json
 import time
 from itertools import islice
+from typing import Annotated
 
 import typer
 
 from .churn import Churn
+from .scenarios import ScenarioType, generate_scenario, generate_set
 from .sinks import RedisSink, StdoutSink
 from .world import World
 
@@ -71,6 +73,41 @@ def final_state(
                     }
                 )
             )
+
+
+@app.command()
+def scenario(
+    scenario_type: Annotated[ScenarioType, typer.Option("--type")],
+    seed: int = 42,
+    resources: int = 60,
+    depth: int = 0,
+    messages: str = "",
+) -> None:
+    """Plant one causal scenario: spec JSON (with ground truth) on
+    stdout; --messages FILE also writes the message stream as JSONL.
+    depth=0 uses the type's default."""
+    generated = generate_scenario(scenario_type, seed, resources, depth=depth or None)
+    if messages:
+        with open(messages, "w") as f:
+            for m in generated.messages:
+                f.write(m.model_dump_json() + "\n")
+    print(generated.spec.model_dump_json())
+
+
+@app.command("scenario-set")
+def scenario_set(
+    seed: int = 42,
+    count: int = 30,
+    resources: int = 60,
+    out: str = "-",
+) -> None:
+    """Emit a taxonomy-covering scenario set as JSONL (~20% controls)."""
+    lines = [g.spec.model_dump_json() for g in generate_set(seed, count, resources)]
+    if out == "-":
+        print("\n".join(lines))
+    else:
+        with open(out, "w") as f:
+            f.write("\n".join(lines) + "\n")
 
 
 @app.command()

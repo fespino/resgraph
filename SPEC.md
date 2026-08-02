@@ -1177,11 +1177,25 @@ exhaustive dispatch (`assert_never` on the fall-through, per D0): a
 new taxonomy type makes the type checker name every grader, report,
 and coverage statement that must handle it.
 
+**Trial protocol** (agents are stochastic; a single run is an
+anecdote): headline dimensions run k=3 trials per item, and the
+verdict is **pass^k** — all trials pass — because consistency is the
+product requirement for an on-call tool; a triage assistant that is
+right one run in ten spends trust it never earns back. pass@k is
+reported alongside as the capability ceiling, never as the headline
+(at k=10 the two diverge toward ~100% vs ~0% —
+[demystifying evals](https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents)).
+The judge dimension runs k=1 (it grades prose, not correctness).
+Failure-derived items form the **regression suite**, expected to hold
+~100% and reported separately from capability slices, which are
+allowed to start low — a capability slice at 0% across all trials
+indicts the scenario before the model.
+
 Run artifacts pin the full verdict environment: run_id, git_ref,
 model, thinking configuration, environment (cpu/mem limits, store
-digests), per-item per-dim results, tokens, cost, latency — container
-resources alone swing agent benchmarks by more than model gaps
-([infrastructure noise](https://www.anthropic.com/engineering/infrastructure-noise)).
+digests), per-item per-trial per-dim results, tokens, cost, latency —
+container resources alone swing agent benchmarks by more than model
+gaps ([infrastructure noise](https://www.anthropic.com/engineering/infrastructure-noise)).
 Baseline `evals/baseline.json` refreshes only by a deliberate, labeled
 commit.
 

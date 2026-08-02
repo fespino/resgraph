@@ -983,4 +983,30 @@ retrieval. Ranking them today would repeat the mistake this section
 exists to prevent; each gets its two-axis line here when the horizon
 reaches it, under a dated amendment.
 
+## Corrections
+
+The decision log's credibility does not rest on never being wrong — it
+rests on being auditable when wrong. Corrections used to live in commit
+messages and PR threads, where nobody re-reading this file finds them;
+this table is where they land now. A log with zero corrections after
+twenty-plus decisions reads as unaudited, not infallible.
+
+Two rules:
+
+- **Any claim corrected during a phase gets a dated row here** at
+  closeout — what was claimed, where, what was actually true, what
+  changed as a result.
+- **Dependency claims are re-verified before a phase builds on them.**
+  Where a decision asserts "X is safe because D-N" or "Y depends on Z,"
+  the building phase re-checks the assertion instead of trusting the
+  prose; a failed check lands here. (The phase-6 chaos drill is the
+  motivating case: a written-down phase-3 readiness lesson was violated
+  the first time it applied in a new context — the lesson existed,
+  nothing forced re-contact with it.)
+
+| Date | Claimed (where) | Actually true | What changed |
+|---|---|---|---|
+| 2026-07-31 | "~80% of wall time in `socket.recv_into`" — the phase-3 profiling story, on the PR #29 record and in the post draft | ~37% of tottime is the raw syscall; ~80% is cumtime of the driver's whole receive path (buffering + parsing included). The conflation was caught by a pre-publication adversarial pass | Attribution corrected in the post, BENCHMARKS.md, and as a correcting reply on PR #29 — the wrong number was already part of that record. The finding (round-trip chattiness; batching fix) survived unchanged |
+| 2026-08-01 | "~366 MB cold-store footprint" — ad-hoc `du` over mixed stream content, early phase 4 | Directionally right, methodologically loose, and mis-attributed: at batch 1,024 the total is 363.5 MB but the parquet data is 18–23 MB at any batch size — the footprint was Iceberg commit metadata (977 files), not data. 25.2 MB total at batch 8,192 | BENCHMARKS.md carries the same-generator, same-method sweep and flags the ad-hoc number as loose; commit granularity recorded as a storage decision, not just a throughput one |
+
 

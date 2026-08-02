@@ -460,3 +460,10 @@ def test_resource_missing_deleted_and_invalid(catalog, monkeypatch):
         assert c.get("/resources/x").status_code == 400
     finally:
         api_app.app.dependency_overrides.clear()
+
+
+def test_empty_timestamps_are_400s_not_sql_nones(client):
+    # pyright found these: an empty-string `at`/`from`/`to` parsed to
+    # None and flowed toward SQL; now they stop at the boundary (D0)
+    assert client.get("/world", params={"at": ""}).status_code == 400
+    assert client.get("/diff", params={"from": "", "to": ""}).status_code == 400

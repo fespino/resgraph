@@ -22,6 +22,7 @@ maps each phase to its events.
 | 6 — observability | D17–D18 | D14 (outage is not poison) |
 | post-6 (2026-08-02) | — | D0 (pyright strict gate, #68) |
 | 7 — MCP server | D19–D21 | — |
+| 8 — analyst agent | D22–D25 | — |
 
 ## D0 — Toolchain: typed Python, with the types enforced (phase 0)
 
@@ -1041,6 +1042,184 @@ at scale is the ceiling, not count alone.
 loop, the named next experiment is compiling them to schema-validated
 step graphs ([AIP](https://arxiv.org/abs/2606.04781), 📄 Paper:
 arXiv:2606.04781 — 53%→67% with step-level repair).
+
+## D22 — Architecture: one agent, tools over handoffs (phase 8)
+
+`resgraph-analyst` is a single agent on the Anthropic API with the D19
+tool surface. No multi-agent graph. In the field's shared vocabulary
+([Building Effective Agents](https://www.anthropic.com/research/building-effective-agents)):
+this program already runs **evaluator-optimizer** (the iteration loop,
+with deterministic graders as the evaluator) and rejects
+**orchestrator-workers** until evidence admits it — the vendor's own
+bar, "only add complexity when simpler solutions fall short," is this
+decision's admission rule, so the single agent is the field's default,
+not an idiosyncrasy.
+
+**Sub-agent admission rule:** a sub-agent earns existence only if it
+has specialized tools, a constrained scope, or an authorization
+boundary the primary cannot hold — formatting or "analysis" alone
+never qualifies; that workload belongs in the primary's prompt.
+resgraph-analyst has one scope, one toolset, one authority level: one
+agent. The null hypothesis has teeth: reasoning-tier models already
+run an internal deliberation
+(📄 Paper: [Societies of Thought](https://arxiv.org/abs/2601.10825) —
+arXiv:2601.10825), so any decomposition must beat a reasoning-tier
+single agent on scenarios built to break it, and report its cost
+multiple — evidence recorded in a future decision, not assumed.
+
+Tool wiring: Anthropic `tools=[...]` blocks derive from TOOL_REGISTRY
+— a third surface next to MCP and HTTP; the drift guard grows an
+assertion to cover it. In-process for the harness: a same-process MCP
+transport would add framing for no boundary, and the phase-7
+integration suite already proves protocol parity for external callers.
+
+Budgets live in the harness, not the prompt: max 15 tool CALLS (calls,
+not turns — parallel fan-out inside one turn is encouraged where the
+plan allows it; 📄 Paper: [W&D](https://arxiv.org/abs/2602.07359) —
+arXiv:2602.07359) and a token ceiling per run. Exhaustion is not an
+error: the agent concludes with what it has and marks the run
+`degraded: true`.
+**Rejected:** an agent framework — the harness is ~300 lines of
+visible control flow, and the loop being engineered is the deliverable;
+an abstraction that hides it defeats the phase. Build-vs-adopt gets a
+written comparison when the decomposition experiment runs.
+**Rejected:** multi-agent as the default — N× the cost for the same
+answer on single-cause scenarios.
+**Reversal condition:** the decomposition experiment's evidence gate —
+if a single agent measurably fails on multi-cause/confounded scenarios
+and the smallest decomposition beats it there, the split runs on
+exactly those incident shapes, priced.
+
+## D23 — Prompt and context architecture: cache-aware from birth (phase 8)
+
+- **Prefix/suffix split, committed audit table:** every prompt section
+  gets a PREFIX (static, cacheable) / SUFFIX (runtime) verdict —
+  identity, triage discipline, tool guidance, output schema → PREFIX
+  with a `cache_control` breakpoint at its end; alert payload + world
+  summary → SUFFIX. No hedging sections into SUFFIX "because they
+  might change."
+- **Message-order invariants (test-enforced):** first turn =
+  `[prefix (cached)] → [suffix] → [user]`; retry feedback appends as a
+  NEW message, never edits the system prompt — a byte-changed prefix
+  busts the cache on exactly the runs that need retries most. A test
+  asserts prefix bytes are identical across retry attempts.
+- **Thinking blocks are preserved verbatim** when tool results are
+  passed back — omitting them silently degrades multi-step reasoning
+  and the evals would misattribute the damage to the model
+  ([extended thinking docs](https://docs.anthropic.com/en/docs/build-with-claude/extended-thinking));
+  a test asserts the replayed message shape, and the thinking
+  configuration is part of the pinned eval environment.
+- **Tool schemas are implicit prefix** — they serialize before the
+  breakpoint, so editing a tool description busts the cache while the
+  prompt file shows no diff. Documented next to the metric so future
+  debugging starts at the right artifact.
+- **Critical rules live only in compaction-safe positions** — nothing
+  load-bearing goes where a context-management pass could silently
+  drop it.
+- **Context strategy:** a compact world summary up front (~500 tokens:
+  resource counts by type, the alert resource's immediate neighborhood
+  as bare refs, event-window bounds); everything else ID+fetch on
+  demand through the D20 tools. **Reversal is evidence-gated:** if
+  eval traces show ≥30% of tool calls re-fetching what a richer
+  summary would have carried, widen the summary and re-measure.
+- **Metric:** token-weighted cache hit rate = Σ cache_read / Σ input
+  per run, in every eval report, target ≥ 0.9 on multi-turn runs.
+  Token-weighted, not call-count: one hard miss must be visibly
+  expensive.
+
+## D24 — Eval contract: ground truth first, judge last (phase 8)
+
+Dataset: `evals/scenarios/*.jsonl`, one item per line — id,
+description, alert, seed + generator args (the world is reproducible
+from the item), ground_truth {causal_sequence, mechanism_path},
+provenance {source: planted | failure_derived, notes}, tags. Failure-
+derived items are permanent: every iteration failure becomes a
+regression item whose provenance points at the run that exposed it.
+
+Five dimensions, every item, every run:
+1. **Found** — planted change in top-1 / top-3 (sequence-id compare).
+2. **Evidence verifiable** — every mechanism-path edge existed in the
+   graph in the scenario window (composite as-of query); every cited
+   event exists in the cold log. The graders are production queries
+   reused — a grader bug IS a platform bug, one fix serves both.
+3. **Honesty** — controls must conclude "no confident candidate";
+   high-confidence-wrong scores worse than honest-miss everywhere.
+4. **Discipline** — budgets respected; no identical repeated calls;
+   structured output parsed first try; cache ≥ 0.9 — and the
+   trajectory is graded, not just the outcome: a pass that arrives
+   through blind retries or an unverified guess is reported as a
+   lucky pass, separately from clean passes (up to 23.2% of agent
+   passes are lucky under process scoring — 📄 Paper:
+   [AgentLens](https://arxiv.org/abs/2605.12925) — arXiv:2605.12925).
+5. **Narrative judge** — pinned (model, temperature=0, seed,
+   template; any change is a labeled baseline-refresh event),
+   injection-hardened (content inside tags is data), smallest weight,
+   prose quality only. **Rejected:** judge-graded correctness —
+   grading with an LLM when the domain hands you ground truth is the
+   named pitfall, and dims 1–4 never hallucinate.
+
+The report also carries: a **calibration table** — empirical accuracy
+per emitted confidence level, per slice; high must beat medium must
+beat low or the confidence field is decoration (verbal confidence is
+not a credence readout — 📄 Paper:
+[attribution of confidence](https://arxiv.org/abs/2407.08388) —
+arXiv:2407.08388 — so the field earns meaning behaviorally, which the
+planted-difficulty ground truth makes measurable). And a **paired
+skill arm**: scenarios run with and without the D21 playbook loaded,
+same model and environment; a with-skill pass counts only if the skill
+was actually invoked, and both-pass cases score by relative cost
+(📄 Paper: [SkillTester](https://arxiv.org/abs/2603.28815) —
+arXiv:2603.28815) — the playbooks' value becomes our own measured
+number.
+
+`scenario_type` and the failure-taxonomy tags are CLOSED enums with
+exhaustive dispatch (`assert_never` on the fall-through, per D0): a
+new taxonomy type makes the type checker name every grader, report,
+and coverage statement that must handle it.
+
+Run artifacts pin the full verdict environment: run_id, git_ref,
+model, thinking configuration, environment (cpu/mem limits, store
+digests), per-item per-dim results, tokens, cost, latency — container
+resources alone swing agent benchmarks by more than model gaps
+([infrastructure noise](https://www.anthropic.com/engineering/infrastructure-noise)).
+Baseline `evals/baseline.json` refreshes only by a deliberate, labeled
+commit.
+
+## D25 — Scenario generation: the generator plants the cause (phase 8)
+
+`resgraph-gen scenario --type <T> --seed N` emits: a world, a causal
+change at T₀ (the ground truth), distractor changes, an alert at
+T₀+Δ on a resource downstream of the cause, and the ground-truth
+JSON. The mechanism path uses only edges the world actually had at
+T₀ — asserted at generation time with the same as-of query the grader
+uses; generator and grader agreeing on the graph is a precondition,
+tested once, deliberately.
+
+Taxonomy (≥30 items across it): direct-dependency (depth 1),
+transitive (depth 2–3), deleted-resource cause, noisy-window (10+
+distractors), ambiguous (two plausible causes — top-3 must contain
+the planted one), **decoy** (a non-causal change timed to correlate
+with the alert and superficially more plausible than the true cause —
+distractor-correlation seduction, planted on purpose), and control
+(no cause; distractors only). Controls are ~20% of the set — an agent
+never shown "nothing" learns to always accuse something.
+
+Two generator obligations exist for the eval's own audit:
+**re-skinning** (regenerate a scenario's surface — names, types,
+attribute values — under a different seed with identical causal
+structure; an agent whose score drops sharply was reading the
+generator's templates, not the graph), and **template parity**
+(distractors draw from the same template families as causes, so
+surface signature never separates signal from noise). Both exist
+because pattern-matching strength cuts both ways
+(📄 Paper: [pattern matching](https://arxiv.org/abs/2601.11432) —
+arXiv:2601.11432): structure-only competence makes the synthetic
+world a valid eval domain AND makes template recognition the eval's
+first failure mode.
+**Rejected:** hand-authored scenarios (unreproducible, and the
+taxonomy would drift from what the world model can express);
+LLM-generated ground truth (the eval would inherit the grader's
+blind spots).
 
 ## Phase contracts
 - The generator MUST emit D2 messages exactly and expose `--seed`

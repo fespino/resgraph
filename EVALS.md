@@ -250,7 +250,31 @@ graders can check directly).
   the next move is a canonical worked example in the prefix, not
   more rules.
 
-## Iteration 5 — pre-registered 2026-08-03, run pending
+## Iteration 5 — pre-registered 2026-08-03, run `20260803T162225Z` (partial: 17/30, org spend cap; all 6 controls completed — $2.18)
+
+**Outcome: best honesty yet, one short of the prediction; causal
+readings truncated below attributability.** Honesty 3/6 (predicted
+≥ 4/6, invalidating < 3/6 — the middle band): the worked example
+moved the behavior further than any rule (0 → 1 → 2 → 2 → 3 across
+the series) and confidence inflation is nearly gone (high-confidence
+control accusations 4 → 1). The causal half ran 11 of 24 items —
+decoy 0/2 and transitive 0/2 on the truncated sample are too small
+to separate example-harm from variance, and are recorded as
+unattributed. Fabrications 0 (fourth consecutive run); discipline
+1.00; evidence 1.00.
+
+The truncation cause is a new external-failure class for the signal
+triage list: the org's monthly API spend cap — the billing layer's
+own T4, a control independent of anyone's obedience, including ours.
+
+**Standing decision at the cap:** finish the phase's remaining runs
+(≈ $30: honesty resolution, k=3 baseline, model arms, skill arm)
+requires raising the Console limit; otherwise the phase concludes by
+characterizing the honesty residual on the recorded five iterations
+— which the memo permits — and the pre-registered experiments carry
+to next month unchanged.
+
+### As pre-registered:
 
 - **Signal triage (protocol rule 1):** harness gap, demonstration-
   shaped — not worker variance (controls failed consistently across

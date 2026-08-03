@@ -1,6 +1,7 @@
-"""Four structural assertions that make schema drift impossible, not
-just currently absent. AST, not grep — survives formatting and aliased
-imports."""
+"""Structural assertions that make schema drift impossible, not just
+currently absent. AST, not grep — survives formatting and aliased
+imports. One assertion pair per registry surface: MCP, HTTP, and the
+analyst's Anthropic tool blocks."""
 
 import ast
 import inspect
@@ -123,6 +124,39 @@ def test_registry_and_implementations_agree():
             ):
                 orphans.append(f"{module_name}.{name}")
     assert not orphans, f"canonical functions missing from the registry: {orphans}"
+
+
+def test_no_anthropic_tool_blocks_outside_the_analyst_toolset():
+    """An Anthropic tool block is a dict literal carrying an
+    "input_schema" key; hand-authoring one anywhere but the derivation
+    loop would put a tool on the agent's surface the registry cannot
+    see."""
+    analyst_tools = SRC / "analyst" / "tools.py"
+    offenders: list[str] = []
+    for path in _py_files():
+        if path == analyst_tools:
+            continue
+        tree = ast.parse(path.read_text())
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Dict):
+                continue
+            for key in node.keys:
+                if isinstance(key, ast.Constant) and key.value == "input_schema":
+                    offenders.append(f"{path}:{node.lineno}")
+    assert not offenders, f"tool block outside {analyst_tools.name}: {offenders}"
+
+
+def test_analyst_surface_derives_from_registry():
+    from resgraph.analyst.tools import RegistryToolset
+
+    toolset = RegistryToolset(lambda: None)  # type: ignore[arg-type, return-value]
+    blocks = {b["name"]: b for b in toolset.blocks()}
+    assert set(blocks) == {e.name for e in TOOL_REGISTRY}
+    for entry in TOOL_REGISTRY:
+        block = blocks[entry.name]
+        assert block["description"] == entry.description
+        assert block["input_schema"] == entry.input_model.model_json_schema()
+        assert entry.hints.read_only and not entry.privileged
 
 
 def test_registry_module_is_the_only_registry():

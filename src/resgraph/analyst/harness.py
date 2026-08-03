@@ -32,6 +32,7 @@ MAX_RUN_TOKENS = 150_000
 MAX_VALIDATION_RETRIES = 2
 
 _ID_RE = re.compile(rf"\b(?:{'|'.join(sorted(t.value for t in ResourceType))})-\d{{6}}\b")
+_SEQ_RE = re.compile(r'"sequence":\s*(\d+)')
 
 _EXHAUSTED = (
     "Tool budget exhausted. Conclude now from the evidence already "
@@ -135,9 +136,13 @@ def _extract_json(text: str) -> str | None:
     return text[start : end + 1] if 0 <= start < end else None
 
 
-def parse_and_validate(text: str, seen: set[str]) -> tuple[TriageReport | None, list[str]]:
-    """Schema first, then referential honesty: a report citing a resource
-    the run never saw fails here, before any grader."""
+def parse_and_validate(
+    text: str, seen: set[str], seen_sequences: frozenset[int] | set[int] = frozenset()
+) -> tuple[TriageReport | None, list[str]]:
+    """Schema first, then referential honesty, then verdict arithmetic:
+    a report citing resources or events the run never saw fails here,
+    and the abstention flag must equal what the verdicts imply — the
+    flag is derived, not chosen."""
     raw = _extract_json(text)
     if raw is None:
         return None, ["no JSON object found in the reply"]
@@ -151,6 +156,24 @@ def parse_and_validate(text: str, seen: set[str]) -> tuple[TriageReport | None, 
         for rid in sorted({s.resource_id, *s.mechanism_path})
         if rid not in seen
     ]
+    for i, s in enumerate(report.suspects):
+        if s.verdict.event_found and s.sequence == 0:
+            errors.append(
+                f"suspect {i}: event_found=true but sequence 0 is the initial "
+                "snapshot, not a change event"
+            )
+        elif s.verdict.event_found and s.sequence not in seen_sequences:
+            errors.append(
+                f"suspect {i}: event_found=true but sequence {s.sequence} never "
+                "appeared in this run's tool results"
+            )
+    confident = any(s.verdict.confident for s in report.suspects)
+    if report.no_confident_candidate == confident:
+        errors.append(
+            "no_confident_candidate must be exactly (no suspect has all three "
+            f"verdicts true); emitted {report.no_confident_candidate} while a "
+            f"fully-confident suspect present={confident}"
+        )
     return (None, errors) if errors else (report, [])
 
 
@@ -207,6 +230,7 @@ def run_triage(
     usage = Usage()
     trace: list[ToolCall] = []
     failures: list[str] = []
+    seen_sequences: set[int] = set()
     report: TriageReport | None = None
     calls_used = 0
     retries = 0
@@ -252,6 +276,7 @@ def run_triage(
                 trace.append(ToolCall(tu.name, args, outcome.ok, outcome.payload))
                 if outcome.ok:
                     seen |= _ids(outcome.payload)
+                    seen_sequences |= {int(m) for m in _SEQ_RE.findall(outcome.payload)}
                 results.append(
                     {
                         "type": "tool_result",
@@ -264,7 +289,7 @@ def run_triage(
             continue
 
         text = "".join(b.text for b in resp.content if getattr(b, "type", None) == "text")
-        report, errors = parse_and_validate(text, seen)
+        report, errors = parse_and_validate(text, seen, seen_sequences)
         if report is not None:
             break
         failures.extend(errors)

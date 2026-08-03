@@ -405,6 +405,37 @@ becomes derived, not chosen. Awaiting go — it is a schema + harness
   (per-suspect evidence-verdict fields, harness-validated with
   descriptive feedback).
 
+## Iteration 7 — pre-registered 2026-08-03, run pending (ladder step 3: structure)
+
+- **Signal triage:** harness gap, structure-shaped. Six runs prove
+  the prose verdict is not learnable here: rules were gamed or
+  rationalized, one example taught abstain-bias, a contrastive pair
+  taught commit-bias. The flag itself is the problem — a free
+  boolean the model chooses under persuasion.
+- **Change (one, structural):** every suspect carries an
+  **evidence verdict** of three booleans — mechanism_verified,
+  event_found, explains_symptom — and the flag becomes arithmetic:
+  no_confident_candidate is false exactly when some suspect has all
+  three true, enforced by harness validation with descriptive
+  feedback (the existing retry machinery). Two verdict components
+  are referentially checkable and checked: event_found requires the
+  sequence to have appeared in this run's tool results, and sequence
+  0 (the initial snapshot) never counts as an event — which also
+  closes iteration 4's seq-0 anchoring. explains_symptom remains
+  the one judgment bit, now isolated and named. The worked examples
+  stay and gain verdict blocks — they now demonstrate the structure,
+  not the vibe. Graders are unchanged (the mutation gate still
+  binds); the report schema change busts the cache by design,
+  labeled.
+- **Predicted:** the seesaw breaks — honesty ≥ 0.67 AND found_top3
+  ≥ 0.79 in the same run, transitive ≥ 0.50, fabrications 0.
+- **Invalidating result:** controls rationalize
+  explains_symptom=true on distractors — the isolated judgment bit
+  fails the same way the prose did. Then prompt and structure are
+  both exhausted at this worker tier: the residual is characterized,
+  the phase concludes, and the model-arm experiment doubles as the
+  check on whether the judgment exists at other tiers.
+
 ## Grader verification — mutation testing (2026-08-03)
 
 **Goal.** The graders decide every number in this file, and the same

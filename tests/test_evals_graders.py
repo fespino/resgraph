@@ -30,6 +30,11 @@ def report_with(seqs, confidence="high", no_candidate=False):
                 "sequence": s,
                 "resource_id": f"host-{s:06d}",
                 "mechanism_path": [f"host-{s:06d}", "vm-000002"],
+                "verdict": {
+                    "mechanism_verified": True,
+                    "event_found": True,
+                    "explains_symptom": True,
+                },
                 "confidence": confidence,
                 "evidence": ["e"],
             }

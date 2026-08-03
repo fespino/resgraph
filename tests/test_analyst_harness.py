@@ -21,6 +21,9 @@ PROMPT = Prompt(
     ),
 )
 
+ALL_TRUE = {"mechanism_verified": True, "event_found": True, "explains_symptom": True}
+HEDGED = {"mechanism_verified": True, "event_found": False, "explains_symptom": False}
+
 VALID_REPORT = json.dumps(
     {
         "suspects": [
@@ -28,12 +31,30 @@ VALID_REPORT = json.dumps(
                 "sequence": 41,
                 "resource_id": "host-000001",
                 "mechanism_path": ["host-000001", "vm-000002"],
+                "verdict": ALL_TRUE,
                 "confidence": "high",
                 "evidence": ["host-000001 state flipped to down at seq 41"],
             }
         ],
         "no_confident_candidate": False,
         "narrative": "The host under the VM went down.",
+    }
+)
+
+HEDGED_REPORT = json.dumps(
+    {
+        "suspects": [
+            {
+                "sequence": 41,
+                "resource_id": "host-000001",
+                "mechanism_path": ["host-000001", "vm-000002"],
+                "verdict": HEDGED,
+                "confidence": "low",
+                "evidence": ["correlate only; event not re-read"],
+            }
+        ],
+        "no_confident_candidate": True,
+        "narrative": "Hedged.",
     }
 )
 
@@ -78,7 +99,7 @@ class FakeToolset:
     def __init__(self, payload=None):
         self.calls = []
         self._payload = payload or json.dumps(
-            {"found": True, "id": "host-000001", "relationships": []}
+            {"found": True, "id": "host-000001", "sequence": 41, "relationships": []}
         )
 
     def blocks(self):
@@ -128,7 +149,7 @@ def test_token_ceiling_refuses_tools():
     client = FakeClient(
         [
             response(tool_use("t1", "fetch_resource", {}), u=usage(inp=50_000, out=10_000)),
-            response(text(VALID_REPORT)),
+            response(text(HEDGED_REPORT)),
         ]
     )
     toolset = FakeToolset()
@@ -138,7 +159,7 @@ def test_token_ceiling_refuses_tools():
 
 
 def test_validation_retry_appends_new_message_system_untouched():
-    client = FakeClient([response(text("not json at all")), response(text(VALID_REPORT))])
+    client = FakeClient([response(text("not json at all")), response(text(HEDGED_REPORT))])
     result = run_triage(PROMPT, FakeToolset(), client, model=MODEL)
 
     assert result.report is not None
@@ -150,10 +171,10 @@ def test_validation_retry_appends_new_message_system_untouched():
 
 
 def test_referential_check_rejects_unseen_resource():
-    bad = json.loads(VALID_REPORT)
+    bad = json.loads(HEDGED_REPORT)
     bad["suspects"][0]["resource_id"] = "host-999999"
     bad["suspects"][0]["mechanism_path"] = ["host-999999", "vm-000002"]
-    client = FakeClient([response(text(json.dumps(bad))), response(text(VALID_REPORT))])
+    client = FakeClient([response(text(json.dumps(bad))), response(text(HEDGED_REPORT))])
     result = run_triage(PROMPT, FakeToolset(), client, model=MODEL)
 
     assert result.report is not None
@@ -168,7 +189,7 @@ def test_retries_exhausted_returns_no_report():
 
 
 def test_report_degraded_flag_propagates():
-    flagged = json.loads(VALID_REPORT)
+    flagged = json.loads(HEDGED_REPORT)
     flagged["degraded"] = True
     client = FakeClient([response(text(json.dumps(flagged)))])
     result = run_triage(PROMPT, FakeToolset(), client, model=MODEL)
@@ -194,6 +215,7 @@ def test_parse_and_validate_reads_fenced_json():
     report, errors = parse_and_validate(
         f"Here is the report:\n```json\n{VALID_REPORT}\n```",
         {"host-000001", "vm-000002"},
+        {41},
     )
     assert errors == []
     assert report is not None and report.suspects[0].resource_id == "host-000001"
@@ -241,3 +263,30 @@ def test_registry_toolset_unknown_tool():
     outcome = toolset.execute("drop_tables", {})
     assert not outcome.ok
     assert json.loads(outcome.payload)["error_class"] == "invalid_input"
+
+
+def test_flag_must_equal_verdict_arithmetic():
+    inconsistent = json.loads(VALID_REPORT)
+    inconsistent["no_confident_candidate"] = True  # while an all-true verdict exists
+    client = FakeClient(
+        [
+            response(tool_use("t1", "fetch_resource", {"resource_id": "host-000001"})),
+            response(text(json.dumps(inconsistent))),
+            response(text(VALID_REPORT)),
+        ]
+    )
+    result = run_triage(PROMPT, FakeToolset(), client, model=MODEL)
+    assert result.report is not None
+    assert not result.report.no_confident_candidate
+    assert any("must be exactly" in f for f in result.validation_failures)
+
+
+def test_event_found_requires_a_seen_nonzero_sequence():
+    _, errors = parse_and_validate(VALID_REPORT, {"host-000001", "vm-000002"}, set())
+    assert any("never appeared in this run's tool results" in e for e in errors)
+    snapshot_claim = json.loads(VALID_REPORT)
+    snapshot_claim["suspects"][0]["sequence"] = 0
+    _, errors = parse_and_validate(
+        json.dumps(snapshot_claim), {"host-000001", "vm-000002"}, {0, 41}
+    )
+    assert any("initial snapshot, not a change event" in e for e in errors)

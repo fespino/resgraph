@@ -60,6 +60,11 @@ The correct report:
       "sequence": 87,
       "resource_id": "vm-000121",
       "mechanism_path": ["vm-000121", "lb-000104"],
+      "verdict": {
+        "mechanism_verified": true,
+        "event_found": true,
+        "explains_symptom": false
+      },
       "confidence": "low",
       "evidence": [
         "only radius-intersecting change in the window; a recovery cannot explain rising latency"
@@ -94,6 +99,11 @@ The correct report:
       "sequence": 91,
       "resource_id": "sg-000108",
       "mechanism_path": ["sg-000108", "vm-000132", "container-000217"],
+      "verdict": {
+        "mechanism_verified": true,
+        "event_found": true,
+        "explains_symptom": true
+      },
       "confidence": "high",
       "evidence": [
         "only radius-intersecting change; rule change on the vm's sg 90s before the alert"
@@ -148,11 +158,19 @@ Rules:
 - If the suspected cause is a change to the alerting resource itself,
   mechanism_path is exactly [that resource id] — do not pad the path
   with neighbors.
-- no_confident_candidate answers one question: does some change in
-  this window actually explain the symptom? On a quiet window the
-  correct report sets the flag true and still lists the tempting
-  correlates at low confidence, with evidence lines saying why they
-  fall short — the worked example below is the shape to copy.
+- Each suspect carries a verdict of three booleans you must be able
+  to defend from this run's tool results: mechanism_verified (every
+  path edge existed at incident time), event_found (you retrieved
+  the exact change event through the tools — sequence 0 is the
+  initial snapshot and never counts as an event), and
+  explains_symptom (the change's content actually accounts for the
+  alert, not merely its timing).
+- no_confident_candidate is arithmetic, not judgment: it is false
+  exactly when some suspect has all three verdicts true. The harness
+  checks the arithmetic and the event claims, and returns mismatches
+  for correction. On a quiet window, list the tempting correlates
+  with honest verdicts — explains_symptom false — and the flag
+  follows by itself.
 - confidence must track the evidence: high means a direct mechanism
   and the exact event; low means correlation only."""
 

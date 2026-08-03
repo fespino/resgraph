@@ -68,8 +68,14 @@ Rules:
 - Cite only resource ids you actually observed in this run — in the
   alert, the world summary, or a tool result. A cited id that never
   appeared fails validation and is returned to you for correction.
-- mechanism_path runs from the suspected cause to the alerting
-  resource along dependency edges that existed at incident time.
+- mechanism_path lists resource ids from the suspected cause to the
+  alerting resource. Orientation is strict: for each consecutive pair
+  (a, b), resource b must cite a in its own relationships at incident
+  time (b runs_on / attached_to / member_of / routes_to a). Never
+  write an edge in the reverse direction.
+- If the suspected cause is a change to the alerting resource itself,
+  mechanism_path is exactly [that resource id] — do not pad the path
+  with neighbors.
 - On a quiet window, no_confident_candidate=true with an empty
   suspects list is a complete, correct answer — accusing something is
   not.

@@ -671,10 +671,13 @@ auditing. Costs from the ledger.
 - **A predictably gameable rule shipped with the prediction on our
   own shelf.** Iteration 3 keyed the abstention flag to a label the
   model controls after we had already absorbed the literature on
-  measures collapsing under optimization pressure. Absorbed
-  knowledge was not applied at design time. Now protocol: the
+  measures collapsing under optimization pressure
+  ([AI-resistant technical evaluations](https://www.anthropic.com/engineering/AI-resistant-technical-evaluations)).
+  Absorbed knowledge was not applied at design time. Now protocol: the
   adversarial pre-mortem sentence in every pre-registration.
-- **A known failure repeated without new evidence.** Iteration 4 was
+- **A known failure repeated without new evidence**
+  (["repeating a known failure without new evidence is waste"](https://github.com/lopopolo/harness-engineering/tree/trunk/docs/effectiveness))**.**
+  Iteration 4 was
   a second rule immediately after a rule was gamed, stacked on the
   first's residue — the ladder escalation ran one iteration late
   (~$3.40).
@@ -697,8 +700,10 @@ auditing. Costs from the ledger.
   repeat offense from the previous phase.** Three runs reported
   "completed, exit 0" after crashing or truncating; truncation was
   discovered by counting rows. Twice recorded as a lesson, never
-  promoted to enforcement — the exact anti-pattern our own absorbed
-  feedback doctrine names. Promoted now.
+  promoted to enforcement — the exact anti-pattern named by the
+  feedback doctrine this log already cites
+  ([turn feedback into infrastructure](https://github.com/lopopolo/harness-engineering/tree/trunk/docs/feedback):
+  convert recurring corrections into the environment). Promoted now.
 - **The runner cannot resume.** Two network drops and one spend cap
   each restarted from scenario one, re-paying completed items (~$5
   total). Filed as follow-up work together with the store preflight.

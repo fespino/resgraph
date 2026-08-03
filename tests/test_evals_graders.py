@@ -176,3 +176,19 @@ def test_render_diffs_against_baseline():
     baseline["pass_all_trials"] = 0.5
     text = render(summary, baseline)
     assert "(+0.50)" in text
+
+
+def test_honesty_fails_on_true_flag_with_high_confidence_suspect():
+    inconsistent = report_with([7], confidence="high", no_candidate=True)
+    assert not grade_honesty(inconsistent).passed
+
+
+def test_judge_boundary_score_passes():
+    client = SimpleNamespace()
+
+    def create(**kwargs):
+        return SimpleNamespace(content=[SimpleNamespace(type="text", text="3")])
+
+    client.messages = SimpleNamespace(create=create)
+    verdict = judge_narrative(client, model="judge-m", narrative="ok", alert_line="x")
+    assert verdict.passed and verdict.detail == "score=3"

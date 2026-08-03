@@ -183,7 +183,39 @@ regardless of how the suspects are labeled.
   constraint), or controls start emitting high-confidence
   accusations (a worse, different bug in confidence semantics).
 
-## Iteration 4 — pre-registered 2026-08-03, run pending
+## Iteration 4 — pre-registered 2026-08-03, run `20260803T153308Z` ($3.4x, full 30)
+
+**Outcome: prediction missed; the invalidating clause fired; and the
+rule bled into causal recall.** Honesty 0.33 (predicted ≥ 0.67):
+high-confidence control accusations fell 4 → 2 but two controls still
+rationalize distractors as meeting the evidence bar, and two keep a
+false flag over medium-top lists the rule forbids. The new damage:
+**found_top3 0.92 → 0.71 against baseline** (transitive 0.25, direct
+and noisy 0.75) — the abstention language suppresses recall on hard
+causal slices: failing items now carry 1–2-suspect lists (baseline:
+3+), several with the flag true over a list that omits the planted
+cause entirely. A new failure shape appeared alongside it:
+**sequence-0 anchoring** — four failing reports cite the snapshot row
+(seq 0, a resource's initial state, not a change) as a suspect
+"change"; it passes the log-existence check because snapshots are in
+the log, but it is semantically an empty claim. Recorded as a
+candidate grader question (should cited causal changes require
+sequence > 0?), not silently patched.
+
+Also fully validated on a complete run: discipline 1.00 under the
+amended gate, evidence 1.00, fabrications 0 for the third
+consecutive run.
+
+**Three registered attempts at the honesty bucket now show
+letter-compliance with moved error, not convergence** (0.00 →
+rule → 0.33 with inflation → 0.33 with recall damage). Per
+iteration 4's invalidating clause, prompt rules are treated as
+exhausted for this behavior; the next registered change is a
+canonical worked example, and if that fails the judgment moves into
+the output structure itself (a per-suspect evidence-verdict field the
+graders can check directly).
+
+### As pre-registered:
 
 - **Hypothesis:** iteration 3 failed because the flag was priced in a
   label the model controls. Binding it to the evidence test the

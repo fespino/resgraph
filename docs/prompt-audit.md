@@ -17,6 +17,7 @@ section list in sync.
 | world summary | SUFFIX | system block 2, after the breakpoint | per-run: counts, alert neighborhood, window bounds |
 | alert payload | user message | first user turn | per-run |
 | tool results, budget refusals, validation feedback | new messages | appended by the harness | the transcript only grows; nothing edits bytes before the breakpoint (message-order invariants are test-enforced) |
+| the transcript itself | moving breakpoint | one `cache_control` on the last block of the last message, re-placed each request | added by iteration 2 (EVALS.md): the prefix-only design re-billed the growing conversation every turn — baseline rows showed `cache_creation=0`, `cache_read` a flat multiple of the prefix, and a hit rate that *falls* as runs lengthen. Marks are metadata; moving one changes no content bytes. |
 
 The metric this table protects: token-weighted cache hit rate =
 Σ cache_read / Σ input per run (`Usage.cache_hit_rate` in

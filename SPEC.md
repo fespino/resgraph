@@ -1126,6 +1126,13 @@ exactly those incident shapes, priced.
   per run, in every eval report, target ≥ 0.9 on multi-turn runs.
   Token-weighted, not call-count: one hard miss must be visibly
   expensive.
+- **Amended 2026-08-03 (baseline run 1, EVALS.md iteration 2):** the
+  prefix breakpoint alone is insufficient — the growing transcript
+  re-bills as plain input every turn, so the metric structurally
+  cannot reach 0.9 on multi-turn runs. The harness adds one moving
+  breakpoint on the last message block of each request; the
+  audit-table method missed this because the transcript is the one
+  section that exists only at runtime.
 
 ## D24 — Eval contract: ground truth first, judge last (phase 8)
 

@@ -146,7 +146,7 @@ def test_validation_retry_appends_new_message_system_untouched():
     a, b = client.requests
     assert json.dumps(a["system"]) == json.dumps(b["system"])
     assert b["messages"][-1]["role"] == "user"
-    assert "failed validation" in b["messages"][-1]["content"]
+    assert "failed validation" in b["messages"][-1]["content"][0]["text"]
 
 
 def test_referential_check_rejects_unseen_resource():

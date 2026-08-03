@@ -60,7 +60,25 @@ What run 1 actually says, bucketed per the failure taxonomy:
   0.71 (bar: ≥0.60), evidence 0.92 on non-fabricated paths, first-try
   parsing 30/30.
 
-## Iteration 1 — pre-registered 2026-08-03, run pending
+## Iteration 1 — pre-registered 2026-08-03, run `20260803T121152Z` ($4.11)
+
+**Outcome: halt cleared.** Fabrications 2 → 0, evidence 0.92 → 1.00
+— the hypothesis held: the model was citing real edges in undefined
+orientations, and defining the orientation fixed it (decoy-s42007 now
+reports the self-cause as a single-element path, exactly the new
+rule). **One prediction missed, instructively:** decoy stayed at 0.50
+and found_top3 dipped 0.92 → 0.83 (two items, both decoy). Item diff
+shows why: in the baseline, a fabricated path was *subsidizing* the
+found score — s42007 had the planted cause in top-3 alongside an
+invalid mechanism; with invention banned it ranks its honest
+self-cause reading first and drops the plant. The stricter contract
+also shortens suspect lists (s42019: one suspect where run 1 gave
+three). Both are the trade the memo endorses — an honest miss
+outranks an invalid hit — and the shorter-list effect is noted as a
+candidate cause when the honesty iteration touches abstention rules.
+pass^k unchanged at 0.67; every other slice identical run-over-run.
+
+### As pre-registered:
 
 - **Hypothesis:** the two fabrications are contract ambiguity, not
   invention — the model cites real edges in undefined orientations.

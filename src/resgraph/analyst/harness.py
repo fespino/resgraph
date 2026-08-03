@@ -156,6 +156,24 @@ def _feedback(errors: list[str]) -> str:
     )
 
 
+def _mark_transcript_breakpoint(messages: list[dict[str, Any]]) -> None:
+    """One moving breakpoint on the last block of the last user message,
+    so the growing transcript caches incrementally. The prefix-only
+    design left the whole conversation re-billed every turn (EVALS.md,
+    iteration 2). Marks are metadata: moving one does not change
+    content bytes, and message objects are mutated in place so the
+    transcript-only-grows invariant holds."""
+    for message in messages:
+        content = message["content"]
+        if isinstance(content, list):
+            for block in content:
+                if isinstance(block, dict):
+                    block.pop("cache_control", None)
+    last = messages[-1]["content"]
+    if isinstance(last, list) and last and isinstance(last[-1], dict):
+        last[-1]["cache_control"] = {"type": "ephemeral"}
+
+
 def run_triage(
     prompt: Prompt,
     toolset: Toolset,
@@ -167,7 +185,9 @@ def run_triage(
     max_tokens: int = 8_000,
     thinking: dict[str, Any] | None = None,
 ) -> RunResult:
-    messages: list[dict[str, Any]] = [{"role": "user", "content": prompt.user}]
+    messages: list[dict[str, Any]] = [
+        {"role": "user", "content": [{"type": "text", "text": prompt.user}]}
+    ]
     seen = _ids(prompt.user)
     for block in prompt.system:
         seen |= _ids(str(block.get("text", "")))
@@ -186,6 +206,7 @@ def run_triage(
 
     while turns < turn_cap:
         turns += 1
+        _mark_transcript_breakpoint(messages)
         kwargs: dict[str, Any] = {"thinking": thinking} if thinking is not None else {}
         resp = client.messages.create(
             model=model,
@@ -239,7 +260,7 @@ def run_triage(
             break
         retries += 1
         messages.append({"role": "assistant", "content": resp.content})
-        messages.append({"role": "user", "content": _feedback(errors)})
+        messages.append({"role": "user", "content": [{"type": "text", "text": _feedback(errors)}]})
 
     return RunResult(
         report=report,

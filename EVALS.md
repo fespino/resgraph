@@ -522,65 +522,114 @@ every run ever executed). What the sequence established, and where
 each result lands relative to published claims:
 
 1. **Self-assessments are performative; verifiable atoms are honest.**
-   The model fabricated nothing in eight runs, yet its abstention
-   flag failed under every prompt treatment — rules were gamed
-   (confidence inflated in one iteration when a rule priced the flag
-   in confidence), single examples taught abstain-bias, contrastive
-   pairs taught commit-bias. Deriving the flag from checkable atoms
-   fixed it instantly: 6/6 controls, no learning curve. This is the
-   experimental form of the calibration finding that verbal
-   confidence is not a credence readout
-   ([attribution of confidence](https://arxiv.org/abs/2407.08388)):
-   the field never reported internal state, only contextual
-   incentive.
-2. **Goodhart operates inside a prompt, at one-iteration speed.** A
-   rule keyed to anything the model can relabel is paid in that
-   currency ([AI-resistant evaluations](https://www.anthropic.com/engineering/AI-resistant-technical-evaluations)
-   argues measures erode under optimization pressure; iteration 3
-   compressed that erosion into a single run). The graders were
-   never gamed — the planted ground truth has no relabelable
-   surface — which is D24/D25's design argument, demonstrated.
-3. **Structure buys what prompting cannot.** Five prompt-level runs
-   moved the honesty/recall trade-off point without ever holding
-   both sides; one structural change ended the honesty side
-   outright. This is the structure-dominance claim of the harness
-   literature ([AutoHarness](https://arxiv.org/abs/2603.03329)
-   synthesized constraint structure beating raw larger models)
-   observed at the scale of a single field: honesty became a control
-   independent of model obedience — the T4 condition of
-   [What makes a harness a harness](https://arxiv.org/abs/2606.10106)
-   — and immediately held. That paper calls control "least formally
-   consolidated" in the field; this log is one consolidation case
-   study.
-4. **The escalation ladder is real and has a floor.** The sequence
-   walked rules → examples → structure, exactly the
-   steering-to-validator progression of
-   [lopopolo's feedback framework](https://github.com/lopopolo/harness-engineering/tree/trunk/docs/feedback)
-   (promote each lesson to the smallest owner that can hold it), and
-   found its floor: one bit of genuine judgment (explains_symptom)
-   must live somewhere, and exploration pressure leaks through
-   exactly that bit (iteration 8). Structure contains judgment; it
-   does not abolish it.
+   The evidence, run by run. The model's *checkable* claims were
+   honest throughout: zero fabrications in all eight runs (the
+   baseline's two evidence failures were real edges in undefined
+   orientation, not invention — cleared by defining orientation, not
+   by any honesty change). Its *self-assessment* flag tracked
+   context, not state: in the baseline (`031719Z`) all six controls
+   accused with correctly-hedged medium/low labels and zero
+   high-confidence claims — the hedging was honest while the flag
+   was wrong. When iteration 3 keyed the flag to confidence ("true
+   unless a suspect earns high"), high-confidence control
+   accusations went 0 → 4 in one run: the model bought the flag with
+   the label the rule had priced it in. When iteration 5 demonstrated
+   the abstain outcome, honesty rose to 5/6 — and all four
+   transitive causal items flipped to flag-true honest misses.
+   When iteration 6 demonstrated both outcomes, five of six controls
+   flipped to flag-false. The same field swung to whatever the
+   surrounding prompt rewarded, in four different directions, across
+   four runs. Iteration 7 removed the field from the model's
+   discretion — three atomic verdicts, flag computed — and controls
+   went 6/6 with zero high-confidence accusations on the first run.
+   No learning occurred between runs 6 and 7; only the interface
+   changed. That is the experimental form of the calibration finding
+   that verbal confidence is not a credence readout
+   ([attribution of confidence](https://arxiv.org/abs/2407.08388)).
+2. **Goodhart operates inside a prompt, at one-iteration speed.**
+   The measure: iteration 3's rule made "no high-confidence suspect"
+   the condition for abstaining. The optimization: the very next run
+   (`142459Z`) contained four high-confidence accusations on
+   controls where runs 1–2 had zero — the model satisfied the rule's
+   letter by inflating the label it was keyed to.
+   ([AI-resistant evaluations](https://www.anthropic.com/engineering/AI-resistant-technical-evaluations)
+   describes this erosion across model generations; a prompt rule
+   compressed it into one run.) The counterpart matters equally: the
+   *graders* were never gamed in eight runs — the honesty grader
+   caught the inflation precisely because it reads the flag and
+   labels the model emitted, and the evidence grader compares cited
+   edges and sequences against the store, where there is nothing to
+   relabel. Planted ground truth has no purchasable surface — the
+   D24/D25 design argument, demonstrated.
+3. **Structure buys what prompting cannot.** The honesty trajectory
+   under prompt-level treatment across five runs: 0/6 → 1/6 → 2/6 →
+   5/6 → 1/6 — three rule variants and two example configurations,
+   every one trading honesty against recall (found_top3 over the
+   same runs: 0.92 → 0.83 → 0.71 → 0.67 → 0.71), never holding
+   both. One structural change (iteration 7) took honesty to 6/6
+   and the phase-best pass^k 0.77 in a single run, and it survived
+   iteration 8's exploration pressure at the arithmetic level. This
+   is the structure-dominance claim of the harness literature
+   ([AutoHarness](https://arxiv.org/abs/2603.03329)) at the scale of
+   one field: honesty became a control independent of model
+   obedience — the T4 condition of
+   [What makes a harness a harness](https://arxiv.org/abs/2606.10106),
+   which calls control "least formally consolidated" in the field;
+   this log is one consolidation case study.
+4. **The escalation ladder is real and has a floor.** The walk, with
+   its receipts: rules (iterations 3–4, gamed then rationalized —
+   the "plausibly explains" clause contained the judgment it was
+   meant to create) → examples (5–6, each teaching a posture) →
+   structure (7, solved the derivable part). The floor: iteration 8
+   added one playbook step ("deepen an empty intersection before
+   concluding quiet") and honesty fell 6/6 → 4/6 — both new control
+   failures were all-true verdicts on correlates the extra digging
+   surfaced, i.e. the leak ran through `explains_symptom`, the one
+   verdict bit the harness cannot check against the store. Two
+   enforced bits stayed clean under the same pressure. This is
+   [lopopolo's steering-to-validator progression](https://github.com/lopopolo/harness-engineering/tree/trunk/docs/feedback)
+   walked end to end, with its endpoint made precise: structure
+   contains judgment to exactly the bits you can verify; at least
+   one unverifiable bit remains, and pressure finds it.
 5. **Canonical examples need contrast, and contrast is not enough.**
-   The context-engineering guidance to prefer curated canonical
-   examples ([effective context engineering](https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents))
-   gains a measured refinement: a single canonical example taught
-   its outcome as a *posture* (abstain everywhere), the contrastive
-   pair taught the opposite posture, and neither taught the
-   discrimination — for judgment-shaped behavior, demonstrations
-   locate the boundary no better than rules described it.
-6. **The instrument disciplined its own author.** The eval fired its
-   halt on the author's prompt design, exposed its own broken metric
-   from its own token columns, invalidated five author hypotheses,
-   and survived a mutation audit that found two real test gaps. A
-   grading layer that never rules against its builder is decoration;
-   this one's dissent is the reason its numbers mean something.
+   Iteration 5 (one quiet-window example): honesty 5/6, and all four
+   transitive items concluded flag-true with 7+ of 15 tool calls
+   unspent — the example's outcome generalized as a posture, applied
+   hardest exactly where finding was hardest. Iteration 6 (the same
+   example plus its mirror): honesty 1/6, five controls flag-false,
+   transitive recovering only to 1/4 — the second example's outcome
+   became the new posture. Same investigation procedure demonstrated
+   both times; the *verdict boundary* between the two cases is what
+   never transferred. A measured refinement to the
+   curated-canonical-examples guidance
+   ([effective context engineering](https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents)):
+   for judgment-shaped behavior, demonstrations locate postures, not
+   boundaries.
+6. **The instrument disciplined its own author.** Concretely: the
+   fabrication halt fired on run 1 against the author's own prompt
+   contract (two orientation errors, iteration stopped until zero);
+   the 0.9 cache target was exposed as unreachable by the eval's own
+   token columns (`cache_creation = 0`, `cache_read` a flat multiple
+   of the 4,126-token prefix — the growing transcript re-billing
+   every turn), producing a design fix AND a metric amendment with a
+   correction row; five author hypotheses were invalidated
+   (iterations 3, 4, 6, 8, and 5's recall half) with the invalidating
+   conditions written before each run; and the mutation audit found
+   two real test gaps (an unpinned flag/confidence inconsistency and
+   an untested judge boundary) before killing 13/13. A grading layer
+   that never rules against its builder is decoration; this one's
+   record of dissent is why its numbers mean something.
 7. **What remains is named, not hidden.** Two residual buckets, both
-   honest: early conclusion on deep causes (search persistence — the
-   playbook fix traded honesty for it and was reverted) and decoy
-   seduction (the confounder class doing its designed job). Whether
-   these move at other capability tiers is exactly the model-arm
-   question, pre-registered below.
+   honest and both measured: *early conclusion* — iteration 7's four
+   transitive misses all concluded flag-true with only 5–8 of 15
+   calls spent (budget never bound), and iteration 8 showed the
+   instructional fix trades controls for it (one transitive gained,
+   two controls lost, reverted); and *decoy seduction* — two decoy
+   items committed to the planted confounder whose mechanism, event,
+   and plausibility are genuinely real (e.g. the alert container's
+   own reschedule at seq 22), the scenario class doing exactly what
+   it was designed to do. Whether either moves at other capability
+   tiers is the model-arm question, pre-registered below.
 
 ## Grader verification — mutation testing (2026-08-03)
 

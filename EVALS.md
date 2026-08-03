@@ -250,6 +250,34 @@ graders can check directly).
   the next move is a canonical worked example in the prefix, not
   more rules.
 
+## Iteration 5 — pre-registered 2026-08-03, run pending
+
+- **Signal triage (protocol rule 1):** harness gap, demonstration-
+  shaped — not worker variance (controls failed consistently across
+  four runs: 0/6, 1/6, 2/6, 2/6), not external, not an overfit
+  control (the honesty grader was never gamed; the prompt was).
+  Three rule attempts moved error without converging: the prompt
+  lacks a demonstration of the joint judgment, not another clause.
+- **Change (one, ladder step 2, consolidating per protocol rule 2):**
+  iteration 4's evidence-bar rules are REMOVED, replaced by one
+  coarse flag rule plus a canonical worked example in the prefix — a
+  quiet window with a tempting radius-intersecting correlate, shown
+  end-to-end to the correct conclusion: correlate listed at low
+  confidence with an evidence line saying why it falls short, flag
+  true. Enabling fix folded in: citable ids now seed only from
+  post-breakpoint blocks and tool results — the prefix was already
+  leaking the skill body's example ids (vm-000047, container-000123)
+  into the citable set, so example ids could have passed referential
+  validation and surfaced as grader-level fabrications.
+- **Predicted:** honesty ≥ 0.67; control high-confidence accusations
+  0; found_top3 recovers toward ≥ 0.83 as the competing instruction
+  is removed; fabrications 0. Prefix grows; fingerprint change
+  labeled.
+- **Invalidating result:** honesty < 0.5 — demonstration is
+  insufficient and the judgment moves into the output structure
+  (per-suspect evidence-verdict fields, harness-validated with
+  descriptive feedback).
+
 ## Pre-registered experiment — model arms (runs after the harness stabilizes)
 
 Question on the record (Fran, 2026-08-03): does task complexity

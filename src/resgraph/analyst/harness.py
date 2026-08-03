@@ -192,9 +192,17 @@ def run_triage(
     messages: list[dict[str, Any]] = [
         {"role": "user", "content": [{"type": "text", "text": prompt.user}]}
     ]
+    # Citable ids come from run data only: the user message and the
+    # suffix blocks after the cache breakpoint. Prefix text (skill
+    # bodies, worked examples) carries illustrative ids that must not
+    # pass referential validation.
     seen = _ids(prompt.user)
+    past_breakpoint = False
     for block in prompt.system:
-        seen |= _ids(str(block.get("text", "")))
+        if past_breakpoint:
+            seen |= _ids(str(block.get("text", "")))
+        if "cache_control" in block:
+            past_breakpoint = True
 
     usage = Usage()
     trace: list[ToolCall] = []

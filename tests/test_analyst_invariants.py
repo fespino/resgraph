@@ -169,3 +169,19 @@ def test_generator_and_grader_agree_on_the_graph(tmp_path):
             t0_edges, _ = evidence_inputs(catalog, moments[-1])
             for dependency, dependent in zip(path, path[1:], strict=False):
                 assert (dependent, dependency) in t0_edges, (kind, path)
+
+
+def test_prefix_example_ids_are_not_citable():
+    from resgraph.analyst.harness import _ids
+    from resgraph.analyst.prompts import prefix_text
+
+    leaked = _ids(prefix_text())
+    assert leaked, "the prefix is expected to carry illustrative ids"
+    rid = sorted(leaked)[0]
+    report = json.loads(VALID_REPORT)
+    report["suspects"][0]["resource_id"] = rid
+    report["suspects"][0]["mechanism_path"] = [rid, "vm-000002"]
+    client = SnapshottingClient([response(text(json.dumps(report)))] * 3)
+    result = run_triage(PROMPT, FakeToolset(), client, model=MODEL)
+    assert result.report is None
+    assert any(rid in f for f in result.validation_failures)

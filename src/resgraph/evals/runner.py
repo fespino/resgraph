@@ -137,6 +137,27 @@ def _git_ref() -> str:
         return "unknown"
 
 
+def resume_state(
+    path: Path, model: str, judge_model: str | None
+) -> tuple[str, set[tuple[str, int]], set[str]]:
+    """run_id, completed (scenario_id, trial) pairs, and fingerprints of
+    an existing run file. Refuses a worker or judge mismatch outright;
+    the fingerprint check happens at first execution, where the current
+    one is first known."""
+    rows = [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
+    if not rows:
+        raise SystemExit(f"resume refused: {path} has no rows")
+    first = rows[0]
+    if first["model"] != model or first.get("judge_model") != judge_model:
+        raise SystemExit(
+            f"resume refused: run file pins model={first['model']} "
+            f"judge={first.get('judge_model')}, requested {model}/{judge_model}"
+        )
+    done = {(r["scenario_id"], r["trial"]) for r in rows}
+    prints = {r["cache_fingerprint"] for r in rows if r.get("cache_fingerprint")}
+    return first["run_id"], done, prints
+
+
 def run_eval(
     scenarios: list[Scenario],
     client: Any,
@@ -148,8 +169,17 @@ def run_eval(
     out_dir: Path = Path("evals/runs"),
     max_tool_calls: int = MAX_TOOL_CALLS,
     thinking: dict[str, Any] | None = None,
+    resume_path: Path | None = None,
 ) -> Path:
-    run_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    done: set[tuple[str, int]] = set()
+    prior_fingerprints: set[str] = set()
+    if resume_path is not None:
+        run_id, done, prior_fingerprints = resume_state(resume_path, model, judge_model)
+        out = resume_path
+    else:
+        run_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+        out_dir.mkdir(parents=True, exist_ok=True)
+        out = out_dir / f"{run_id}.jsonl"
     envpin = {
         "run_id": run_id,
         "git_ref": _git_ref(),
@@ -157,9 +187,7 @@ def run_eval(
         "judge_model": judge_model,
         "thinking": thinking,
     }
-    out_dir.mkdir(parents=True, exist_ok=True)
-    out = out_dir / f"{run_id}.jsonl"
-    with out.open("w") as f:
+    with out.open("a" if resume_path is not None else "w") as f:
         for spec in scenarios:
             gen = rebuild(spec)
             summary = world_summary(gen)
@@ -170,6 +198,13 @@ def run_eval(
                 summary=summary,
             )
             for trial in range(trials):
+                if (spec.id, trial) in done:
+                    continue
+                fingerprint = cache_fingerprint(prompt, RegistryToolset(lambda: QueryContext()))
+                if prior_fingerprints and fingerprint not in prior_fingerprints:
+                    raise SystemExit(
+                        "resume refused: prompt/tool fingerprint differs from the run file"
+                    )
                 with tempfile.TemporaryDirectory() as tmp:
                     catalog = load_stores(driver, gen, Path(tmp))
 
@@ -214,7 +249,7 @@ def run_eval(
                         "total": result.usage.spent,
                     },
                     "cache_hit_rate": result.usage.cache_hit_rate,
-                    "cache_fingerprint": cache_fingerprint(prompt, toolset),
+                    "cache_fingerprint": fingerprint,
                     "latency_s": round(latency, 3),
                     "validation_failures": result.validation_failures,
                     "report": result.report.model_dump() if result.report else None,

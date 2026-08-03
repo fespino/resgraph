@@ -220,6 +220,7 @@ def run_eval(
                     "report": result.report.model_dump() if result.report else None,
                 }
                 f.write(json.dumps(row) + "\n")
+                f.flush()
     return out
 
 

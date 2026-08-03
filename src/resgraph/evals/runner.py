@@ -10,7 +10,7 @@ from cleanup discipline.
 """
 
 import json
-import subprocess
+import subprocess  # nosec B404 — one fixed-arg git call below
 import tempfile
 import time
 from datetime import UTC, datetime
@@ -110,8 +110,10 @@ def grade_all(
     if is_control:
         dims.append(grade_honesty(result.report))
     else:
-        assert spec.ground_truth is not None
-        dims.extend(grade_found(result.report, spec.ground_truth))
+        truth = spec.ground_truth
+        if truth is None:
+            raise RuntimeError("causal scenario without ground truth")
+        dims.extend(grade_found(result.report, truth))
         edges, log_sequences = evidence_inputs(catalog, spec.alert.fired_at)
         dims.append(grade_evidence(result.report, edges, log_sequences))
     dims.append(grade_discipline(result, max_tool_calls=max_tool_calls))
@@ -129,7 +131,7 @@ def grade_all(
 
 def _git_ref() -> str:
     try:
-        out = subprocess.run(
+        out = subprocess.run(  # nosec B603 B607 — literal args, no user input
             ["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True, check=True
         )
         return out.stdout.strip()

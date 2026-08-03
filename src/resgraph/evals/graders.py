@@ -15,7 +15,7 @@ from resgraph.analyst.harness import RunResult
 from resgraph.analyst.models import TriageReport
 from resgraph.gen.scenarios import GroundTruth
 
-CACHE_HIT_FLOOR = 0.9
+UNCACHED_CEILING = 0.1
 
 
 @dataclass(frozen=True)
@@ -82,6 +82,8 @@ def grade_discipline(result: RunResult, *, max_tool_calls: int) -> DimResult:
         problems.append("report did not parse first try")
     if result.report is None:
         problems.append("no valid report produced")
-    if result.turns > 1 and result.usage.cache_hit_rate < CACHE_HIT_FLOOR:
-        problems.append(f"cache hit {result.usage.cache_hit_rate:.2f} < {CACHE_HIT_FLOOR}")
+    if result.turns > 1 and result.usage.uncached_fraction > UNCACHED_CEILING:
+        problems.append(
+            f"uncached re-read fraction {result.usage.uncached_fraction:.2f} > {UNCACHED_CEILING}"
+        )
     return DimResult("discipline", not problems, "; ".join(problems))

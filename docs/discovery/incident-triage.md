@@ -56,6 +56,11 @@ against the graph and the log.
 - **Budgets:** p95 wall-clock and cost per run inside the committed
   baseline (numbers land with the baseline JSON at run 1); token-
   weighted cache hit rate ≥ 0.9 on multi-turn runs.
+  *Amended 2026-08-03 (EVALS.md iteration 2, SPEC correction row):
+  the cache gate is the uncached re-read fraction ≤ 0.1. The 0.9
+  floor penalized one-time cache writes, which are cost every new
+  token owes, not waste; the bar changes here, dated, because this
+  file's history is the witness that it never bends quietly.*
 
 ### Coverage statement (what the bar deliberately excludes)
 

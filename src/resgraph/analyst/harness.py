@@ -83,6 +83,12 @@ class Usage:
     def cache_hit_rate(self) -> float:
         return self.cache_read_tokens / self.total_input if self.total_input else 0.0
 
+    @property
+    def uncached_fraction(self) -> float:
+        """Input billed at full price — neither read from nor written
+        to cache."""
+        return self.input_tokens / self.total_input if self.total_input else 0.0
+
 
 @dataclass
 class ToolCall:
@@ -158,11 +164,9 @@ def _feedback(errors: list[str]) -> str:
 
 def _mark_transcript_breakpoint(messages: list[dict[str, Any]]) -> None:
     """One moving breakpoint on the last block of the last user message,
-    so the growing transcript caches incrementally. The prefix-only
-    design left the whole conversation re-billed every turn (EVALS.md,
-    iteration 2). Marks are metadata: moving one does not change
-    content bytes, and message objects are mutated in place so the
-    transcript-only-grows invariant holds."""
+    so the growing transcript caches incrementally. Marks are metadata:
+    moving one changes no content bytes, and message dicts are mutated
+    in place so replayed objects keep their identity."""
     for message in messages:
         content = message["content"]
         if isinstance(content, list):

@@ -488,6 +488,30 @@ every remaining miss is truthfully reported as a miss.
   characterized as-is; or honesty regresses, meaning the structure
   failed to protect what it claimed to.
 
+**Run `20260803T205126Z` ($4.61, 30/30): invalidated on both
+components — and the interaction it exposed is the residual's true
+shape.** Transitive 1/4 (predicted ≥ 2/4): playbook adherence was
+partial — one item followed the deepening step and found its cause
+(8 calls, committed), one dug to 11 calls and still missed, two
+concluded at 6–7 calls as before. And honesty dipped 1.00 → 0.67:
+the two control failures are all-true verdicts on distractors dug up
+by the extra exploration — the deepening pressure leaks through
+`explains_symptom`, the one verdict bit structure cannot check. The
+final characterization: **exploration pressure and abstention
+interact through the single unenforced judgment bit.** Structure
+contains the interaction (the arithmetic held; fabrications 0 for
+the eighth consecutive run) but cannot eliminate it, because one bit
+of genuine judgment must live somewhere.
+
+**Resolution per protocol rule 2 (consolidate, never stack):** the
+deepening step is REVERTED — one transitive item gained, two
+controls lost, and the memo's ordering puts control honesty above
+transitive recall. Iteration 7's configuration is the phase's
+certified candidate: honesty 1.00, found_top3 0.71, pass^k 0.77,
+fabrications 0. The k=3 trial run certifies it next; the deepening
+step remains a recorded candidate for the MCP surface's human
+consumers, where it was never measured.
+
 ## Grader verification — mutation testing (2026-08-03)
 
 **Goal.** The graders decide every number in this file, and the same

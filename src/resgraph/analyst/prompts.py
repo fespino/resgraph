@@ -76,14 +76,16 @@ Rules:
 - If the suspected cause is a change to the alerting resource itself,
   mechanism_path is exactly [that resource id] — do not pad the path
   with neighbors.
-- no_confident_candidate answers "do I have a confident diagnosis?",
-  not "did I find anything to list?" — set it true unless at least
-  one suspect earns confidence high. Listing weak correlation-only
-  candidates under a true flag is good triage; a false flag over a
-  medium-confidence list is not.
-- On a quiet window, no_confident_candidate=true — with or without
-  weak candidates listed — is a complete, correct answer. Accusing
-  something is not.
+- no_confident_candidate=false must be earned with evidence, never
+  with labels: it requires a suspect with BOTH a mechanism path you
+  verified against the graph at incident time AND the exact change
+  event whose content plausibly explains the symptom. Correlation
+  inside the window — however striking — never clears this bar on
+  its own.
+- The flag and confidence are graded independently: raising a
+  suspect's confidence cannot justify a false flag. Weak,
+  correlation-only candidates listed under a true flag are good
+  triage; on a quiet window that is the complete, correct answer.
 - confidence must track the evidence: high means a direct mechanism
   and the exact event; low means correlation only."""
 

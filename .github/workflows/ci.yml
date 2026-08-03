@@ -79,6 +79,13 @@ jobs:
         env:
           RESGRAPH_REQUIRE_STORES: "1"   # integration tests must run, not skip
         continue-on-error: true
+      - id: mutation
+        name: grader mutation gate
+        # a survivor means a grader can lie while the suite stays green;
+        # the driver exits nonzero on any survivor (see EVALS.md,
+        # "Grader verification")
+        run: uv run python evals/meta/mutate_graders.py
+        continue-on-error: true
       - name: Build CI summary
         if: always()
         run: |
@@ -94,6 +101,7 @@ jobs:
             echo "| pyright (strict) | $(s "${{ steps.typecheck.outcome }}") |"
             echo "| promtool | $(s "${{ steps.promtool.outcome }}") |"
             echo "| pytest | $(s "${{ steps.tests.outcome }}") — $(tail -1 pytest.out) |"
+            echo "| grader mutation gate | $(s "${{ steps.mutation.outcome }}") |"
           } > ci-summary.md
           cat ci-summary.md >> "$GITHUB_STEP_SUMMARY"
       - name: Comment CI summary on PR

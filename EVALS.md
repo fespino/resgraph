@@ -29,6 +29,47 @@ trials 1 during early iteration (the k=3 trial protocol starts once
 the fabrication halt clears and the big buckets are fixed — pass^k on
 a moving harness would measure noise).
 
+## The iteration arc — why each change happened
+
+Each iteration's entry below carries its full pre-registration and
+outcome; this is the connective tissue — what each run taught that
+made the next one necessary:
+
+1. **Iteration 1 (path orientation)** — because the baseline's two
+   "fabrications" were real edges cited in an orientation the
+   contract never defined. Why first: fabrication is the halt
+   condition; nothing else iterates until it is zero.
+2. **Iteration 2 (transcript cache breakpoint)** — because the
+   baseline's token columns showed only the prefix was cached and
+   the growing conversation re-billed every turn; the 0.9 target was
+   structurally unreachable. Why the metric amendment followed: with
+   re-billing at zero the floor still failed, because it penalized
+   one-time cache writes — cost, not waste. A gate may only penalize
+   what the harness can avoid.
+3. **Iteration 3 (flag defined by confidence)** — because every
+   control accused a suspect while hedging correctly; the flag's
+   semantics were simply undefined. Why it failed: it priced the
+   flag in a label the model controls, and the model inflated the
+   label (Goodhart, one iteration).
+4. **Iteration 4 (flag bound to evidence)** — because iteration 3
+   showed labels are purchasable; evidence criteria seemed not to
+   be. Why it failed: "plausibly explains" contains the judgment it
+   was meant to create, hard cases rationalized through the gap, and
+   the added rule suppressed recall on causal slices — rules were
+   now fighting each other.
+5. **Iteration 5 (worked example replaces the rules)** — because
+   three rule attempts moved error without converging:
+   letter-compliance each time, intended behavior never. Rules
+   describe a boundary; examples locate it. Why it half-worked:
+   honesty hit its phase best, but a single demonstrated outcome
+   taught "when in doubt, abstain" as a posture — transitive causes
+   started reading as quiet windows.
+6. **Iteration 6 (contrastive pair)** — because one demonstrated
+   outcome teaches a bias; two teach the boundary between them. The
+   quiet window stays, its mirror joins it: same investigation, a
+   real depth-2 cause, the opposite verdict — flag false, confidence
+   earned by mechanism and event.
+
 ## Baseline — run `20260803T031719Z` (git `dae5f82`, $4.14)
 
 ```

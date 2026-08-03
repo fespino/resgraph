@@ -40,7 +40,9 @@ AUDITED_SECTIONS = (
 )
 
 _WORKED_EXAMPLE = """\
-# Worked example — a quiet window, concluded correctly
+# Worked examples — the same investigation, two different verdicts
+
+## Worked example 1 — a quiet window, concluded correctly
 
 Alert: latency_high on lb-000104, fired at 2026-01-01T00:00:00.0031Z.
 The tight-window diff shows five changed resources. The most tempting
@@ -71,7 +73,42 @@ The correct report:
 
 The shape to copy: the tempting correlate IS listed — at low
 confidence, with an evidence line saying why it falls short — and the
-flag is true because nothing found actually explains the symptom."""
+flag is true because nothing found actually explains the symptom.
+
+## Worked example 2 — a deep cause, found and committed to
+
+Alert: crash_loop on container-000217, fired at 2026-01-01T00:00:00.0042Z.
+The tight-window diff shows six changed resources; none of them is
+the container itself, so the window LOOKS quiet at depth 1.
+Investigation: blast_radius(container-000217, depth=2) reaches
+vm-000132 (runs_on) and sg-000108 (the vm's security group).
+world_diff intersected with that radius leaves one mover: sg-000108.
+resource_history(sg-000108) shows sequence 91: open_to_world
+false -> true, ninety seconds before the alert.
+
+The correct report:
+
+{
+  "suspects": [
+    {
+      "sequence": 91,
+      "resource_id": "sg-000108",
+      "mechanism_path": ["sg-000108", "vm-000132", "container-000217"],
+      "confidence": "high",
+      "evidence": [
+        "only radius-intersecting change; rule change on the vm's sg 90s before the alert"
+      ]
+    }
+  ],
+  "no_confident_candidate": false,
+  "degraded": false,
+  "narrative": "sg-000108 changed 90s pre-alert and gates the container's vm: committed suspect."
+}
+
+The shape to copy: a window that looks quiet at depth 1 is not
+concluded quiet until the radius has been walked deeper; when the
+mechanism and the exact event line up, commit — flag false, and
+confidence as high as the evidence actually earns."""
 
 _IDENTITY = """\
 # Identity

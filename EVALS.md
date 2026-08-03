@@ -331,7 +331,35 @@ honesty 0.00 / found_top3 0.92; v5 is honesty 0.83 / found_top3
 0.67. Two latency outliers (~650s, API stalls) inflate p95; noted,
 not investigated.
 
-## Iteration 6 — pre-registered 2026-08-03, awaiting run
+## Iteration 6 — pre-registered 2026-08-03, run `20260803T185628Z` ($4.08, 30/30)
+
+**Outcome: invalidated, first branch — the pair taught "always
+commit."** Honesty collapsed 5/6 → 1/6: five controls now conclude
+flag-false, mostly over medium-top lists, two with high-confidence
+accusations. And the predicted recall recovery barely arrived:
+found_top3 0.71 (predicted ≥ 0.79), transitive 1/4 (predicted
+≥ 2/4). Fabrications 0 for the sixth consecutive run; evidence 1.00;
+discipline 29/30.
+
+The six-run seesaw is now the phase's cleanest dataset — honesty /
+found_top3 per run: baseline 0.00/0.92 → it1 0.17/0.83 → it4
+0.33/0.71 → it5 0.83/0.67 → it6 0.17/0.71. Every prompt-level
+intervention — three rule attempts, one example, one contrastive
+pair — moved the trade-off point without ever holding both sides.
+The judgment "does this window explain this symptom?" does not fit
+in demonstration space any better than it fit in rule space.
+
+**Escalation, as pre-registered twice: ladder step 3.** The judgment
+moves into the output structure — per-suspect evidence-verdict
+fields (mechanism verified at incident time? exact event found? does
+it explain the symptom?) that the model must fill, the harness
+validates deterministically with descriptive feedback (flag false
+requires a suspect with all verdicts true), and the graders check
+directly against the store. Nothing left to persuade; the flag
+becomes derived, not chosen. Awaiting go — it is a schema + harness
++ grader change, the phase's first structural iteration.
+
+### As pre-registered (iteration 6):
 
 - **Signal triage:** harness gap, demonstration-shaped — the same
   class as iteration 5, now on the opposite side: consistent

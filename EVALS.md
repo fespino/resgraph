@@ -274,7 +274,41 @@ characterizing the honesty residual on the recorded five iterations
 — which the memo permits — and the pre-registered experiments carry
 to next month unchanged.
 
-### As pre-registered:
+**Full re-run `20260803T170527Z` ($4.08, 30/30): the honesty
+component CONFIRMED, the recall component measured as one-sided
+demonstration bias.** Honesty 0.83 (5/6 — prediction ≥ 0.67 met;
+best of the phase; one high-confidence accusation remains). pass^k
+0.70, best yet. Fabrications 0, fifth consecutive run. But
+found_top3 fell to 0.67 with **transitive 0/4 — and every transitive
+failure sets the flag TRUE**: the model now treats deep-cause
+windows as quiet windows, several anchoring on the sequence-0
+snapshot again. The single worked example demonstrated only the
+abstain outcome, and the model over-applies it exactly where finding
+is hardest. Textbook one-sided few-shot bias; the honesty/recall
+tension is now the phase's measured central finding: baseline was
+honesty 0.00 / found_top3 0.92; v5 is honesty 0.83 / found_top3
+0.67. Two latency outliers (~650s, API stalls) inflate p95; noted,
+not investigated.
+
+## Iteration 6 — pre-registered 2026-08-03, awaiting run
+
+- **Signal triage:** harness gap, demonstration-shaped — the same
+  class as iteration 5, now on the opposite side: consistent
+  over-abstention on transitive items (4/4 flag-true misses), not
+  variance.
+- **Change (one, still ladder step 2):** the worked example becomes a
+  **contrastive pair** — the existing quiet-window case plus a
+  deep-cause case: a transitive (depth-2) fault found through the
+  radius walk, concluded with the flag FALSE and confidence earned
+  by the mechanism and the exact event. Demonstrating both outcomes
+  teaches the discrimination; demonstrating one taught a bias.
+- **Predicted:** transitive ≥ 0.50, found_top3 ≥ 0.79, honesty holds
+  ≥ 0.67, fabrications 0.
+- **Invalidating result:** recall recovers but honesty collapses (the
+  pair teaches "always commit") or both stay flat — examples
+  exhausted, judgment moves to the evidence-verdict output fields.
+
+### As pre-registered (iteration 5):
 
 - **Signal triage (protocol rule 1):** harness gap, demonstration-
   shaped — not worker variance (controls failed consistently across

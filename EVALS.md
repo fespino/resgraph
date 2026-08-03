@@ -94,7 +94,35 @@ pass^k unchanged at 0.67; every other slice identical run-over-run.
   attribution moves to model behavior and the fix moves to the
   harness's referential checks.
 
-## Iteration 2 — pre-registered 2026-08-03, queued behind the halt
+## Iteration 2 — pre-registered 2026-08-03, run `20260803T124249Z` ($3.46)
+
+**Outcome: the waste is gone; the floor is wrong.** Uncached input
+across the whole 30-scenario run: 234 tokens (baseline: 250,754) —
+re-read fraction 0.000; the transcript re-billing the breakpoint was
+built to kill is eliminated entirely. Cost $4.14 → $3.46 per run.
+Cache hit 0.68 → 0.85 mean — and 0 of 30 rows reach the 0.9 floor,
+because every remaining non-read token is `cache_creation` (110,975
+across the run): the one-time write each NEW token must pay before it
+can ever be read. Short 3–5-turn runs never amortize writes below
+10% of input. The pre-registration's invalidating clause ("below 0.9
+→ the message-order tests have a hole") was too binary — the data
+shows a third outcome it didn't anticipate: zero waste AND floor
+missed, which is a metric-definition bug, not a runtime bug. Per the
+failure taxonomy that is an **eval bug — our failure**, and the
+proposed fix is a labeled amendment (discipline gates on uncached
+re-read fraction ≤ 0.1, the waste the metric was built to catch;
+cache-hit stays reported), pending sign-off — the memo's no-quiet-
+bar-bending rule applies to the bar itself.
+
+**Unregistered movements = variance until proven otherwise.** pass^k
+0.67 → 0.73, honesty 0.00 → 0.17, decoy and transitive up, direct
+down 0.25 — none of these had a registered change targeting them,
+and at trials=1 each slice is 4–6 items, so ±1 item swings a slice
+by 0.17–0.25. No credit claimed, no blame assigned; this is the
+argument for starting the k=3 trial protocol once the metric
+amendment lands.
+
+### As pre-registered:
 
 - **Hypothesis:** the cache floor is the prefix-only breakpoint, not
   runtime behavior (fingerprint was stable all run).

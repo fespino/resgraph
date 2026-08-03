@@ -40,10 +40,7 @@ Not for "what depends on X" questions — that is incident-impact.
    could have hurt the victim at that moment.
 4. Intersect: suspects = diff refs ∩ radius refs. Deleted resources
    rank above changed, changed above created, closer-in-radius above
-   farther. An empty intersection at depth 2 is not a conclusion:
-   deepen — `blast_radius` again with depth=3 — before concluding
-   the window quiet. Causes routinely sit two or three dependency
-   hops from the victim.
+   farther.
 5. `resource_history` on each suspect (usually 2–4): find the exact
    event in the window — its op, sequence, and what the attrs or
    relationships changed from/to.
@@ -93,6 +90,3 @@ Not for "what depends on X" questions — that is incident-impact.
   intersection — history is the expensive step; intersect first.
 - Treating an empty tight window as "nothing changed" without widening
   once and saying the window was widened.
-- Concluding "no confident candidate" with most of the tool budget
-  unspent and the radius never deepened past 2 — an honest miss is
-  acceptable only after the playbook is exhausted, not before.

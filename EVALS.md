@@ -436,6 +436,34 @@ becomes derived, not chosen. Awaiting go — it is a schema + harness
   the phase concludes, and the model-arm experiment doubles as the
   check on whether the judgment exists at other tiers.
 
+**Run `20260803T200610Z` ($3.93, 30/30): honesty solved; the recall
+residual decomposes into two named buckets, neither of them lying.**
+Honesty 1.00 — 6/6 controls, zero high-confidence accusations, the
+memo's ≥ 0.9 bar met for the first time, by the first iteration with
+nothing to persuade. pass^k 0.77, best of the phase. Discipline
+1.00, evidence 1.00, fabrications 0 (seventh consecutive run). The
+prediction's recall half missed: found_top3 0.71 (predicted ≥ 0.79),
+transitive 0/4. The invalidating clause did NOT fire — controls
+never rationalized explains_symptom.
+
+The item decode reframes the residual:
+
+- **Early conclusion (transitive, 4/4):** every failure is an honest
+  miss — flag true, low confidence, hedged verdicts — with only 5–8
+  of 15 tool calls spent. Budget does not bind; the model stops
+  exploring and says so honestly. A search-persistence gap, not a
+  judgment gap: nothing in the discipline says "deepen the radius
+  once before concluding a window quiet."
+- **Decoy seduction (2/4):** committed wrong answers on the planted
+  seductive confounder, whose mechanism, event, and surface
+  plausibility are all real — the scenario class doing exactly what
+  D25 built it to do.
+
+The seesaw did not break symmetrically: structure fixed the honesty
+side completely and left recall where prompt-era iterations had
+pushed it. The harness has converged to **honest-but-shallow** — 
+every remaining miss is truthfully reported as a miss.
+
 ## Grader verification — mutation testing (2026-08-03)
 
 **Goal.** The graders decide every number in this file, and the same

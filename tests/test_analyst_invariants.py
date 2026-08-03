@@ -40,6 +40,11 @@ VALID_REPORT = json.dumps(
                 "sequence": 41,
                 "resource_id": "host-000001",
                 "mechanism_path": ["host-000001", "vm-000002"],
+                "verdict": {
+                    "mechanism_verified": True,
+                    "event_found": True,
+                    "explains_symptom": True,
+                },
                 "confidence": "high",
                 "evidence": ["host-000001 went down"],
             }
@@ -181,6 +186,9 @@ def test_prefix_example_ids_are_not_citable():
     report = json.loads(VALID_REPORT)
     report["suspects"][0]["resource_id"] = rid
     report["suspects"][0]["mechanism_path"] = [rid, "vm-000002"]
+    report["suspects"][0]["verdict"]["event_found"] = False
+    report["suspects"][0]["verdict"]["explains_symptom"] = False
+    report["no_confident_candidate"] = True
     client = SnapshottingClient([response(text(json.dumps(report)))] * 3)
     result = run_triage(PROMPT, FakeToolset(), client, model=MODEL)
     assert result.report is None

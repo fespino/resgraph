@@ -405,6 +405,40 @@ becomes derived, not chosen. Awaiting go — it is a schema + harness
   (per-suspect evidence-verdict fields, harness-validated with
   descriptive feedback).
 
+## Grader verification — mutation testing (2026-08-03)
+
+**Goal.** The graders decide every number in this file, and the same
+author wrote the graders and the system under test. "The tests pass"
+does not establish that the tests *constrain* the graders — a test
+suite can accompany code without gripping it. Mutation testing
+measures the grip directly: break each grader on purpose and require
+the suite to notice.
+
+**Methodology.** Thirteen targeted semantic mutants — not random
+token flips but the specific bugs each grader exists to prevent:
+comparisons inverted (found_top1), the top-3 window removed, the
+evidence edge-orientation flipped (the exact bug class iteration 1
+was about), edge checking disabled outright, the log-existence check
+inverted, the honesty conjunction weakened AND→OR, high-confidence
+detection retargeted, the repeated-call and parse-first-try and
+uncached-fraction checks disabled or inverted, pass^k silently
+computed as pass@k, controls made to always pass, and the judge's
+pass boundary moved by one. Each mutant is applied alone, the grader
+suite runs against it, and the original is restored regardless of
+outcome. KILLED means the suite failed (the tests noticed); SURVIVED
+means the suite stayed green while a grader lied — a test gap. The
+driver is committed at `evals/meta/mutate_graders.py`, exits nonzero
+on survivors, and is re-run after any grader change; a survivor must
+become a test before the change merges.
+
+**Results.** First pass: 11/13 killed. Both survivors were genuine
+gaps, not artifacts: no test pinned the inconsistent state of a true
+flag alongside a high-confidence suspect (so weakening the honesty
+conjunction passed), and no test exercised the judge's boundary
+score of exactly 3 (so an off-by-one passed). Both became tests in
+the same commit; re-run: 13/13 killed. The audit finding holes is
+what distinguishes it from a ritual.
+
 ## Pre-registered experiment — model arms (runs after the harness stabilizes)
 
 Question on the record (Fran, 2026-08-03): does task complexity

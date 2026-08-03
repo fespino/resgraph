@@ -197,3 +197,28 @@ def test_judge_boundary_score_passes():
     client.messages = SimpleNamespace(create=create)
     verdict = judge_narrative(client, model="judge-m", narrative="ok", alert_line="x")
     assert verdict.passed and verdict.detail == "score=3"
+
+
+def test_resume_state_reads_and_refuses(tmp_path):
+    import pytest as _pytest
+
+    from resgraph.evals.runner import resume_state
+
+    f = tmp_path / "run.jsonl"
+    f.write_text(
+        json.dumps(
+            {
+                "run_id": "r1",
+                "model": "m",
+                "judge_model": "j",
+                "scenario_id": "a",
+                "trial": 0,
+                "cache_fingerprint": "fp",
+            }
+        )
+        + "\n"
+    )
+    run_id, done, prints = resume_state(f, "m", "j")
+    assert run_id == "r1" and done == {("a", 0)} and prints == {"fp"}
+    with _pytest.raises(SystemExit, match="resume refused"):
+        resume_state(f, "other-model", "j")

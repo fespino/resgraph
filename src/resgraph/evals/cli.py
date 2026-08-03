@@ -20,9 +20,11 @@ def run(
     out_dir: str = "evals/runs",
     max_tool_calls: int = 15,
     thinking: str = "adaptive",
+    resume: str = "",
 ) -> None:
     """Run every scenario x trials against docker stores + the API;
-    one JSONL row per (item, trial) lands in out_dir."""
+    one JSONL row per (item, trial) lands in out_dir. --resume PATH
+    appends to a truncated run file, skipping completed rows."""
     from anthropic import Anthropic
 
     from resgraph.graph.client import get_driver
@@ -41,6 +43,7 @@ def run(
         out_dir=Path(out_dir),
         max_tool_calls=max_tool_calls,
         thinking={"type": "adaptive"} if thinking == "adaptive" else None,
+        resume_path=Path(resume) if resume else None,
     )
     print(out)
 

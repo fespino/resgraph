@@ -33,7 +33,7 @@ services:
     extra_hosts: ["host.docker.internal:host-gateway"]
   grafana:
     profiles: ["obs"]
-    image: grafana/grafana:12.3.0@sha256:70d9599b186ce287be0d2c5ba9a78acb2e86c1a68c9c41449454d0fc3eeb84e8
+    image: grafana/grafana:13.1.1@sha256:7cb8c64c4d57a57e734073f3cc94620adb24a0acb929bd80ba9f14017e3a975b
     ports: ["3000:3000"]
     # anonymous admin: a local-only dashboard behind no network boundary;
     # auth here would be theater

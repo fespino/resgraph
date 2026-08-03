@@ -1151,8 +1151,11 @@ Five dimensions, every item, every run:
    lucky pass, separately from clean passes (up to 23.2% of agent
    passes are lucky under process scoring — 📄 Paper:
    [AgentLens](https://arxiv.org/abs/2605.12925) — arXiv:2605.12925).
-5. **Narrative judge** — pinned (model, temperature=0, seed,
-   template; any change is a labeled baseline-refresh event),
+5. **Narrative judge** — pinned (model and template; any change is a
+   labeled baseline-refresh event; the pin originally included
+   temperature=0 and a seed, but the API rejects temperature on this
+   model generation and never exposed a seed — a pin can only contain
+   knobs the API accepts, see Corrections 2026-08-03),
    injection-hardened (content inside tags is data), smallest weight,
    prose quality only. **Rejected:** judge-graded correctness —
    grading with an LLM when the domain hands you ground truth is the
@@ -1373,5 +1376,6 @@ Two rules:
 | 2026-07-31 | "~80% of wall time in `socket.recv_into`" — the phase-3 profiling story, on the PR #29 record and in the post draft | ~37% of tottime is the raw syscall; ~80% is cumtime of the driver's whole receive path (buffering + parsing included). The conflation was caught by a pre-publication adversarial pass | Attribution corrected in the post, BENCHMARKS.md, and as a correcting reply on PR #29 — the wrong number was already part of that record. The finding (round-trip chattiness; batching fix) survived unchanged |
 | 2026-08-01 | "~366 MB cold-store footprint" — ad-hoc `du` over mixed stream content, early phase 4 | Directionally right, methodologically loose, and mis-attributed: at batch 1,024 the total is 363.5 MB but the parquet data is 18–23 MB at any batch size — the footprint was Iceberg commit metadata (977 files), not data. 25.2 MB total at batch 8,192 | BENCHMARKS.md carries the same-generator, same-method sweep and flags the ad-hoc number as loose; commit granularity recorded as a storage decision, not just a throughput one |
 | 2026-08-02 | "Pinned to MCP spec revision 2026-07-28" — D19 as first written during phase 7, and the phase's own protocol test | The pin was untested prose: the SDK negotiates that revision only on the stateless `discover` path, and the test was using the legacy `initialize` handshake, which negotiates an older revision — the suite was green while exercising the path the pinned revision deprecates | Caught pre-merge by reading the spec against the implementation (#77): the test switched to `discover` and now asserts the negotiated revision equals the pin, so an SDK upgrade that shifts it fails CI. The claim became true-and-tested before it shipped |
+| 2026-08-03 | "Narrative judge pinned (model, temperature=0, seed, template)" — D24 as first written | The API rejects `temperature` outright on this model generation (400: "deprecated for this model") and has never exposed a seed — two of the four pinned knobs were not ours to pin. Caught on the first real judge call of the baseline run, which is exactly when untested prose gets tested | D24 amended: the pin is model + template, the only knobs the API accepts; the judge call and its test updated. Same failure class as the revision-pin row above — a pin written before the API contradicts it |
 
 

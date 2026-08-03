@@ -3,7 +3,10 @@
 The judge never grades correctness — dimensions 1–4 own it and they
 never hallucinate. Pinned: model and template are part of the eval
 environment; changing either is a labeled baseline-refresh event.
-Hardened: report content arrives inside tags declared as data.
+The current model generation rejects the temperature parameter
+outright, so the pin is exactly those two things — determinism knobs
+the API refuses cannot be part of the contract. Hardened: report
+content arrives inside tags declared as data.
 """
 
 import re
@@ -34,7 +37,6 @@ def judge_narrative(client: Any, *, model: str, narrative: str, alert_line: str)
     resp = client.messages.create(
         model=model,
         max_tokens=16,
-        temperature=0,
         messages=[
             {
                 "role": "user",

@@ -119,7 +119,7 @@ def test_judge_is_pinned_and_hardened():
     client.messages = SimpleNamespace(create=create)
     verdict = judge_narrative(client, model="judge-m", narrative="fine", alert_line="x on y")
     assert verdict.passed and verdict.detail == "score=4"
-    assert client.requests[0]["temperature"] == 0
+    assert "temperature" not in client.requests[0]  # API rejects it on this model generation
     assert client.requests[0]["model"] == "judge-m"
 
 

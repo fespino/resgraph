@@ -136,7 +136,32 @@ amendment lands.
   breakpoint in place — the miss is then runtime message mutation,
   and the message-order invariant tests have a hole to find.
 
-## Iteration 3 — pre-registered 2026-08-03, run pending
+## Iteration 3 — pre-registered 2026-08-03, run `20260803T142459Z` (partial: 12/30, API outage; all 6 controls completed — decisive for this hypothesis)
+
+**Outcome: prediction missed; the second invalidating clause fired.**
+Honesty 2/6 (predicted ≥ 0.83) — and the failure shape is new:
+**four high-confidence accusations on controls**, where every prior
+run had zero. Defining the flag in terms of confidence ("true unless
+a suspect earns high") handed the model a ticket price for keeping
+the flag false — and it paid it by inflating confidence. The rule
+created the incentive; the model followed it. This is Goodhart's law
+executed in a single iteration, caught only because the
+pre-registration named the failure before the run: "controls start
+emitting high-confidence accusations — a worse, different bug."
+
+What the partial run also showed: the causal half that ran went 6/6
+on found_top3 and evidence (fabrications still 0), and the amended
+discipline gate passed 11/12 — iteration 2's metric amendment
+behaves as intended under real traffic.
+
+Attribution for iteration 4: the flag cannot be derived from a field
+the model prices. The abstention rule must bind to the *evidence
+test* the graders already own — high confidence requires a verified
+mechanism plus the exact event, and a window with only
+correlation-level candidates is a no-confident-candidate case
+regardless of how the suspects are labeled.
+
+### As pre-registered:
 
 - **Hypothesis:** controls fail because `no_confident_candidate` is
   undefined relative to confidence. The run-3 shape: five of six

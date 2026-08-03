@@ -79,6 +79,7 @@ def test_prefix_json_schema_is_canonical():
     text = prefix_text()
     start = text.index('{\n  "$defs"')
     depth = 0
+    end = start
     for i, ch in enumerate(text[start:], start):
         depth += ch == "{"
         depth -= ch == "}"

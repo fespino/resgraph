@@ -202,7 +202,7 @@ def run_eval(
             for trial in range(trials):
                 if (spec.id, trial) in done:
                     continue
-                fingerprint = cache_fingerprint(prompt, RegistryToolset(lambda: QueryContext()))
+                fingerprint = cache_fingerprint(prompt, RegistryToolset(QueryContext))
                 if prior_fingerprints and fingerprint not in prior_fingerprints:
                     raise SystemExit(
                         "resume refused: prompt/tool fingerprint differs from the run file"

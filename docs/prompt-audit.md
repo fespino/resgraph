@@ -13,6 +13,7 @@ section list in sync.
 | triage discipline (change-forensics skill body) | PREFIX | system block 1 | the committed playbook; changes only when the skill file does |
 | tool guidance | PREFIX | system block 1 | steering conventions, static — budget *numbers* stay out of the prompt entirely (D22: budgets live in the harness) |
 | output contract (TriageReport schema + rules) | PREFIX | system block 1, last section; the block carries the `cache_control` breakpoint | derived from `models.py` — changing the report contract is *supposed* to bust the cache, visibly |
+| worked example (canonical quiet-window case) | PREFIX | system block 1, after the output contract | teaches the abstention shape rules could not (EVALS.md iterations 3–5); its illustrative ids are excluded from referential citability — the harness seeds citable ids from post-breakpoint blocks and tool results only |
 | tool schemas (TOOL_REGISTRY) | implicit PREFIX | serialized by the API before the breakpoint | editing a tool name/description/schema busts the cache while prompts.py shows no diff. Measured, not just documented: `cache_fingerprint` hashes tool blocks + prefix into every run record, so a cache-hit drop diffs to either "fingerprint changed — find the registry/prompt edit" or "fingerprint stable — runtime bug". |
 | world summary | SUFFIX | system block 2, after the breakpoint | per-run: counts, alert neighborhood, window bounds |
 | alert payload | user message | first user turn | per-run |

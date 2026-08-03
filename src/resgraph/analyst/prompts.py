@@ -34,9 +34,44 @@ AUDITED_SECTIONS = (
     "triage discipline",
     "tool guidance",
     "output contract",
+    "worked example",
     "world summary",
     "alert payload",
 )
+
+_WORKED_EXAMPLE = """\
+# Worked example — a quiet window, concluded correctly
+
+Alert: latency_high on lb-000104, fired at 2026-01-01T00:00:00.0031Z.
+The tight-window diff shows five changed resources. The most tempting
+correlate: vm-000121 runs two of the lb's targets and changed
+state=starting -> running forty seconds before the alert.
+Investigation: blast_radius(lb-000104) contains vm-000121;
+resource_history(vm-000121) shows sequence 87 is that state change —
+a recovery, not a fault — and nothing else in the radius moved.
+
+The correct report:
+
+{
+  "suspects": [
+    {
+      "sequence": 87,
+      "resource_id": "vm-000121",
+      "mechanism_path": ["vm-000121", "lb-000104"],
+      "confidence": "low",
+      "evidence": [
+        "only radius-intersecting change in the window; a recovery cannot explain rising latency"
+      ]
+    }
+  ],
+  "no_confident_candidate": true,
+  "degraded": false,
+  "narrative": "Quiet window: the only in-radius change is a recovery; no confident candidate."
+}
+
+The shape to copy: the tempting correlate IS listed — at low
+confidence, with an evidence line saying why it falls short — and the
+flag is true because nothing found actually explains the symptom."""
 
 _IDENTITY = """\
 # Identity
@@ -76,16 +111,11 @@ Rules:
 - If the suspected cause is a change to the alerting resource itself,
   mechanism_path is exactly [that resource id] — do not pad the path
   with neighbors.
-- no_confident_candidate=false must be earned with evidence, never
-  with labels: it requires a suspect with BOTH a mechanism path you
-  verified against the graph at incident time AND the exact change
-  event whose content plausibly explains the symptom. Correlation
-  inside the window — however striking — never clears this bar on
-  its own.
-- The flag and confidence are graded independently: raising a
-  suspect's confidence cannot justify a false flag. Weak,
-  correlation-only candidates listed under a true flag are good
-  triage; on a quiet window that is the complete, correct answer.
+- no_confident_candidate answers one question: does some change in
+  this window actually explain the symptom? On a quiet window the
+  correct report sets the flag true and still lists the tempting
+  correlates at low confidence, with evidence lines saying why they
+  fall short — the worked example below is the shape to copy.
 - confidence must track the evidence: high means a direct mechanism
   and the exact event; low means correlation only."""
 
@@ -111,7 +141,7 @@ def prefix_text() -> str:
         "and nothing else, matching this schema:\n\n"
         f"{schema}\n\n{_OUTPUT_RULES}"
     )
-    return "\n\n".join((_IDENTITY, discipline, _TOOL_GUIDANCE, output_contract))
+    return "\n\n".join((_IDENTITY, discipline, _TOOL_GUIDANCE, output_contract, _WORKED_EXAMPLE))
 
 
 def suffix_text(summary: WorldSummary) -> str:

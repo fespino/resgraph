@@ -7,6 +7,21 @@ pre-registered (hypothesis → single change → predicted effect →
 invalidating result) before its run. The committed baseline is
 `evals/baseline.json`; it refreshes only via labeled commits.
 
+Two protocol rules added 2026-08-03, after iterations 1–4:
+
+- **Signal triage precedes hypothesis.** A failing dimension is a
+  lead, not a diagnosis: before registering a fix, classify the
+  signal — harness gap, worker variance, external failure, or overfit
+  control. This file already contains one of each (the flag
+  semantics, the trials=1 slice swings, the truncated runs, the 0.9
+  cache floor); iterations 3–4 skipped the step and assumed
+  harness gap.
+- **Prompt changes consolidate, never stack.** A superseded rule is
+  removed when its replacement lands — accumulated rule sediment
+  becomes competing instructions (iteration 4's evidence-bar rule
+  cost the causal slices 0.21 of found_top3 while its target bucket
+  didn't move).
+
 Environment pin (all runs unless a row says otherwise): model
 `claude-opus-4-8`, adaptive thinking, judge = same model + pinned
 template, 30-scenario dataset `evals/scenarios/base.jsonl` (seed 42),

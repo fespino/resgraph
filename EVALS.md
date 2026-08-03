@@ -22,6 +22,24 @@ Two protocol rules added 2026-08-03, after iterations 1–4:
   cost the causal slices 0.21 of found_top3 while its target bucket
   didn't move).
 
+Three more, added 2026-08-04 from the honest review below:
+
+- **Adversarial pre-mortem in every pre-registration:** one required
+  sentence — "how could the model satisfy this change's letter
+  without the intended behavior?" Would have caught iterations 3
+  and 4 before they ran.
+- **A contract touches reality before it is pinned:** one real API
+  call per external contract before its pin is written (the
+  temperature/seed pin failed on first contact, the second such
+  catch across phases).
+- **A metric target is dry-run before it is committed:** simulate
+  the formula on a hand-built trace of the intended design (the 0.9
+  cache floor was pencil-and-paper unreachable; we paid ~$8 of runs
+  to learn it).
+- **Two prediction misses in one technique class means escalate,
+  not refine** — and the next prediction in a failed class shrinks
+  toward the observed effect.
+
 Environment pin (all runs unless a row says otherwise): model
 `claude-opus-4-8`, adaptive thinking, judge = same model + pinned
 template, 30-scenario dataset `evals/scenarios/base.jsonl` (seed 42),
@@ -630,6 +648,68 @@ each result lands relative to published claims:
    own reschedule at seq 22), the scenario class doing exactly what
    it was designed to do. Whether either moves at other capability
    tiers is the model-arm question, pre-registered below.
+
+## Honest review — our mistakes in this sequence (2026-08-04)
+
+The iteration log above records the model's failures; this section
+records ours, because a log that only audits the subject isn't
+auditing. Costs from the ledger.
+
+**Design-time (the expensive class):**
+
+- **Contracts committed before touching reality.** D24 pinned the
+  judge at temperature=0 with a seed; the API rejects the first and
+  never offered the second — caught by the first real call, after
+  the spec was written. Second occurrence of this class (phase 7's
+  revision pin was the first). Now protocol: one real call before
+  any pin.
+- **A metric target committed without dry-running its formula.** The
+  0.9 cache floor was structurally unreachable with a prefix-only
+  breakpoint — derivable by hand in minutes; discovered by ~$8 of
+  runs. Now protocol: simulate the formula on a synthetic trace
+  first.
+- **A predictably gameable rule shipped with the prediction on our
+  own shelf.** Iteration 3 keyed the abstention flag to a label the
+  model controls after we had already absorbed the literature on
+  measures collapsing under optimization pressure. Absorbed
+  knowledge was not applied at design time. Now protocol: the
+  adversarial pre-mortem sentence in every pre-registration.
+- **A known failure repeated without new evidence.** Iteration 4 was
+  a second rule immediately after a rule was gamed, stacked on the
+  first's residue — the ladder escalation ran one iteration late
+  (~$3.40).
+
+**Calibration:**
+
+- **Early predictions were systematically over-optimistic about
+  prompt fixes** (predicted ≥ 0.83, delivered 0.33; predicted
+  ≥ 0.67, delivered 0.33). Conservatism arrived only after two
+  misses. Now protocol: failed-class predictions shrink; two misses
+  in a class escalates.
+
+**Operational:**
+
+- **First paid run launched against an unchecked store** — the wipe
+  OOM'd a memgraph carrying 32 hours of accumulated data and took
+  the container runtime down with it. A store preflight belongs in
+  the runner.
+- **Output pipes masked exit codes on money-spending commands — a
+  repeat offense from the previous phase.** Three runs reported
+  "completed, exit 0" after crashing or truncating; truncation was
+  discovered by counting rows. Twice recorded as a lesson, never
+  promoted to enforcement — the exact anti-pattern our own absorbed
+  feedback doctrine names. Promoted now.
+- **The runner cannot resume.** Two network drops and one spend cap
+  each restarted from scenario one, re-paying completed items (~$5
+  total). Filed as follow-up work together with the store preflight.
+- **No spend-headroom check before a paid sequence** — the org cap
+  fired mid-run as a surprise.
+
+The meta-pattern across most of these: knowledge that was recorded
+but never promoted to an enforcing owner — the same lesson the
+post-experiment re-read taught about reading sources, demonstrated
+on ourselves. Mistakes converted to protocol above; tooling gaps
+filed as issues.
 
 ## Grader verification — mutation testing (2026-08-03)
 

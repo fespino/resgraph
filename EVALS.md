@@ -464,6 +464,30 @@ side completely and left recall where prompt-era iterations had
 pushed it. The harness has converged to **honest-but-shallow** — 
 every remaining miss is truthfully reported as a miss.
 
+## Iteration 8 — pre-registered 2026-08-03, run pending
+
+- **Signal triage:** harness gap, guides-level. The early-conclusion
+  bucket (transitive 4/4 honest misses with 7+ unspent calls) tracks
+  the playbook exactly: the change-forensics discipline says widen
+  the window once if the diff is empty, but says nothing about
+  deepening the radius when the shallow intersection is empty — the
+  model stops where its playbook stops. Not variance (4/4 across two
+  runs), not budget (never bound), not the grader.
+- **Change (one):** the skill gains the missing step and its
+  anti-pattern — an empty diff∩radius intersection at depth 2 is not
+  a conclusion; deepen the radius once before concluding a window
+  quiet. Cross-surface note: the skill body is also the MCP prompt
+  surface, so both consumers of the playbook improve; the prefix
+  changes, fingerprint labeled.
+- **Predicted:** transitive ≥ 0.50, found_top3 ≥ 0.79, honesty holds
+  ≥ 0.83 (the verdict arithmetic is structurally immune to this
+  change), fabrications 0.
+- **Invalidating result:** transitive unmoved with calls still ≤ 8 —
+  the model does not follow the deepened playbook, persistence is
+  behavioral rather than instructional, and the residual is
+  characterized as-is; or honesty regresses, meaning the structure
+  failed to protect what it claimed to.
+
 ## Grader verification — mutation testing (2026-08-03)
 
 **Goal.** The graders decide every number in this file, and the same

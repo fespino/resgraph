@@ -25,7 +25,7 @@ services:
     # Observability profile (D17): opt-in so default runs stay lean —
     # the observer must not distort the benchmarks it observes.
     profiles: ["obs"]
-    image: prom/prometheus:v3.9.1@sha256:1f0f50f06acaceb0f5670d2c8a658a599affe7b0d8e78b898c1035653849a702
+    image: prom/prometheus:v3.13.2@sha256:508729e0e2d18e11fd742a5a5ca70e557b940a93948c3c95fd0123a6fd538b69
     ports: ["9090:9090"]
     volumes:
       - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro

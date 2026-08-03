@@ -136,6 +136,48 @@ amendment lands.
   breakpoint in place — the miss is then runtime message mutation,
   and the message-order invariant tests have a hole to find.
 
-Honesty (0/6 controls) is the next-biggest bucket after the halt
-clears and is prompt-side work on the abstention rules; it gets its
-own pre-registration when it comes up.
+## Iteration 3 — pre-registered 2026-08-03, run pending
+
+- **Hypothesis:** controls fail because `no_confident_candidate` is
+  undefined relative to confidence. The run-3 shape: five of six
+  controls list only medium/low suspects yet set the flag false; the
+  single pass sets it true *while still listing a low-confidence
+  candidate*. The model reads the flag as "did I find anything to
+  list," not "do I have a confident diagnosis" — and never emits a
+  high-confidence accusation on a control, so the confidence
+  calibration itself is not the bug.
+- **Change (one):** the output contract defines the flag:
+  no_confident_candidate=true unless at least one suspect earns
+  confidence high; listing weak correlation-only candidates is
+  compatible with the flag being true.
+- **Predicted:** honesty 0.17 → ≥ 0.83; found/evidence unmoved (the
+  flag gates nothing they grade). Prefix changes; fingerprint change
+  labeled.
+- **Invalidating result:** controls still set the flag false over
+  medium-only lists (the flag definition isn't the binding
+  constraint), or controls start emitting high-confidence
+  accusations (a worse, different bug in confidence semantics).
+
+## Pre-registered experiment — model arms (runs after the harness stabilizes)
+
+Question on the record (Fran, 2026-08-03): does task complexity
+justify the pinned Opus worker? Answered by measurement, not
+judgment:
+
+- **Arms:** `claude-opus-4-8` (the pinned worker), `claude-sonnet-4-6`
+  (~40% cheaper), `claude-haiku-4-5` (~80% cheaper). Same harness,
+  same 30 scenarios, k=3 trials per arm. The judge stays pinned on
+  Opus across all arms — it is part of the instrument, not the
+  worker under test.
+- **Hypothesis (the structure-dominance question made falsifiable):**
+  the harness carries enough of the capability that Sonnet lands
+  within 2 items of Opus on pass^k at ~40% of the cost.
+- **Decision rule, stated before the run:** Sonnet pass^k ≥ Opus
+  pass^k − 0.07 → the production recommendation flips to Sonnet and
+  Opus remains the eval-design worker. Haiku is expected to find the
+  floor where the model, not the harness, binds — wherever it breaks
+  first is a finding, not a failure.
+- **Reported per arm:** pass^k / pass@k, per-dim and per-slice rates,
+  cost per passed triage, latency percentiles. Each non-Opus arm is a
+  new worker epoch: its failures get fresh attribution, never
+  back-ported assumptions.

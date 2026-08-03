@@ -61,11 +61,19 @@ class SnapshottingClient:
         self.messages = SimpleNamespace(create=self._create)
 
     def _create(self, **kwargs):
+        marks = [
+            (i, j)
+            for i, m in enumerate(kwargs["messages"])
+            if isinstance(m["content"], list)
+            for j, block in enumerate(m["content"])
+            if isinstance(block, dict) and "cache_control" in block
+        ]
         self.requests.append(
             {
                 "system_bytes": json.dumps(kwargs["system"], sort_keys=True, default=str),
                 "tools_bytes": json.dumps(kwargs["tools"], sort_keys=True, default=str),
                 "messages": list(kwargs["messages"]),
+                "marks_at_call_time": marks,
             }
         )
         return self._responses.pop(0)
@@ -110,7 +118,18 @@ def test_message_order_and_thinking_replay():
     replayed_tool_turn = final[1]["content"]
     assert replayed_tool_turn[0].type == "thinking"
     assert replayed_tool_turn[0].thinking == "considering the host"
-    assert "failed validation" in final[4]["content"]
+    assert "failed validation" in final[4]["content"][0]["text"]
+
+
+def test_transcript_breakpoint_moves_and_stays_single():
+    client = full_run_client()
+    run_triage(PROMPT, FakeToolset(), client, model=MODEL)
+    for request in client.requests:
+        last_msg = len(request["messages"]) - 1
+        last_block = len(request["messages"][last_msg]["content"]) - 1
+        assert request["marks_at_call_time"] == [(last_msg, last_block)], (
+            "exactly one transcript breakpoint per request, always on the final block"
+        )
 
 
 def test_turn_cap_terminates_a_model_that_never_concludes():

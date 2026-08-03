@@ -512,6 +512,76 @@ fabrications 0. The k=3 trial run certifies it next; the deepening
 step remains a recorded candidate for the MCP surface's human
 consumers, where it was never measured.
 
+## Conclusions — what eight iterations demonstrated
+
+The iteration era is closed: eight pre-registered runs, four
+invalidations, one metric amendment, one revert — every run
+informative, ≈ $36 total. The certified configuration is iteration
+7's (honesty 1.00, found_top3 0.71, pass^k 0.77, fabrications 0 on
+every run ever executed). What the sequence established, and where
+each result lands relative to published claims:
+
+1. **Self-assessments are performative; verifiable atoms are honest.**
+   The model fabricated nothing in eight runs, yet its abstention
+   flag failed under every prompt treatment — rules were gamed
+   (confidence inflated in one iteration when a rule priced the flag
+   in confidence), single examples taught abstain-bias, contrastive
+   pairs taught commit-bias. Deriving the flag from checkable atoms
+   fixed it instantly: 6/6 controls, no learning curve. This is the
+   experimental form of the calibration finding that verbal
+   confidence is not a credence readout
+   ([attribution of confidence](https://arxiv.org/abs/2407.08388)):
+   the field never reported internal state, only contextual
+   incentive.
+2. **Goodhart operates inside a prompt, at one-iteration speed.** A
+   rule keyed to anything the model can relabel is paid in that
+   currency ([AI-resistant evaluations](https://www.anthropic.com/engineering/AI-resistant-technical-evaluations)
+   argues measures erode under optimization pressure; iteration 3
+   compressed that erosion into a single run). The graders were
+   never gamed — the planted ground truth has no relabelable
+   surface — which is D24/D25's design argument, demonstrated.
+3. **Structure buys what prompting cannot.** Five prompt-level runs
+   moved the honesty/recall trade-off point without ever holding
+   both sides; one structural change ended the honesty side
+   outright. This is the structure-dominance claim of the harness
+   literature ([AutoHarness](https://arxiv.org/abs/2603.03329)
+   synthesized constraint structure beating raw larger models)
+   observed at the scale of a single field: honesty became a control
+   independent of model obedience — the T4 condition of
+   [What makes a harness a harness](https://arxiv.org/abs/2606.10106)
+   — and immediately held. That paper calls control "least formally
+   consolidated" in the field; this log is one consolidation case
+   study.
+4. **The escalation ladder is real and has a floor.** The sequence
+   walked rules → examples → structure, exactly the
+   steering-to-validator progression of
+   [lopopolo's feedback framework](https://github.com/lopopolo/harness-engineering/tree/trunk/docs/feedback)
+   (promote each lesson to the smallest owner that can hold it), and
+   found its floor: one bit of genuine judgment (explains_symptom)
+   must live somewhere, and exploration pressure leaks through
+   exactly that bit (iteration 8). Structure contains judgment; it
+   does not abolish it.
+5. **Canonical examples need contrast, and contrast is not enough.**
+   The context-engineering guidance to prefer curated canonical
+   examples ([effective context engineering](https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents))
+   gains a measured refinement: a single canonical example taught
+   its outcome as a *posture* (abstain everywhere), the contrastive
+   pair taught the opposite posture, and neither taught the
+   discrimination — for judgment-shaped behavior, demonstrations
+   locate the boundary no better than rules described it.
+6. **The instrument disciplined its own author.** The eval fired its
+   halt on the author's prompt design, exposed its own broken metric
+   from its own token columns, invalidated five author hypotheses,
+   and survived a mutation audit that found two real test gaps. A
+   grading layer that never rules against its builder is decoration;
+   this one's dissent is the reason its numbers mean something.
+7. **What remains is named, not hidden.** Two residual buckets, both
+   honest: early conclusion on deep causes (search persistence — the
+   playbook fix traded honesty for it and was reverted) and decoy
+   seduction (the confounder class doing its designed job). Whether
+   these move at other capability tiers is exactly the model-arm
+   question, pre-registered below.
+
 ## Grader verification — mutation testing (2026-08-03)
 
 **Goal.** The graders decide every number in this file, and the same

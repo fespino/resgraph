@@ -716,6 +716,18 @@ post-experiment re-read taught about reading sources, demonstrated
 on ourselves. Mistakes converted to protocol above; tooling gaps
 filed as issues.
 
+## Certification run (k=3) — first attempt `20260803T221121Z` (partial: 19/90, org spend cap; $2.88)
+
+The controls completed all three trials before the cap fired, so the
+honesty variance measurement is in: **0.78 under repeated trials**
+(five of six controls pass 3/3; control-s42005 passes 2/3).
+Iteration 7's single-run 6/6 was partly the lucky edge of its
+distribution — the precise thing the trial protocol exists to
+expose, and the honest number the certification will carry.
+Fabrications 0 across 19 further rows. The causal slices await the
+run's completion; issue #94's --resume and --max-cost were filed
+hours before this truncation proved them.
+
 ## Grader verification — mutation testing (2026-08-03)
 
 **Goal.** The graders decide every number in this file, and the same

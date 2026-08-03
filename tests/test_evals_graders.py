@@ -100,7 +100,7 @@ def test_discipline_flags_repeats_retries_and_cold_cache():
     assert not verdict.passed
     assert "identical repeated calls" in verdict.detail
     assert "did not parse first try" in verdict.detail
-    assert "cache hit" in verdict.detail
+    assert "uncached re-read fraction" in verdict.detail
 
 
 def test_discipline_passes_a_clean_run():

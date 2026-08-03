@@ -1133,6 +1133,14 @@ exactly those incident shapes, priced.
   breakpoint on the last message block of each request; the
   audit-table method missed this because the transcript is the one
   section that exists only at runtime.
+- **Amended 2026-08-03, second (iteration 2's outcome):** the
+  discipline gate is the **uncached re-read fraction ≤ 0.1** (plain
+  input / total input), not the cache-hit floor. With re-billing at
+  zero, short runs still fail 0.9 because the residue is
+  `cache_creation` — the one-time write every new token owes, which
+  is cost but not waste. A gate may only penalize what the harness
+  can avoid. The token-weighted cache-hit rate remains reported in
+  every run row; see the correction row dated 2026-08-03.
 
 ## D24 — Eval contract: ground truth first, judge last (phase 8)
 
@@ -1384,5 +1392,6 @@ Two rules:
 | 2026-08-01 | "~366 MB cold-store footprint" — ad-hoc `du` over mixed stream content, early phase 4 | Directionally right, methodologically loose, and mis-attributed: at batch 1,024 the total is 363.5 MB but the parquet data is 18–23 MB at any batch size — the footprint was Iceberg commit metadata (977 files), not data. 25.2 MB total at batch 8,192 | BENCHMARKS.md carries the same-generator, same-method sweep and flags the ad-hoc number as loose; commit granularity recorded as a storage decision, not just a throughput one |
 | 2026-08-02 | "Pinned to MCP spec revision 2026-07-28" — D19 as first written during phase 7, and the phase's own protocol test | The pin was untested prose: the SDK negotiates that revision only on the stateless `discover` path, and the test was using the legacy `initialize` handshake, which negotiates an older revision — the suite was green while exercising the path the pinned revision deprecates | Caught pre-merge by reading the spec against the implementation (#77): the test switched to `discover` and now asserts the negotiated revision equals the pin, so an SDK upgrade that shifts it fails CI. The claim became true-and-tested before it shipped |
 | 2026-08-03 | "Narrative judge pinned (model, temperature=0, seed, template)" — D24 as first written | The API rejects `temperature` outright on this model generation (400: "deprecated for this model") and has never exposed a seed — two of the four pinned knobs were not ours to pin. Caught on the first real judge call of the baseline run, which is exactly when untested prose gets tested | D24 amended: the pin is model + template, the only knobs the API accepts; the judge call and its test updated. Same failure class as the revision-pin row above — a pin written before the API contradicts it |
+| 2026-08-03 | "Token-weighted cache hit ≥ 0.9 on multi-turn runs" as the discipline gate — D23 and the discovery memo's quality bar | The floor is unreachable on short runs even with zero waste: after iteration 2 eliminated transcript re-billing entirely (uncached input 250,754 → 234 tokens per run), 0/30 rows reached 0.9 because the residue is `cache_creation` — the one-time write every new token owes before it can be read. The metric penalized unavoidable cost, not waste | D23 amended (second amendment) and the memo bar updated in place with a dated note: the gate is uncached re-read fraction ≤ 0.1 — the re-billing the metric was built to catch — with cache-hit still reported. An eval bug by the phase's own taxonomy: ours, recorded loudly per the memo's no-quiet-bar-bending rule |
 
 

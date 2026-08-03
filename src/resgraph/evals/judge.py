@@ -3,10 +3,7 @@
 The judge never grades correctness — dimensions 1–4 own it and they
 never hallucinate. Pinned: model and template are part of the eval
 environment; changing either is a labeled baseline-refresh event.
-The current model generation rejects the temperature parameter
-outright, so the pin is exactly those two things — determinism knobs
-the API refuses cannot be part of the contract. Hardened: report
-content arrives inside tags declared as data.
+Hardened: report content arrives inside tags declared as data.
 """
 
 import re

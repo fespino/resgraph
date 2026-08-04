@@ -56,10 +56,12 @@ Every tool is a plain function with a Pydantic input model, a
 Pydantic output model, and one thing the LLM never sees: a
 keyword-only caller context, injected by the transport and absent
 from the LLM-facing schema — so a caller cannot supply its own
-authority, structurally. One `TOOL_REGISTRY` declares the surface,
-and both consumers derive from it in a loop: the MCP server
-registers its tools from the registry, and the HTTP API mounts
-`/tools/{name}` routes from the same entries. The transport is
+authority, structurally
+([the canonical tool bodies](https://github.com/fespino/resgraph/tree/phase-7-mcp-server/src/resgraph/tools/canonical)).
+One [`TOOL_REGISTRY`](https://github.com/fespino/resgraph/blob/phase-7-mcp-server/src/resgraph/tools/registry.py)
+declares the surface, and both consumers derive from it in a loop:
+the MCP server registers its tools from the registry, and the HTTP
+API mounts `/tools/{name}` routes from the same entries. The transport is
 never the truth-bearing module: the truth about a tool — its name,
 its schemas, its behavior — lives in the registry, and a transport
 only carries it. You could delete both transports without losing a
@@ -73,7 +75,9 @@ ask," because each transport bears its own version of the truth
 and the versions drift independently.
 
 "Derive from one source" is a rule that decays unless something
-enforces it, so the phase ships a drift guard: CI assertions that
+enforces it, so the phase ships a drift guard
+([test_drift_guard.py](https://github.com/fespino/resgraph/blob/phase-7-mcp-server/tests/test_drift_guard.py)):
+CI assertions that
 parse the source tree as an AST and fail on any tool registration
 outside the registry loop, any `/tools` route outside the mount,
 and any model class duplicated across surfaces — plus a signature
@@ -252,7 +256,9 @@ controls, each paired with the failure it exists to prevent:
 
 Per this series' standing rule, a design claim about payload size
 needs a number, a method, and a hardware label. The payload
-benchmark measures the canonical refs-and-cap response against the
+benchmark
+([tool_payload_bench.py](https://github.com/fespino/resgraph/blob/phase-7-mcp-server/benchmarks/tool_payload_bench.py))
+measures the canonical refs-and-cap response against the
 same traversal serialized fat, across 1k/10k/100k-resource worlds —
 and the headline is that **at natural radii the cap barely
 matters**: seed-42 blast radii top out around 30 nodes, refs-vs-fat
@@ -281,9 +287,11 @@ cap is for.
 
 Tools say what the agent *can* do; the phase also ships two
 opinions about what it *should* do — investigation playbooks
-exposed as MCP prompts: `incident-impact` ("what breaks if X
-dies?") and `change-forensics` ("what changed around the time
-things broke?"). Each is a markdown skill with a
+exposed as MCP prompts:
+[`incident-impact`](https://github.com/fespino/resgraph/blob/phase-7-mcp-server/skills/incident-impact/SKILL.md)
+("what breaks if X dies?") and
+[`change-forensics`](https://github.com/fespino/resgraph/blob/phase-7-mcp-server/skills/change-forensics/SKILL.md)
+("what changed around the time things broke?"). Each is a markdown skill with a
 Pydantic-validated manifest, and its tool references are checked
 against the registry at startup: a playbook naming a tool that
 doesn't exist fails loudly at boot, never silently at runtime.
@@ -304,9 +312,9 @@ similar skills, so similarity at scale, not count alone, is the
 ceiling. And the exit condition is written down in advance: if
 prose playbooks plateau
 under evaluation, the named next experiment is compiling them into
-schema-validated step graphs, per
-[AIP](https://arxiv.org/abs/2606.04781)'s measured 53% → 67% with
-step-level repair.
+schema-validated step graphs, per the measured 53% → 67% with
+step-level repair in
+[AIP: A Graph Representation for Learning and Governing Agent Skills](https://arxiv.org/abs/2606.04781).
 
 ## The spec is a checklist you can run
 
@@ -337,7 +345,8 @@ nothing anywhere checked which revision had actually been
 negotiated. The suite was green while exercising the exact path
 the pinned revision deprecates: the pin, as written, was prose.
 The review caught it before merge, and the fix is the same
-discipline this series applies to performance numbers: the test
+discipline this series applies to performance numbers: the
+[protocol test](https://github.com/fespino/resgraph/blob/phase-7-mcp-server/tests/test_mcp_protocol.py)
 switched to the `discover` path and the claim became a CI
 assertion — the negotiated protocol version must equal the pin —
 so an SDK upgrade that shifts it fails the build instead of

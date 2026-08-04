@@ -47,6 +47,11 @@ MCP prompts (D21).
 
 ## One registry, two surfaces, zero drift
 
+The first opinion is architectural. This server exposes the same
+five tools over two protocols — MCP for agents, HTTP for everything
+else — and a dual surface forces a question that sounds trivial
+until it isn't: where does a tool's definition live?
+
 Every tool is a plain function with a Pydantic input model, a
 Pydantic output model, and one thing the LLM never sees: a
 keyword-only caller context, injected by the transport and absent
@@ -296,7 +301,8 @@ minimalism for its own sake:
 measured 82% task completion with curated skills against 9%
 without — and wrong-skill selection appearing at around twenty
 similar skills, so similarity at scale, not count alone, is the
-ceiling. And the exit is pre-registered: if prose playbooks plateau
+ceiling. And the exit condition is written down in advance: if
+prose playbooks plateau
 under evaluation, the named next experiment is compiling them into
 schema-validated step graphs, per
 [AIP](https://arxiv.org/abs/2606.04781)'s measured 53% → 67% with

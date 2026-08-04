@@ -79,13 +79,30 @@ make the wrong state unrepresentable, then stop reviewing for it.
 
 ## Task-shaped, not route-shaped
 
-The five tools are the questions an investigator actually asks, not
-the REST routes the platform happens to have: `blast_radius` (what
-breaks if this dies — live or as of time T), `dependency_path` (why
-does A depend on B), `resource_history`, `world_diff`, and one
-polymorphic `fetch_resource`. An agent investigating an incident
-wants `blast_radius(db-42)`, not five REST calls it must
-orchestrate itself. Anthropic's
+Put an API in front of an agent and the first design question is
+what one tool should *be*. The field currently has three live
+answers: mirror your existing REST routes one-to-one
+(route-shaped), hand over an entire CLI as a single tool and let
+the model compose commands (wide), or shape each tool around one
+question the consumer actually asks (task-shaped). This section is
+the argument for the third, the evidence that makes the other two
+genuinely tempting, and the recorded conditions under which the
+decision would flip.
+
+Route-shaped is the answer nobody chooses on purpose — it is what
+you get by exposing the API you already have. It was rejected here
+because it moves the orchestration burden onto the agent: the
+platform's REST surface answers "what breaks if db-42 dies, as of
+last Tuesday?" only through a sequence of calls the caller must
+order, hold intermediate results for, and join. Every hop the
+model orchestrates itself is context spent, latency added, and one
+more place to go wrong. So each tool is instead one investigator's
+question, whole: `blast_radius` (what breaks if this dies — live
+or as of time T), `dependency_path` (why does A depend on B),
+`resource_history`, `world_diff`, and one polymorphic
+`fetch_resource` for detail. An agent investigating an incident
+asks `blast_radius(db-42)` and gets the answer, not homework.
+Anthropic's
 [Building Effective Agents](https://www.anthropic.com/research/building-effective-agents)
 calls the discipline agent-computer-interface design, and the
 principle is [poka-yoke](https://en.wikipedia.org/wiki/Poka-yoke),
@@ -93,10 +110,9 @@ manufacturing's mistake-proofing idea — a connector that only fits
 the right way up — applied to a tool surface: make the mistake
 structurally hard, not instructed-against.
 
-Two serious alternatives to this shape were considered, rejected —
-and recorded in the spec with the condition that would reopen each.
-
-The first is *wide* tools. Microsoft's Azure SRE team
+The second answer — *wide* tools — is the one that almost won, and
+it was rejected with a written condition for reopening it.
+Microsoft's Azure SRE team
 [reported](https://techcommunity.microsoft.com/blog/appsonazureblog/context-engineering-lessons-from-building-azure-sre-agent/4481200/)
 collapsing 100+ narrow tools into roughly five — but each of their
 five is an entire CLI ecosystem handed over as a single tool: the
@@ -114,7 +130,8 @@ traces show the model improvising around the surface — asking
 questions the five tools cannot express or combine — a wide-tool
 variant gets measured before a sixth tool gets added.
 
-The second alternative is composing tools *in code*. In Anthropic's
+A third option cuts across the shape question rather than
+answering it: composing tools *in code*. In Anthropic's
 [code execution with MCP](https://www.anthropic.com/engineering/code-execution-with-mcp)
 pattern, the model doesn't call tools one at a time with every
 intermediate result flowing through its context window; it writes a
@@ -129,45 +146,83 @@ composition moves server-side. A rejected alternative with a named
 trigger is a decision; a rejected alternative without one is a
 mood.
 
-Every tool also declares its risk annotations explicitly —
-read-only, non-destructive, idempotent, closed-world — because the
-[MCP tool-annotation defaults](https://blog.modelcontextprotocol.io/posts/2026-03-16-tool-annotations/)
-read as destructive-and-open-world when unstated, and, as that post
-puts it, "risk profile is a property of the session, not of any
-single server": the client composing your read-only server with
-someone else's write-capable one is the thing being defended.
-Per-tool metadata carries `timeout_s` and a structured
-error-action map (rephrase / retry / give up) — two of the
-operational gaps named by an
-[enterprise MCP deployment field report](https://arxiv.org/abs/2603.13417).
+## What every tool declares, whatever its shape
+
+Independent of the shape argument, every tool on this surface ships
+with declared risk and operational metadata — and the intended
+reader of those declarations is not the model. It is the *client*
+that will compose this server with others.
+
+The risk annotations are MCP's four standard hints, declared
+explicitly on every tool: read-only, non-destructive, idempotent,
+closed-world. Declaring them is not optional politeness: the
+[spec's defaults](https://blog.modelcontextprotocol.io/posts/2026-03-16-tool-annotations/)
+assume the worst when a hint is unstated — destructive and
+open-world — so an unlabeled read-only tool presents itself as
+dangerous. And the labels matter beyond this server, because, as
+that post puts it, "risk profile is a property of the session, not
+of any single server": the model's session may combine this
+read-only server with someone else's write-capable one, and the
+client can only reason about what that *combination* can do if
+every server labels itself truthfully. Honest labels here are a
+contribution to someone else's security decision.
+
+The operational metadata is per-tool `timeout_s` and an
+error-action map — for each failure class, whether the productive
+response is to rephrase the call, retry it unchanged, or give up.
+Both exist because an
+[enterprise MCP deployment field report](https://arxiv.org/abs/2603.13417)
+named their absence among the gaps that hurt in production: a tool
+without a declared timeout leaves every client guessing how long to
+wait, and an error without a declared action invites retry loops on
+failures no retry will fix.
 
 ## Budgets are enforced, not requested
 
-The agent must not be able to ask an unbounded question — and
-enforcement lives server-side, because prompt etiquette is not a
-control:
+The question this section answers: what stops an agent from hurting
+itself — or the platform — with an *honest* query? A blast radius
+on a well-connected host is a 53,775-token answer if serialized
+naively (measured below); an unbounded `depth` parameter is a
+traversal the stores pay for; a twenty-minute-old payload about a
+churning world is a wrong answer wearing a fresh timestamp. None of
+these are misbehavior. They are the default outcomes of a naive
+surface meeting a curious consumer.
 
-- **Clamps, not errors.** A `depth` beyond the traversal cap clamps
-  and says so (`depth_clamped: true`). An agent that gets clamped
-  keeps working; one that gets a 500 retries in a loop.
-- **Refs + fetch.** Traversals and diffs return bare refs — id,
-  type, one line — and `fetch_resource` returns detail for the few
-  that matter. A 400-node blast radius with full attributes is a
-  blown context window the agent cannot steer. Azure SRE's report
-  lands the same rule from production: treat large tool outputs as
-  data sources, not context.
-- **A hard token cap on every response.** Overflow paginates with
-  `truncated: true`, an honest `total_count`, and the next move
-  written in prose — `pagination_hint: "call again with offset=N"`
-  — because the consumer is a language model, so the payload itself
-  teaches the follow-up. Pagination is an argument, not a separate
-  tool; a truncated radius is "at least N", never "N".
-- **Freshness on everything.** Every response carries `fetched_at`
-  and its source store. An agent reasoning over a twenty-minute-old
-  payload about a live system needs to know to re-fetch; freshness
-  *is* correctness when the world churns.
-- **Errors are steering surfaces.** A rejected filter answers with
-  the correction in the error message, not in documentation.
+The design position: every one of those failure modes gets a
+control, the control lives server-side in the response protocol
+itself, and none of it relies on the prompt — because a prompt
+instruction is a request to a consumer that may never have read it,
+may not recall it mid-task, and cannot be made to obey it. "Please
+paginate responsibly" is etiquette; a token cap is a control. Five
+controls, each paired with the failure it exists to prevent:
+
+- **Clamps, not errors** — against the unbounded traversal. A
+  `depth` beyond the traversal cap clamps and says so
+  (`depth_clamped: true`). An agent that gets clamped keeps
+  working; one that gets a 500 retries in a loop.
+- **Refs + fetch — against the context-window blowout.** Traversals
+  and diffs return bare refs — id, type, one line — and
+  `fetch_resource` returns detail for the few that matter. A
+  400-node blast radius with full attributes is a payload the agent
+  cannot steer once received. Azure SRE's report lands the same
+  rule from production: treat large tool outputs as data sources,
+  not context.
+- **A hard token cap on every response — against the answer no
+  refs-only shaping can bound**, because fan-out is unbounded.
+  Overflow paginates with `truncated: true`, an honest
+  `total_count`, and the next move written in prose —
+  `pagination_hint: "call again with offset=N"` — because the
+  consumer is a language model, so the payload itself teaches the
+  follow-up. Pagination is an argument, not a separate tool; a
+  truncated radius is "at least N", never "N".
+- **Freshness on everything — against the stale answer.** Every
+  response carries `fetched_at` and its source store. An agent
+  reasoning over a twenty-minute-old payload about a live system
+  needs to know to re-fetch; freshness *is* correctness when the
+  world churns.
+- **Errors are steering surfaces — against the mistake repeated
+  forever.** A rejected filter answers with the correction in the
+  error message, not in documentation.
   [Stripe's steering experiments](https://stripe.dev/blog/ai-steering-experiments)
   measured the asymmetry that justifies this: passive documentation
   goes unread — "agents simply don't wander" — while error-based

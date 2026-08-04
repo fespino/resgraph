@@ -39,10 +39,12 @@ AI layer — is underway. Each phase is tagged at its end state:
 | 5 | Query layer: mini planner, push-down, one API over both stores | `phase-5-query-layer` |
 | 6 | Observability: wide events, SLOs, the chaos drill (INC-001) | `phase-6-observability` |
 | 7 | MCP server: 5 task-shaped tools from one registry, drift guard, skills-as-prompts | `phase-7-mcp-server` |
+| 8 | Analyst agent + eval harness: planted ground truth, 8 pre-registered iterations, zero fabrications ever | `phase-8-analyst` |
 
 Each increment lands via issue → PR, citing the SPEC decisions
-(D-numbers) it implements. Next: the analyst agent — incident triage
-against planted ground truth, with evals as the development loop.
+(D-numbers) it implements. Next: the safe runtime —
+permission tiers, audit at rest, and the chaos drill for an agent
+that acts.
 
 ## Quickstart: to a live dashboard
 

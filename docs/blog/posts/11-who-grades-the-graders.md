@@ -62,10 +62,11 @@ built in public, and it closes the trio that began with
 [the eval build](09-ground-truth-first-judge-last.md) and
 [the honesty arc](10-goodhart-inside-a-prompt.md). It is also the
 post where the trio's subject inverts: the first two audited the
-agent; this one audits the instrument — and the discipline it lands
-on is the one any AI-generated harness will need, because this
-build is an early instance of a pattern that is about to be
-everywhere.
+agent; this one audits the instrument. The discipline it lands on
+is one I would want around any AI-generated harness — and this
+build reads to me like an early instance of a pattern the field is
+moving toward, which is the opinion the rest of the post argues
+for.
 
 One thing the background reading surfaced is worth naming up front,
 because it shapes the whole post: the two bodies of literature this
@@ -143,8 +144,8 @@ market scale, where vendors sell both the capability and its
 governance, and — as a
 [Thoughtworks analysis of that gap](https://www.thoughtworks.com/insights/blog/technology-strategy/ai-vendors-governance-gap-adopters-risk)
 puts it — "no vendor can credibly recommend against their own
-products." A record of dissent is the only credential an evaluator
-can offer that its author cannot fake, at any scale.
+products." A record of dissent is the one credential I know of
+that an evaluator's author cannot fake, at either scale.
 
 **Layer 4: what rests on trust is named, not hidden.** Three things
 still depend on judgment. The LLM judge — deliberately the smallest

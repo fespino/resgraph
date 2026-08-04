@@ -147,7 +147,12 @@ control:
   measured the asymmetry that justifies this: passive documentation
   goes unread — "agents simply don't wander" — while error-based
   steering reliably corrects behavior at exactly the moment the
-  agent is paying attention.
+  agent is paying attention. Birgitta Böckeler's
+  [sensor work for coding agents](https://martinfowler.com/articles/sensors-for-coding-agents.html)
+  lands the same rule from the harness side: sensor output should
+  carry the self-correction guidance inline, written for the model
+  that reads it — error messages as an API contract, not as human
+  diagnostics.
 
 ## The benchmark that keeps the shape honest
 

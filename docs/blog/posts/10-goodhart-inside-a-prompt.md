@@ -24,17 +24,17 @@ rewarded — in four different directions. A rule keyed to confidence
 bought confidence inflation within a single run. A rule keyed to
 evidence got rationalized through its own judgment gap. One worked
 example taught "when in doubt, abstain"; adding its mirror taught
-"always commit."
-Meanwhile the model's *checkable* claims stayed clean the whole
+"always commit." Meanwhile the model's *checkable* claims stayed
+clean the whole
 time: it never invented an edge or an event in any run of the phase
 (the baseline's two evidence failures were real edges in an
 orientation the contract hadn't defined — the previous post's
 story). Then one structural change — deriving the field by
 arithmetic from three verifiable booleans instead of asking for it
-— took it from
-worst to perfect in a single run, with no learning in between. Only
-the interface changed. This post is that arc, run by run, because it
-is the most useful thing this project has measured so far.
+— took it from worst to perfect in a single run, with no learning
+in between. Only the interface changed. This post is that arc, run
+by run, because it is the most useful thing this project has
+measured so far.
 
 <!-- more -->
 
@@ -127,9 +127,10 @@ prompt, in one iteration.
 
 **Iteration 4** reasoned: the flag was priced in a label the model
 controls, so bind it to something it doesn't — the evidence test the
-graders own. The new rule — again contract prose, layered onto
-iteration 3's residue rather than replacing it, a stacking that
-later earned its own protocol rule: the flag may only be false for a suspect
+graders own. The new rule was again contract prose, layered onto
+iteration 3's residue rather than replacing it (a stacking that
+later earned its own protocol rule). It said: the flag may only be
+false for a suspect
 with a graph-verified mechanism path *and* the exact change event
 whose content plausibly explains the symptom. Honesty: 0.33 again.
 Two controls rationalized distractors as meeting the bar — because
@@ -284,8 +285,9 @@ if report.no_confident_candidate == confident:
 ```
 
 The error strings are not diagnostics for a human log — they are
-the retry prompt, written to steer the model's next attempt. The contract prose
-shrank rather than grew: the rules the flag no longer needs came
+the retry prompt, written to steer the model's next attempt. The
+contract prose shrank rather than grew: the rules the flag no
+longer needs came
 out, and the worked examples stayed but now demonstrate the
 structure, not the vibe. One more thing deliberately did not
 change: the graders. The instrument held still, so runs six and
@@ -294,9 +296,9 @@ seven differ by exactly one thing.
 The run came back: **honesty 1.00.** Six of six controls, zero
 high-confidence accusations, the bar met for the first time — by
 the first configuration with nothing to persuade. pass^k — the
-overall rate at which a scenario passes *every* trial, the
-harshest aggregate the harness reports — hit its
-phase best (0.77), fabrications stayed at zero for the seventh
+overall rate at which a scenario passes *every* trial, the harshest
+aggregate the harness reports — hit its phase best (0.77);
+fabrications stayed at zero for the seventh
 consecutive run, and the invalidating clause (controls
 rationalizing `explains_symptom` on distractors) did not fire. No
 prompt wisdom was added between runs six and seven. Only the
@@ -350,8 +352,7 @@ it.
 
 The change was reverted before anything shipped, on the protocol's
 own terms: one transitive item gained, two controls lost, and the
-quality bar
-ranks control honesty above transitive recall. The certified
+quality bar ranks control honesty above transitive recall. The certified
 configuration is iteration 7's: honesty 1.00, found_top3 0.71,
 pass^k 0.77, fabrications zero on every run ever executed — a
 harness that is *honest-but-shallow*, every remaining miss

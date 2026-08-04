@@ -302,28 +302,34 @@ schema-validated step graphs, per
 [AIP](https://arxiv.org/abs/2606.04781)'s measured 53% → 67% with
 step-level repair.
 
-## The pin that was a wish
+## The spec is a checklist you can run
 
-The spec pinned the server to MCP revision `2026-07-28` — the
-[stateless-core release candidate](https://blog.modelcontextprotocol.io/posts/2026-07-28-release-candidate/),
-which fits this surface exactly: all five tools are single-shot
-reads, no session state, no handles.
+The server card opens with a claim: "targets MCP spec revision
+`2026-07-28`." That is a *pin* — the exact protocol revision the
+implementation is written against, declared so that clients and
+the design itself have a fixed target. The pin matters because the
+design leans on what that revision guarantees: its stateless core
+is the reason five single-shot, no-handle tools fit it exactly,
+and its deprecation list is what this surface deliberately avoids
+building on. The phase's closing discipline was to treat that
+claim — and the rest of the
+[spec](https://blog.modelcontextprotocol.io/posts/2026-07-28-release-candidate/)
+— as a checklist to run against the implementation, not a document
+to cite. Running it found three things.
 
-A pin like that is a claim, and reviewing the RC post against the
-implementation tested it. Background for the sequence: an MCP
-client and server don't assume a protocol revision — they *agree*
-on one when they connect, and the revision they land on depends on
-which connection ceremony is used. There are two: the legacy
-`initialize` handshake, and the stateless `discover` path that the
-pinned revision introduces. The SDK negotiates `2026-07-28` only
-over the new path; over the legacy handshake it settles on an
-older revision. The phase's protocol test connected via the legacy
-handshake — so every green run had quietly agreed to an older
-revision, and nothing anywhere checked which revision had actually
-been negotiated. The suite was green while exercising the exact
-path the pinned revision deprecates: the pin, as written, was
-prose.
-
+**First finding: the revision actually in force was not the pinned
+one.** Background the sequence needs: an MCP client and server
+don't assume a protocol revision — they *agree* on one when they
+connect, and which revision they land on depends on which of two
+connection ceremonies is used: the legacy `initialize` handshake,
+or the stateless `discover` path that the pinned revision
+introduces. The SDK negotiates `2026-07-28` only over the new
+path; over the legacy handshake it settles on an older revision.
+The phase's protocol test connected via the legacy handshake — so
+every green run had quietly agreed to an older revision, and
+nothing anywhere checked which revision had actually been
+negotiated. The suite was green while exercising the exact path
+the pinned revision deprecates: the pin, as written, was prose.
 The review caught it before merge, and the fix is the same
 discipline this series applies to performance numbers: the test
 switched to the `discover` path and the claim became a CI
@@ -335,7 +341,7 @@ claim came out enforceable. It still went into the project's
 corrections table even though nothing shipped wrong, because a log
 that only audits the past isn't auditing.
 
-Two more findings from treating the spec as a runnable checklist:
+The second and third findings came from the same checklist:
 
 - **The stdout audit.** The
   [stdio binding](https://modelcontextprotocol.io/specification/2026-07-28/basic/transports/stdio)

@@ -187,8 +187,8 @@ Trials exist because an agent run is stochastic, so a single pass
 can be the lucky edge of a distribution; the phase's later
 certification run caught exactly that, when a dimension that
 scored perfect in one run measured 0.78 under repetition. But
-trials don't start on day one — the process runs in two gears. During
-iteration, every run is single: the baseline halts on fabricated
+trials don't start on day one — the process runs in two gears.
+During iteration, every run is single: the baseline halts on fabricated
 evidence, the next run fixes that one contract, the run after
 fixes the cache design — each paid run exists to check one
 registered change, and running it three times would triple the

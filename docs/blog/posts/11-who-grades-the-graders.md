@@ -39,9 +39,10 @@ evolves the code volume against it — and names machine-gradability
 as its main limitation. Harnesses will increasingly be regenerated
 from specs, behavior, and production data — humans owning the
 framework and controls, AI doing the case-picking and
-invariant-writing where it is simply more efficient. Which makes the question I stopped to
-ask mid-phase the general one, not the local one: **how do I know
-the evals are correct?** This post is the answer I can defend — four layers of
+invariant-writing where it is simply more efficient. Which makes
+the question I stopped to ask mid-phase the general one, not the
+local one: **how do I know the evals are correct?** This post is
+the answer I can defend — four layers of
 argument, two checks you can run yourself, a list of my own
 mistakes with dollar costs attached, and the full price of the
 program.
@@ -72,8 +73,8 @@ on [subjects detecting and gaming the test](https://www.anthropic.com/engineerin
 on [lucky passes](https://arxiv.org/abs/2605.12925) (up to 23.2% of
 agent passes in one audit), or on
 [the environment confounding the score](https://www.anthropic.com/engineering/infrastructure-noise).
-The integrity side documents all of those failures and never
-touches generation. If generated harnesses are the coming default,
+The integrity side documents exactly the failure modes a generated
+harness would inherit. If generated harnesses are the coming default,
 those halves have to meet — and the four layers, the mutation
 audit, and the mistakes ledger below are this project's working
 attempt at that junction.
@@ -110,8 +111,8 @@ them, coherently, in the same direction.
 
 **Layer 3: behavioral independence — the record of dissent.** An
 eval built to flatter its builder does not produce a log this
-embarrassing to its builder. In eight runs, the instrument: halted
-run one on the author's own prompt contract (the orientation
+embarrassing to its builder. Run after run, the instrument: halted
+the baseline on the author's own prompt contract (the orientation
 fabrications); refused to pass a cache target the author had
 committed, exposing it as structurally unreachable from its own
 token columns; invalidated five of the author's pre-registered

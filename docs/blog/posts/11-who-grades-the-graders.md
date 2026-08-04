@@ -352,25 +352,37 @@ diffs — that made each $4 run mean something.
 ## What's still open, on the record
 
 The trust argument is strongest where it ends with a registered
-experiment rather than a claim. The largest open question — does
-this task even need the pinned flagship worker, or does the harness
-carry the capability? — is pre-registered in the log with its arms
-(the setups compared: the pinned worker against two cheaper
-tiers), its hypothesis (the
-mid-tier lands within two items of the flagship on pass^k at
-roughly 40% less cost), and its decision rule written before the run,
-including the condition under which the production recommendation
-flips. The worker stayed pinned through all eight iterations for a
-reason worth stating: with one change per run, every delta is
-attributable — swap models mid-loop and the next delta is
-confounded, and at $4 a run, model cost was never the bottleneck;
-attribution quality was. Which model to run is an eval slice, not a
-preference. The k=3 certification completes first — its partial
-results already supplied the corrected honesty number quoted
-earlier, 0.78 where a single run had said 1.00. Whatever
-these runs return, the answer will be a measurement with a
-pre-committed interpretation, which is the only kind of answer this
-phase has learned to trust.
+experiment rather than a claim. The largest open question,
+concretely: the agent ran on Opus 4.8 — the most capable, most
+expensive worker — through the entire phase. Does the task need
+it, or does the harness carry the capability? The experiment that
+answers this is already written in the log. Three setups that
+differ only in the worker model: Opus 4.8, Sonnet 4.6 (about 40%
+cheaper), and Haiku 4.5 (about 80% cheaper) — same harness, same
+30 scenarios, three trials per scenario, and the judge stays on
+Opus in all three, because the judge is part of the measuring
+instrument, not the thing being measured. The hypothesis, written
+before any of it runs: the harness carries enough of the
+capability that Sonnet lands within two scenarios of Opus on
+pass^k. The decision rule, also written first: if Sonnet finishes
+within that margin (a pass^k gap of at most 0.07), the production
+recommendation flips to Sonnet and Opus keeps only the eval-design
+work. Haiku's job is to find the floor — wherever it breaks first
+shows what the model contributes that the harness cannot.
+
+Why not just try the cheaper models during the phase? Because the
+iteration loop changed exactly one thing per run — that is what
+let every score movement be traced to its cause. Swapping models
+mid-loop would have broken that traceability, and at $4 a run the
+model's price was never the problem; knowing what caused each
+change was. Which model to run is not a preference to argue about
+in a design meeting; it is one more question the eval measures.
+The k=3 certification — every scenario run three times, a pass
+requiring three passes — completes first; its partial results
+already supplied the corrected honesty number quoted earlier, 0.78
+where a single run had said 1.00. Whatever these runs return, the
+answer will be a measurement with a pre-committed interpretation,
+which is the only kind of answer this phase has learned to trust.
 
 ## What I'd take to the next project
 

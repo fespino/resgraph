@@ -73,6 +73,11 @@ experimentally). What this phase adds is the run-by-run mechanics of
 
 ## Rules: gamed, then rationalized
 
+The honesty work starts at iteration 3 — iterations 1 and 2 fixed
+the fabrication contract and the cache design, the previous post's
+story. The first honesty hypothesis was that the flag was simply
+undefined, and a rule would define it.
+
 **Iteration 3** defined the flag in terms the model already used:
 true unless some suspect earns high confidence. The pre-registration
 predicted honesty ≥ 0.83 — and, in its invalidating clause, named

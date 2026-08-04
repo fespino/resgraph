@@ -23,8 +23,9 @@ the quality bar, which kinds of scenario appear and how often, the
 halt conditions, what merges. The volume under that framework —
 the planted cases, the grader implementations, the invariants and
 post-conditions, the thirteen mutants — was generated, under
-review, by the same kind of system the harness exists to grade. I think that split is not a
-quirk of this project but the coming shape of the work. An eval's
+review, by the same kind of system the harness exists to grade. I
+think that split is not a quirk of this project but the coming
+shape of the work. An eval's
 numbers belong to a pairing: the model plus its harness — the
 scaffolding of tools, prompts, and checks the model runs inside.
 [Harness-Bench](https://arxiv.org/abs/2605.27922) ran the same

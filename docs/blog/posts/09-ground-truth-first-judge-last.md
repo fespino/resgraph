@@ -52,8 +52,9 @@ committed before the first graded run.
 
 ## The bar was written before the harness
 
-The first committed artifact of the phase is a problem-discovery
-memo — what human triage actually involves, what it costs, and what
+The first committed artifact of the phase is a
+[problem-discovery memo](https://github.com/fespino/resgraph/blob/phase-8-analyst/docs/discovery/incident-triage.md)
+— what human triage actually involves, what it costs, and what
 "good" means, defined measurably before the first run:
 
 - **Found:** planted cause in the top-3 suspects ≥ 80% of scenarios;
@@ -319,7 +320,8 @@ run. The harness had placed exactly one
 at the prefix end, so the one thing that grows at runtime was the
 one thing never cached — and token-weighted cache hit *falls* as
 runs lengthen, making 0.9 structurally unreachable. The phase's
-prompt-audit table had a verdict for every prompt section and still
+[prompt-audit table](https://github.com/fespino/resgraph/blob/phase-8-analyst/docs/prompt-audit.md)
+had a verdict for every prompt section and still
 missed this: the transcript, the only section that grows at
 runtime, wasn't a row. Iteration 2 moved a second breakpoint onto
 the last message block: uncached

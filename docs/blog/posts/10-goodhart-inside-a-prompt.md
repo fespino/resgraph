@@ -24,8 +24,8 @@ time: it never invented an edge or an event in any run of the phase
 (the baseline's two evidence failures were real edges in an
 orientation the contract hadn't defined — the previous post's
 story). Then one structural change — deriving the field by
-arithmetic from
-three verifiable booleans instead of asking for it — took it from
+arithmetic from three verifiable booleans instead of asking for it
+— took it from
 worst to perfect in a single run, with no learning in between. Only
 the interface changed. This post is that arc, run by run, because it
 is the most useful thing this project has measured so far.

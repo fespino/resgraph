@@ -81,16 +81,22 @@ One piece of machinery to hold while reading, because every
 iteration below is an edit to a specific artifact. The agent ends
 every investigation by emitting a JSON report — ranked suspects,
 evidence, confidence labels, and the flag — which the harness
-validates against a typed schema (a Pydantic model). A report that
-violates the schema or its rules is rejected, and the validator's
-error message goes back to the model as feedback for a retry. The
-system prompt, for its part, carries an *output contract* — the
-prose section that specifies the report and its rules — plus any
-worked examples, and ships the investigation playbook as a markdown
-skill file. So there are exactly four editable surfaces: a sentence
-in the contract, a demonstration in the prompt, the
-schema-and-validator code, and the playbook. The iterations below
-work through them in that order.
+validates against a typed schema (a Pydantic model —
+[models.py](https://github.com/fespino/resgraph/blob/phase-8-analyst/src/resgraph/analyst/models.py)).
+A report that violates the schema or its rules is rejected by
+[`parse_and_validate`](https://github.com/fespino/resgraph/blob/phase-8-analyst/src/resgraph/analyst/harness.py#L139-L177),
+and the validator's error message goes back to the model as
+feedback for a retry. The system prompt, for its part, carries an
+*output contract* — the prose section that specifies the report and
+its rules
+([prompts.py](https://github.com/fespino/resgraph/blob/phase-8-analyst/src/resgraph/analyst/prompts.py))
+— plus any worked examples, and ships the investigation playbook as
+a markdown skill file
+([change-forensics/SKILL.md](https://github.com/fespino/resgraph/blob/phase-8-analyst/skills/change-forensics/SKILL.md)).
+So there are exactly four editable surfaces: a sentence in the
+contract, a demonstration in the prompt, the schema-and-validator
+code, and the playbook. The iterations below work through them in
+that order.
 
 ## Rules: gamed, then rationalized
 
@@ -228,6 +234,22 @@ carries an **evidence verdict** of three booleans:
 - `explains_symptom` — does the change's content account for the
   alert? The one genuine judgment bit, now isolated and named.
 
+The whole change fits on a screen. The verdict, from
+[models.py](https://github.com/fespino/resgraph/blob/phase-8-analyst/src/resgraph/analyst/models.py#L14-L23):
+
+```python
+class EvidenceVerdict(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    mechanism_verified: bool
+    event_found: bool
+    explains_symptom: bool
+
+    @property
+    def confident(self) -> bool:
+        return self.mechanism_verified and self.event_found and self.explains_symptom
+```
+
 And the flag is no longer chosen: `no_confident_candidate` is false
 exactly when some suspect has all three booleans true — arithmetic.
 Unlike everything before it, this iteration is a *code* change, on
@@ -237,7 +259,32 @@ same machinery that already bounced malformed reports — now
 recomputes the flag from the verdicts, rejects any report where
 they disagree, checks `event_found` against the sequence numbers
 that actually appeared in this run's tool results, and sends the
-specific violation back as the retry message. The contract prose
+specific violation back as the retry message. The enforcement, from
+[harness.py](https://github.com/fespino/resgraph/blob/phase-8-analyst/src/resgraph/analyst/harness.py#L159-L177):
+
+```python
+for i, s in enumerate(report.suspects):
+    if s.verdict.event_found and s.sequence == 0:
+        errors.append(
+            f"suspect {i}: event_found=true but sequence 0 is the initial "
+            "snapshot, not a change event"
+        )
+    elif s.verdict.event_found and s.sequence not in seen_sequences:
+        errors.append(
+            f"suspect {i}: event_found=true but sequence {s.sequence} never "
+            "appeared in this run's tool results"
+        )
+confident = any(s.verdict.confident for s in report.suspects)
+if report.no_confident_candidate == confident:
+    errors.append(
+        "no_confident_candidate must be exactly (no suspect has all three "
+        f"verdicts true); emitted {report.no_confident_candidate} while a "
+        f"fully-confident suspect present={confident}"
+    )
+```
+
+The error strings are not diagnostics for a human log — they are
+the retry prompt, written to steer the model's next attempt. The contract prose
 shrank rather than grew: the rules the flag no longer needs came
 out, and the worked examples stayed but now demonstrate the
 structure, not the vibe. One more thing deliberately did not

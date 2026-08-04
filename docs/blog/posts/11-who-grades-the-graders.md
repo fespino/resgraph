@@ -289,7 +289,12 @@ carry the capability? — is pre-registered in the log with its arms
 mid-tier lands within two items of the flagship on pass^k at
 roughly 40% less cost), and its decision rule written before the run,
 including the condition under which the production recommendation
-flips. The k=3 certification completes first — its partial results
+flips. The worker stayed pinned through all eight iterations for a
+reason worth stating: with one change per run, every delta is
+attributable — swap models mid-loop and the next delta is
+confounded, and at $4 a run, model cost was never the bottleneck;
+attribution quality was. Which model to run is an eval slice, not a
+preference. The k=3 certification completes first — its partial results
 already corrected one flattering number, moving control honesty
 from a single-run 1.00 to 0.78 under repeated trials. Whatever
 these runs return, the answer will be a measurement with a

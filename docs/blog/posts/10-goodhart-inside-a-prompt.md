@@ -139,8 +139,22 @@ and hard cases sail through the gap. The rule also did new damage:
 found_top3 fell 0.92 → 0.71 as the abstention language suppressed
 suspect lists on the hardest causal slices, and four reports started
 citing the sequence-0 snapshot row as their "exact event" — a row
-that exists in the log and claims nothing. Rules were now fighting
-each other.
+that exists in the log and claims nothing.
+
+That damage has a name — rules fighting each other — and the
+transcripts show exactly where the contradiction sits. The
+contract's standing mandate says *name ranked suspects*: a probable
+cause at medium confidence is a useful triage, and the found score
+counts the top three. The new bar says *nothing counts without the
+verified mechanism and the exact event*. On easy scenarios both can
+be obeyed at once. On the hard causal slices they cannot —
+assembling that evidence inside the tool budget is precisely what
+makes those slices hard — so each report quietly sacrificed one
+rule to the other. Some obeyed the bar and shrank their suspect
+lists to one or two entries, dropping the planted cause the finding
+mandate exists to surface; others obeyed the letter of "exact
+event" by citing the sequence-0 row, an event in name only. Two
+instructions, one budget, and no rule saying which one wins.
 
 ## The diagnostic: five signals that prompt rules are exhausted
 

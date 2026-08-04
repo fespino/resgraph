@@ -303,6 +303,7 @@ def _generate(
     n_distract = NOISY_DISTRACTORS if scenario_type is ScenarioType.NOISY_WINDOW else DISTRACTORS
     provenance: dict[str, str | int] = {
         "generator": "resgraph-gen scenario",
+        "source": "planted",
         "attempt": attempt,
         "steady_churn": STEADY_CHURN,
         "distractors": n_distract,
@@ -438,6 +439,26 @@ def reskin(spec: Scenario, seed: int) -> GeneratedScenario:
     out = generate_scenario(spec.scenario_type, seed, spec.n_resources, depth=spec.depth)
     provenance = dict(out.spec.provenance) | {"reskin_of": spec.id}
     return GeneratedScenario(out.spec.model_copy(update={"provenance": provenance}), out.messages)
+
+
+def derive_regression(spec: Scenario, *, run_id: str, bucket: str) -> Scenario:
+    """The same world under a new identity: a failing item becomes a
+    permanent regression item whose provenance names what it derives
+    from and the run that exposed it (D24). The world itself is
+    untouched — seed and generator args still rebuild it."""
+    provenance = dict(spec.provenance) | {
+        "source": "failure_derived",
+        "derived_from": spec.id,
+        "exposed_by_run": run_id,
+        "bucket": bucket,
+    }
+    return spec.model_copy(
+        update={
+            "id": f"{spec.id}-r1",
+            "provenance": provenance,
+            "tags": [*spec.tags, "regression", f"bucket:{bucket}"],
+        }
+    )
 
 
 def generate_set(seed: int, count: int = 30, n_resources: int = 60) -> list[GeneratedScenario]:

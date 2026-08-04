@@ -10,12 +10,16 @@ from cleanup discipline.
 """
 
 import json
-import subprocess  # nosec B404 — one fixed-arg git call below
+import os
+import platform
+import subprocess  # nosec B404 — fixed-arg git calls below
 import tempfile
 import time
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+
+import yaml
 
 from resgraph.analyst.harness import (
     MAX_TOOL_CALLS,
@@ -139,6 +143,28 @@ def _git_ref() -> str:
         return "unknown"
 
 
+def _store_images() -> dict[str, str]:
+    """Image refs from compose.yaml, digest included — the file pins by
+    digest, so what it declares is what a started container runs."""
+    try:
+        root = subprocess.run(  # nosec B603 B607 — literal args, no user input
+            ["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True, check=True
+        ).stdout.strip()
+        services = yaml.safe_load((Path(root) / "compose.yaml").read_text())["services"]
+        return {name: svc["image"] for name, svc in services.items() if "image" in svc}
+    except Exception:
+        return {}
+
+
+def _host() -> dict[str, Any]:
+    return {
+        "class": "ci" if os.environ.get("CI") else "laptop",
+        "platform": platform.platform(),
+        "machine": platform.machine(),
+        "cpus": os.cpu_count(),
+    }
+
+
 def resume_state(
     path: Path, model: str, judge_model: str | None
 ) -> tuple[str, set[tuple[str, int]], set[str]]:
@@ -188,6 +214,8 @@ def run_eval(
         "model": model,
         "judge_model": judge_model,
         "thinking": thinking,
+        "stores": _store_images(),
+        "host": _host(),
     }
     with out.open("a" if resume_path is not None else "w") as f:
         for spec in scenarios:

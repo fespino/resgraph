@@ -212,10 +212,16 @@ prompt wisdom was added between runs six and seven. Only the
 interface changed.
 
 This is the structure-beats-steering result that keeps appearing in
-the harness literature —
+the harness literature.
 [AutoHarness](https://arxiv.org/abs/2603.03329) reports synthesized
 harness structure lifting a weaker model over a stronger bare one
-across 145 games — reproduced here at the smallest possible
+across 145 games, and
+[Agentic Harness Engineering](https://arxiv.org/abs/2604.25850) —
+which evolves harnesses autonomously and ablates the result — puts
+it more precisely than we could: its gains live in tools,
+middleware, and memory rather than the system prompt, because
+"factual harness structure transfers while prose-level strategy
+does not." Here the same result reproduces at the smallest possible
 scale: one field, one schema change, worst-to-perfect in one run.
 And it lands on the axis the field's formalization paper,
 [What makes a harness a harness](https://arxiv.org/abs/2606.10106),

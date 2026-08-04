@@ -30,6 +30,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from resgraph.evals.sanitize import sanitize_findings
 from resgraph.gen.scenarios import Scenario, derive_regression, rebuild
 
 
@@ -66,6 +67,11 @@ def main(run_path: str, dataset_path: str, out_path: str) -> None:
         if item.id in specs:
             raise SystemExit(f"id collision with dataset: {item.id}")
         rebuild(item)
+        findings = sanitize_findings(item)
+        if findings:
+            raise SystemExit(
+                f"sanitization refused {item.id}:\n" + "\n".join(f"  {f}" for f in findings)
+            )
         derived[row["scenario_id"]] = item
         print(f"mined: {item.id} bucket={bucket}")
 

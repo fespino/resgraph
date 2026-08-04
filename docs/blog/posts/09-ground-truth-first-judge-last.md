@@ -166,13 +166,21 @@ narrative is coherent and evidence-grounded prose.
 - **narrative** — the judge, pinned to a model and a frozen prompt
   template.
 
-The judge pin taught its own lesson: the spec originally pinned it
-at temperature 0 with a fixed seed, and the API rejected the first
-and never offered the second. A contract isn't a pin until a real
-call has passed through it — the correction is a dated row in the
-spec, and the working pin is model + template only, which is one
-reason the judge gets the smallest weight: it is the least pinnable
-instrument in the stack.
+The judge needed a pin of its own. An LLM grader's scores are only
+comparable across runs if everything that shapes its output is
+frozen: which model judges, the exact prompt template it grades
+with, and — ideally — the sampling randomness. The spec pinned all
+of it: model, template, temperature 0 (the setting that pushes
+sampling toward determinism), and a fixed random seed. Then the
+first real call tested the contract: the API rejected the
+temperature parameter outright — deprecated for this model
+generation — and offers no seed at all. Two of the four pinned
+knobs were never ours to pin. The correction is a dated row in the
+spec, the working pin is model + template only, and the lesson
+generalizes: a contract isn't a pin until a real call has passed
+through it. What cannot be pinned stays variable — which is one
+reason the judge carries the smallest weight: it is the least
+pinnable instrument in the stack.
 
 Scoring uses the pass^k trial protocol — k=3 runs per scenario, pass
 only if all three pass — but not from day one. Trials on a harness

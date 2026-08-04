@@ -9,6 +9,7 @@ from resgraph.gen.scenarios import (
     GeneratedScenario,
     ScenarioError,
     ScenarioType,
+    _default_depth,
     assert_mechanism_path,
     edges_at,
     generate_scenario,
@@ -136,6 +137,13 @@ def test_reskin_preserves_structure_and_changes_surface():
     assert r.spec.ground_truth.mechanism_path != g.spec.ground_truth.mechanism_path
     assert r.spec.provenance["reskin_of"] == g.spec.id
     rebuild(r.spec)
+
+
+def test_default_depth_covers_every_causal_type():
+    for kind in CAUSAL_TYPES:
+        assert 1 <= _default_depth(kind) <= 3
+    with pytest.raises(ValueError, match="no planted depth"):
+        _default_depth(ScenarioType.CONTROL)
 
 
 def test_set_covers_taxonomy_with_control_share():

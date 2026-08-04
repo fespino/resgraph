@@ -20,7 +20,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import StrEnum
 from itertools import pairwise
-from typing import Self
+from typing import Self, assert_never
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
 
@@ -67,14 +67,21 @@ class ScenarioType(StrEnum):
     TRANSITIVE = "transitive"
 
 
-_DEFAULT_DEPTH: dict[ScenarioType, int] = {
-    ScenarioType.AMBIGUOUS: 1,
-    ScenarioType.DECOY: 2,
-    ScenarioType.DELETED_RESOURCE: 1,
-    ScenarioType.DIRECT: 1,
-    ScenarioType.NOISY_WINDOW: 1,
-    ScenarioType.TRANSITIVE: 2,
-}
+def _default_depth(scenario_type: ScenarioType) -> int:
+    match scenario_type:
+        case (
+            ScenarioType.AMBIGUOUS
+            | ScenarioType.DELETED_RESOURCE
+            | ScenarioType.DIRECT
+            | ScenarioType.NOISY_WINDOW
+        ):
+            return 1
+        case ScenarioType.DECOY | ScenarioType.TRANSITIVE:
+            return 2
+        case ScenarioType.CONTROL:
+            raise ValueError("control scenarios have no planted depth")
+        case _:
+            assert_never(scenario_type)
 
 CAUSAL_TYPES = tuple(t for t in ScenarioType if t is not ScenarioType.CONTROL)
 
@@ -306,7 +313,7 @@ def _generate(
             scenario_type, seed, n_resources, churn, messages, state, n_distract, provenance
         )
 
-    want_depth = depth if depth is not None else _DEFAULT_DEPTH[scenario_type]
+    want_depth = depth if depth is not None else _default_depth(scenario_type)
     if not 1 <= want_depth <= 3:
         raise ValueError(f"depth must be 1..3, got {want_depth}")
     found = _walk_path(

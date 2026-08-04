@@ -83,6 +83,7 @@ def _default_depth(scenario_type: ScenarioType) -> int:
         case _:
             assert_never(scenario_type)
 
+
 CAUSAL_TYPES = tuple(t for t in ScenarioType if t is not ScenarioType.CONTROL)
 
 

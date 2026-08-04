@@ -180,7 +180,9 @@ specific bug each grader exists to prevent: the found comparison
 inverted, the top-3 window removed, the evidence edge-orientation
 flipped (the exact bug class from the baseline), edge checking
 disabled outright, the honesty conjunction weakened AND→OR, pass^k
-silently computed as pass@k, controls made to always pass, the
+silently computed as pass@k (all-trials-pass quietly scored as
+any-trial-passes — reliability inflated to capability), controls
+made to always pass, the
 judge's pass boundary moved by one, and five more. Targeted mutants
 beat random ones for this job because every survivor is directly
 interpretable as a missing test case.

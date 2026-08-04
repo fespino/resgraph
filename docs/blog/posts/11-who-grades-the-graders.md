@@ -42,10 +42,9 @@ framework and controls, AI doing the case-picking and
 invariant-writing where it is simply more efficient. Which makes
 the question I stopped to ask mid-phase the general one, not the
 local one: **how do I know the evals are correct?** This post is
-the answer I can defend — four layers of
-argument, two checks you can run yourself, a list of my own
-mistakes with dollar costs attached, and the full price of the
-program.
+the answer I can defend — four layers of argument, two checks you
+can run yourself, a list of my own mistakes with dollar costs
+attached, and the full price of the program.
 
 <!-- more -->
 
@@ -174,9 +173,9 @@ require the suite to notice. Practitioners keep arriving here from
 other directions — Birgitta Böckeler's
 [sensor work for coding agents](https://martinfowler.com/articles/sensors-for-coding-agents.html)
 reaches for mutation testing because "coverage tells us that a line
-was executed, but not that its impact was verified."
-The phase's audit used thirteen
-targeted semantic mutants — not random token flips, but the
+was executed, but not that its impact was verified." The phase's
+audit used thirteen targeted semantic mutants — not random token
+flips, but the
 specific bug each grader exists to prevent: the found comparison
 inverted, the top-3 window removed, the evidence edge-orientation
 flipped (the exact bug class from the baseline), edge checking
@@ -275,8 +274,8 @@ k=3 certification, three model arms, a skill ablation, every
 deferred item filed as an issue with its cost attached — is
 **$50–55**. A five-dimension eval program for an infrastructure
 agent, with a baseline, eight pre-registered iterations, a
-trial-protocol certification, and a grader audit,
-costs about as much as a team lunch. The expensive input was never
+trial-protocol certification, and a grader audit, costs about as
+much as a team lunch. The expensive input was never
 the tokens. It was the discipline — pre-registration, one change
 per run, per-item diffs — that made each $4 run mean something.
 

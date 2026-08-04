@@ -58,6 +58,26 @@ on is the one any AI-generated harness will need, because this
 build is an early instance of a pattern that is about to be
 everywhere.
 
+One thing the background reading surfaced is worth naming up front,
+because it shapes the whole post: the two bodies of literature this
+question needs do not cite each other. The synthesis side shows
+harness layers being generated —
+[AutoHarness](https://arxiv.org/abs/2603.03329),
+[AlphaEvolve](https://arxiv.org/abs/2506.13131),
+[Code World Models](https://arxiv.org/abs/2510.04542) — yet
+AutoHarness's bibliography, checked reference by reference, contains
+no eval-integrity work at all: nothing on
+[eval erosion](https://www.anthropic.com/engineering/AI-resistant-technical-evaluations),
+on [subjects detecting and gaming the test](https://www.anthropic.com/engineering/eval-awareness-browsecomp),
+on [lucky passes](https://arxiv.org/abs/2605.12925) (up to 23.2% of
+agent passes in one audit), or on
+[the environment confounding the score](https://www.anthropic.com/engineering/infrastructure-noise).
+The integrity side documents all of those failures and never
+touches generation. If generated harnesses are the coming default,
+those halves have to meet — and the four layers, the mutation
+audit, and the mistakes ledger below are this project's working
+attempt at that junction.
+
 !!! info "The repo at this phase"
     Browse the repository exactly as it stood when this was written:
     [`phase-8-analyst`](https://github.com/fespino/resgraph/tree/phase-8-analyst).

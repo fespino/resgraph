@@ -5,6 +5,11 @@
 | Name                                         |    Stmts |     Miss |   Cover |   Missing |
 |--------------------------------------------- | -------: | -------: | ------: | --------: |
 | src/resgraph/\_\_init\_\_.py                 |        0 |        0 |    100% |           |
+| src/resgraph/analyst/\_\_init\_\_.py         |        4 |        0 |    100% |           |
+| src/resgraph/analyst/harness.py              |      149 |        4 |     97% |46, 50, 151-152 |
+| src/resgraph/analyst/models.py               |       16 |        0 |    100% |           |
+| src/resgraph/analyst/prompts.py              |       32 |        0 |    100% |           |
+| src/resgraph/analyst/tools.py                |       58 |       22 |     62% |72-80, 89-107, 111 |
 | src/resgraph/api/\_\_init\_\_.py             |        0 |        0 |    100% |           |
 | src/resgraph/api/app.py                      |      149 |       10 |     93% |135-137, 175, 184, 219-220, 253, 270, 299 |
 | src/resgraph/cli.py                          |       81 |        0 |    100% |           |
@@ -14,9 +19,16 @@
 | src/resgraph/cold/rebuild.py                 |       23 |        3 |     87% |     50-52 |
 | src/resgraph/cold/store.py                   |       59 |        1 |     98% |       122 |
 | src/resgraph/consumer.py                     |      155 |        7 |     95% |84, 99, 111, 114, 130, 132-133 |
+| src/resgraph/evals/\_\_init\_\_.py           |        0 |        0 |    100% |           |
+| src/resgraph/evals/cli.py                    |       23 |       23 |      0% |      3-64 |
+| src/resgraph/evals/graders.py                |       42 |        2 |     95% |    76, 84 |
+| src/resgraph/evals/judge.py                  |       11 |        0 |    100% |           |
+| src/resgraph/evals/report.py                 |       51 |        2 |     96% |   29, 110 |
+| src/resgraph/evals/runner.py                 |      122 |       81 |     34% |44, 50-65, 74-84, 103-129, 133-139, 151, 176-261, 266-267 |
 | src/resgraph/gen/\_\_init\_\_.py             |        0 |        0 |    100% |           |
 | src/resgraph/gen/churn.py                    |       65 |        4 |     94% |47-49, 108 |
-| src/resgraph/gen/cli.py                      |       58 |        2 |     97% |   112-113 |
+| src/resgraph/gen/cli.py                      |       75 |       13 |     83% |89-94, 105-110, 149-150 |
+| src/resgraph/gen/scenarios.py                |      215 |       12 |     94% |123, 126, 128, 262, 275-277, 311, 320, 329, 395, 423 |
 | src/resgraph/gen/sinks.py                    |       20 |        0 |    100% |           |
 | src/resgraph/gen/world.py                    |      115 |        0 |    100% |           |
 | src/resgraph/graph/\_\_init\_\_.py           |        0 |        0 |    100% |           |
@@ -45,7 +57,7 @@
 | src/resgraph/tools/context.py                |        6 |        0 |    100% |           |
 | src/resgraph/tools/http.py                   |       21 |        0 |    100% |           |
 | src/resgraph/tools/registry.py               |       20 |        0 |    100% |           |
-| **TOTAL**                                    | **1762** |   **53** | **97%** |           |
+| **TOTAL**                                    | **2502** |  **210** | **92%** |           |
 
 
 ## Setup coverage badge

@@ -125,14 +125,20 @@ rule turned the confidence label into a target, and the label
 stopped measuring confidence — Goodhart's law, executed inside a
 prompt, in one iteration.
 
-**Iteration 4** reasoned: the flag was priced in a label the model
-controls, so bind it to something it doesn't — the evidence test the
-graders own. The new rule was again contract prose, layered onto
-iteration 3's residue rather than replacing it (a stacking that
-later earned its own protocol rule). It said: the flag may only be
-false for a suspect
-with a graph-verified mechanism path *and* the exact change event
-whose content plausibly explains the symptom. Honesty: 0.33 again.
+**Iteration 4** drew the direct conclusion from that failure:
+iteration 3's rule had depended on the model's own confidence
+labels — values the model itself assigns, so any rule keyed to them
+can be satisfied by changing the labels. The replacement tied the
+flag to things the model cannot assign: the evidence facts the
+graders check against the stores. The new rule said: the flag may
+only be false for a suspect with a graph-verified mechanism path
+*and* the exact change event whose content plausibly explains the
+symptom. As an implementation it was one more paragraph in the
+output contract — and it was added next to iteration 3's paragraph
+instead of replacing it, so the prompt now carried both rules at
+once. (That mistake later became its own protocol rule: a
+superseded rule is deleted when its replacement lands.) Honesty:
+0.33 again.
 Two controls rationalized distractors as meeting the bar — because
 "plausibly explains" *contains the judgment it was meant to create*,
 and hard cases sail through the gap. The rule also did new damage:
@@ -385,8 +391,8 @@ certification carries, and the reason the protocol exists.
   either.** This model never fabricated an edge in eight runs while
   its self-report swung with every prompt breeze. Grade them
   together and both readings are noise.
-- **A rule that prices a behavior in a label the model controls
-  will be paid in that label.** Write the adversarial pre-mortem
+- **A rule keyed to a value the model itself assigns will be
+  satisfied by changing that value.** Write the adversarial pre-mortem
   sentence — "how could this be satisfied by letter without the
   intended behavior?" — before the run, not after.
 - **Escalate on the second miss in a technique class.** The five

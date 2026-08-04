@@ -85,13 +85,14 @@ separate conversations.
 One side generates. [AutoHarness](https://arxiv.org/abs/2603.03329)
 synthesizes constraint harnesses,
 [AlphaEvolve](https://arxiv.org/abs/2506.13131) evolves code
-against a human-defined evaluator, and
-[Code World Models](https://arxiv.org/abs/2510.04542) translates
-game rules and observed trajectories into executable checkers —
-legal-move enumeration, termination tests — that its own abstract
-trusts only "contingent on the correctness of the synthesized
-model", a correctness checked by unit tests generated from the
-same trajectories. To check how
+against a human-defined evaluator, and in
+[Code World Models](https://arxiv.org/abs/2510.04542) an LLM reads
+a game's rulebook plus logs of played games and writes the Python
+code that enforces the rules — which moves are legal, when the
+game is over. Everything downstream rides on that generated code
+being right (the paper says so itself), and the only check on it
+is unit tests the system also generates, from the same game logs.
+To check how
 much this side thinks about its instruments, I went through
 AutoHarness's bibliography — twenty references, each one checked —
 and none of them addresses the failure modes the other side has

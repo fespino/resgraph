@@ -307,19 +307,33 @@ step-level repair.
 The spec pinned the server to MCP revision `2026-07-28` — the
 [stateless-core release candidate](https://blog.modelcontextprotocol.io/posts/2026-07-28-release-candidate/),
 which fits this surface exactly: all five tools are single-shot
-reads, no session state, no handles. Then reading the RC post
-against the implementation found the embarrassing part: the SDK
-negotiates that revision only on the modern stateless `discover`
-path, and the phase's own protocol test was using the legacy
-`initialize` handshake — which negotiates an *older* revision. The
-suite was green while exercising the exact path the pinned revision
-deprecates. The pin was untested prose. The fix is the same
-discipline this series applies to performance numbers: the claim
-became a CI assertion — the negotiated protocol version must equal
-the pin — so an SDK upgrade that shifts it fails the build instead
-of silently invalidating the spec. It went into the project's
-corrections table even though it was caught pre-merge, because a
-log that only audits the past isn't auditing.
+reads, no session state, no handles.
+
+A pin like that is a claim, and reviewing the RC post against the
+implementation tested it. Background for the sequence: an MCP
+client and server don't assume a protocol revision — they *agree*
+on one when they connect, and the revision they land on depends on
+which connection ceremony is used. There are two: the legacy
+`initialize` handshake, and the stateless `discover` path that the
+pinned revision introduces. The SDK negotiates `2026-07-28` only
+over the new path; over the legacy handshake it settles on an
+older revision. The phase's protocol test connected via the legacy
+handshake — so every green run had quietly agreed to an older
+revision, and nothing anywhere checked which revision had actually
+been negotiated. The suite was green while exercising the exact
+path the pinned revision deprecates: the pin, as written, was
+prose.
+
+The review caught it before merge, and the fix is the same
+discipline this series applies to performance numbers: the test
+switched to the `discover` path and the claim became a CI
+assertion — the negotiated protocol version must equal the pin —
+so an SDK upgrade that shifts it fails the build instead of
+silently invalidating the spec. This is the process working as
+designed: a claim met its source, the divergence surfaced, and the
+claim came out enforceable. It still went into the project's
+corrections table even though nothing shipped wrong, because a log
+that only audits the past isn't auditing.
 
 Two more findings from treating the spec as a runnable checklist:
 

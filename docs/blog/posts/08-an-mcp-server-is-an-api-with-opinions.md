@@ -64,9 +64,8 @@ outside the registry loop, any `/tools` route outside the mount,
 and any model class duplicated across surfaces — plus a signature
 check that every registered implementation matches its declared
 models exactly. Not "currently no drift" — *structurally cannot
-drift without failing the build*. The
-same idea as a type system: make the wrong state unrepresentable,
-then stop reviewing for it.
+drift without failing the build*. The same idea as a type system:
+make the wrong state unrepresentable, then stop reviewing for it.
 
 ## Task-shaped, not route-shaped
 
@@ -158,7 +157,8 @@ benchmark measures the canonical refs-and-cap response against the
 same traversal serialized fat, across 1k/10k/100k-resource worlds —
 and the honest headline is that **at natural radii the cap barely
 matters**: seed-42 blast radii top out around 30 nodes, refs-vs-fat
-is a 3–4× constant factor, and both fit any context window.
+is a 3–4× constant factor at p95 and above, and both fit any
+context window.
 
 The row that justifies the design is the constructed one — a
 900-dependent hub host, the shape a real cloud always contains and

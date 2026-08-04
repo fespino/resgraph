@@ -16,16 +16,31 @@ tags:
 The previous two posts told the story of an agent being measured:
 a triage agent graded against planted ground truth, a prompt
 gamed and a structure that fixed it, every claim carrying a run ID.
-Here is the problem with that story: nearly every line of code in
-this repository — the agent, the graders, the scenario generator,
-the tests — was written by an AI, working under my direction and
-review. The eval that caught the model gaming a rule was built by
-the same kind of system that did the gaming. Midway through the
-phase I stopped and asked the question any reader of an AI-built
-repo should ask first: **how do I know the evals are correct?**
-This post is the answer I can defend — four layers of argument, two
-checks you can run yourself, a list of my own mistakes with dollar
-costs attached, and the full price of the program.
+Here is the question underneath that story: the instrument doing
+the measuring — the graders, the scenario generator, the mutation
+suite — is AI-generated code. I set the framework and the controls:
+the quality bar, the taxonomy's shares, the halt conditions, what
+merges. The volume under that framework — the planted cases, the
+grader implementations, the invariants and post-conditions, the
+thirteen mutants — was generated, under review, by the same kind of
+system the harness exists to grade. I think that split is not a
+quirk of this project but the coming shape of the work. Evals
+measurably erode within a single model generation
+([Anthropic's numbers](https://www.anthropic.com/engineering/AI-resistant-technical-evaluations)),
+synthesized harnesses already outperform hand-configured ones in
+controlled settings
+([AutoHarness](https://arxiv.org/abs/2603.03329)), and large
+benchmarks already scale by LLM-synthesizing their tasks
+([STATE-Bench](https://github.com/microsoft/STATE-Bench), which
+discloses it). Harnesses will increasingly be regenerated from
+specs, behavior, and production data — humans owning the framework
+and controls, AI doing the case-picking and invariant-writing where
+it is simply more efficient. Which makes the question I stopped to
+ask mid-phase the general one, not the local one: **how do I know
+the evals are correct?** This post is the answer I can defend — four layers of
+argument, two checks you can run yourself, a list of my own
+mistakes with dollar costs attached, and the full price of the
+program.
 
 <!-- more -->
 
@@ -33,9 +48,11 @@ This post is about **resgraph**, a mini referential data platform
 built in public, and it closes the trio that began with
 [the eval build](09-ground-truth-first-judge-last.md) and
 [the honesty arc](10-goodhart-inside-a-prompt.md). It is also the
-post where the series admits what it has been all along: not just a
-platform-engineering exercise but an AI-assisted engineering
-exercise, and the two turn out to need the same discipline.
+post where the trio's subject inverts: the first two audited the
+agent; this one audits the instrument — and the discipline it lands
+on is the one any AI-generated harness will need, because this
+build is an early instance of a pattern that is about to be
+everywhere.
 
 !!! info "The repo at this phase"
     Browse the repository exactly as it stood when this was written:
@@ -255,13 +272,14 @@ phase has learned to trust.
 - **Promote lessons to enforcement or plan to pay for them again.**
   Every operational loss in the ledger was a lesson that existed in
   prose form before it cost money.
-- **The reframe that outlasts the phase:** the discipline that
-  makes an agent trustworthy — planted truth, pre-registration,
-  adversarial instruments, named residuals — is the same discipline
-  that makes AI-assisted engineering itself auditable. If an AI
-  builds your system, the eval layer is not a feature of the
-  product; it is the product's warrant, and it deserves the same
-  adversarial attention as anything else the AI wrote.
+- **The reframe that outlasts the phase:** keep the framework human
+  and let AI generate the volume — but hold the generated layer to
+  the same discipline that makes the agent trustworthy: planted
+  truth, pre-registration, adversarial instruments, named
+  residuals. When harnesses are regenerated as fast as the models
+  they grade, the eval layer is not a feature of the product; it is
+  the product's warrant, and it deserves the same adversarial
+  attention as anything else an AI writes.
 
 Next phase: the analyst gets a safe runtime — permission tiers,
 budgets with enforcement, audit-at-rest, and another chaos drill,

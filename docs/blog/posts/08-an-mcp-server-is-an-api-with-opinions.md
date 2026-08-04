@@ -110,9 +110,13 @@ manufacturing's mistake-proofing idea — a connector that only fits
 the right way up — applied to a tool surface: make the mistake
 structurally hard, not instructed-against.
 
-The second answer — *wide* tools — is the one that almost won, and
-it was rejected with a written condition for reopening it.
-Microsoft's Azure SRE team
+The second answer — *wide* tools — is the one that almost won.
+This becomes the better option the day the five tools stop fitting
+the questions: if agent traces ever show the model improvising
+around the surface — asking things the tools cannot express or
+combine — the spec commits to measuring a wide-tool variant before
+a sixth tool gets added. That condition is written down; here is
+why it hasn't fired. Microsoft's Azure SRE team
 [reported](https://techcommunity.microsoft.com/blog/appsonazureblog/context-engineering-lessons-from-building-azure-sre-agent/4481200/)
 collapsing 100+ narrow tools into roughly five — but each of their
 five is an entire CLI ecosystem handed over as a single tool: the
@@ -124,11 +128,8 @@ have seen millions of `az` and `kubectl` invocations in their
 training data, so the knowledge of how to drive those CLIs is
 already in the weights. That reasoning does not transfer here —
 resgraph's tools are bespoke, no model has ever seen them, so there
-is no trained fluency to lean on, and task-shaped stands. The
-condition that would reopen it, written in the spec: if agent
-traces show the model improvising around the surface — asking
-questions the five tools cannot express or combine — a wide-tool
-variant gets measured before a sixth tool gets added.
+is no trained fluency to lean on, and task-shaped stands — until
+the traces say otherwise.
 
 A third option cuts across the shape question rather than
 answering it: composing tools *in code*. In Anthropic's

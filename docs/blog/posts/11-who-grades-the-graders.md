@@ -96,16 +96,21 @@ code that enforces the rules — which moves are legal, when the
 game is over. Everything downstream rides on that generated code
 being right (the paper says so itself), and the only check on it
 is unit tests the system also generates, from the same game logs.
-To check how
-much this side thinks about its instruments, I went through
+Different jobs, same shape: each of these systems rests on a
+checker whose word is final — the scoring program, the generated
+rule code, the trajectory unit tests — and progress means the
+checker said yes. To check how much this side thinks about those
+checkers, I went through
 AutoHarness's bibliography — twenty references, each one checked —
 and none of them addresses the failure modes the other side has
 documented (the closest is a paper on grading olympiad proofs
 rigorously, which is about evaluation quality, but not of agent
 systems).
 
-The other side documents how evaluations fail — exactly the
-failures a generated harness would inherit:
+The other side documents how evaluations fail. None of these
+failures is specific to generated instruments — hand-built evals
+suffer them all — but a generated harness inherits the list at
+generation speed, with less human review per artifact:
 
 - **[Eval erosion](https://www.anthropic.com/engineering/AI-resistant-technical-evaluations)** —
   as models improve, an evaluation stops being able to separate

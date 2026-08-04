@@ -1178,7 +1178,12 @@ Five dimensions, every item, every run:
 
 The report also carries: a **calibration table** — empirical accuracy
 per emitted confidence level, per slice; high must beat medium must
-beat low or the confidence field is decoration (verbal confidence is
+beat low or the confidence field is decoration.
+**Superseded in part (2026-08-04, phase 8):** the abstention flag is
+now derived from checkable verdicts rather than emitted confidence
+(EVALS.md, iteration 7 — self-assessments measured as performative),
+so the calibration table's subject narrows to the still-emitted
+per-suspect confidence field; it activates with the k=3 data (#96) (verbal confidence is
 not a credence readout — 📄 Paper:
 [attribution of confidence](https://arxiv.org/abs/2407.08388) —
 arXiv:2407.08388 — so the field earns meaning behaviorally, which the

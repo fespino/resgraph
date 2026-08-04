@@ -22,7 +22,7 @@ maps each phase to its events.
 | 6 — observability | D17–D18 | D14 (outage is not poison) |
 | post-6 (2026-08-02) | — | D0 (pyright strict gate, #68) |
 | 7 — MCP server | D19–D21 | — |
-| 8 — analyst agent | D22–D25 | — |
+| 8 — analyst agent | D22–D25 | `phase-8-analyst` |
 
 ## D0 — Toolchain: typed Python, with the types enforced (phase 0)
 
@@ -1311,9 +1311,10 @@ Rows 0–6 are back-filled from tag-to-tag diffs
 | 5 | cold catalog + store readers, `ATTR_POOLS` (D5), hot client, `read_node` + `SYSTEM_PROPS` (phase 3), `ResourceType` | `state_at` grew push-down parameters and `blast_radius` grew filter parameters, both additive with defaults (D16, #50); D2 validation tightened — id/target prefix checks (#50) |
 | 6 | stores, planner, and query layer untouched; wide-event module imports nothing from the platform | D14 addendum superseded in part — outage is not poison (#54); consumer loop grew quarantine/dead-letter hooks, additive (#54) |
 | 7 | `parse_filter` + the DSL, planner `plan`/`explain` + executor `execute_plan`/`QueryContext`, hot queries (`blast_radius`, `dependency_path`), cold queries (`history`, `diff`, `state_at`), `read_node` + `SYSTEM_PROPS`, hot client + cold catalog, generator (test/bench fixtures) | DSL/planner error messages rewritten as steering surfaces — behavior-visible text change, no signatures (D20, #77); API route model renamed `BlastRadiusApiOut` to clear the canonical name (OpenAPI title only, wire unchanged, #77); API gained the registry-derived `/tools` mount, additive (#77) |
+| 8 | `World`/`Churn`/`TOPOLOGY`/`ATTR_POOLS` (scenario planting), `UpdateMessage` + D2 models, cold `get_catalog`/`ensure_tables`/`append_events` + `state_at` (runner + evidence grader — production-query reuse is the design), graph `wipe`/`init_schema`/`load_snapshot`/`apply_batch` (runner), `TOOL_REGISTRY` + canonical tools (third surface derives, drift-guarded), skills loader + `change-forensics` body (the prefix is its second consumer), `QueryContext` | `Caller` literal widened with `"analyst"` — additive (#83); the skill body gained a step in iteration 8 and was reverted same-phase on measurement (net unchanged, EVALS.md) |
 
-Running total through phase 7: 25 interfaces consumed unchanged,
-11 changes — every one recorded as a D-amendment, a supersession, or
+Running total through phase 8: 32 interfaces consumed unchanged,
+12 changes — every one recorded as a D-amendment, a supersession, or
 an additive extension in the phase's PR. No unrecorded break yet; the
 table exists so the first one has nowhere to hide.
 

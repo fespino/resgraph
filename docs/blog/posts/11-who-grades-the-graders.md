@@ -98,8 +98,9 @@ scenario generator knows the planted cause because code planted it;
 "did the agent find it?" is a comparison, not an opinion. An AI
 wrote that code, but no AI runs at grading time, which reduces the
 question from "do I trust a model's judgment?" to "is this code
-correct?" — roughly a hundred readable lines whose job is to
-compare identifiers. That is an ordinary code-review problem, and
+correct?" —
+[89 readable lines](https://github.com/fespino/resgraph/blob/phase-8-analyst/src/resgraph/evals/graders.py)
+whose job is to compare identifiers. That is an ordinary code-review problem, and
 ordinary code-review tools apply.
 
 **Layer 2: the correctness checks don't trust their author.** The
@@ -158,9 +159,11 @@ trust that is implicit has none.
 The four layers are arguments. These are executables.
 
 **Rebuild any run row.** Every scenario is generated from a seed,
-and the generator is deterministic by construction. Take any row in
-any run log, regenerate its world with the CLI, and check the
-planted cause against what the agent was graded on. The ground
+and the
+[generator](https://github.com/fespino/resgraph/blob/phase-8-analyst/src/resgraph/gen/scenarios.py)
+is deterministic by construction. Take any row in any run log,
+regenerate its world with the CLI, and check the planted cause
+against what the agent was graded on. The ground
 truth is not an assertion in a JSON file; it is a reproducible
 computation.
 
@@ -194,7 +197,9 @@ honesty conjunction passed; no test exercised the judge's boundary
 score exactly, so an off-by-one passed. Both became tests in the
 same commit; the re-run killed 13 of 13. The audit finding holes is
 what distinguishes it from a ritual — and it is now a standing CI
-gate (`evals/meta/mutate_graders.py`), re-run after any grader
+gate
+([evals/meta/mutate_graders.py](https://github.com/fespino/resgraph/blob/phase-8-analyst/evals/meta/mutate_graders.py)),
+re-run after any grader
 change, exiting nonzero on survivors, so a grader edit that weakens
 a test's grip cannot merge quietly.
 

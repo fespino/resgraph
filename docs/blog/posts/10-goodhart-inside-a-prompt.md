@@ -209,7 +209,9 @@ phase best (0.77), fabrications stayed at zero for the seventh
 consecutive run, and the invalidating clause (controls
 rationalizing `explains_symptom` on distractors) did not fire. No
 prompt wisdom was added between runs six and seven. Only the
-interface changed.
+interface changed. Which means the structural fix did not make the
+model more honest — the capability was there all along; the harness
+had been asking for it in a gameable dialect.
 
 This is the structure-beats-steering result that keeps appearing in
 the harness literature.

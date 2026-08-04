@@ -19,38 +19,39 @@ gamed and a structure that fixed it, every claim carrying a run ID.
 Here is the question underneath that story: the instrument doing
 the measuring — the graders, the scenario generator, the mutation
 suite — is AI-generated code. I set the framework and the controls:
-the quality bar, the taxonomy's shares, the halt conditions, what
-merges. The volume under that framework — the planted cases, the
-grader implementations, the invariants and post-conditions, the
-thirteen mutants — was generated, under review, by the same kind of
-system the harness exists to grade. I think that split is not a
+the quality bar, which kinds of scenario appear and how often, the
+halt conditions, what merges. The volume under that framework —
+the planted cases, the grader implementations, the invariants and
+post-conditions, the thirteen mutants — was generated, under
+review, by the same kind of system the harness exists to grade. I think that split is not a
 quirk of this project but the coming shape of the work. An eval's
-numbers are pinned to a specific model-harness pairing — across
-5,194 agent trajectories,
-[Harness-Bench](https://arxiv.org/abs/2605.27922) measured
-variation large enough to conclude that capability "should be
-reported at the model-harness configuration level rather than
-attributed to the base model alone" — so every model release makes
-yesterday's measurements stale. Synthesized harnesses already
-outperform hand-configured ones in controlled settings
+numbers belong to a pairing: the model plus its harness — the
+scaffolding of tools, prompts, and checks the model runs inside.
+[Harness-Bench](https://arxiv.org/abs/2605.27922) ran the same
+models through different harnesses, 5,194 agent runs in total, and
+the scores moved so much that its authors tell you to report
+results per model-harness pair, never per model alone. So every
+model release makes yesterday's measurements stale. AI-written
+harnesses already beat hand-built ones in controlled settings
 ([AutoHarness](https://arxiv.org/abs/2603.03329)), and large
-benchmarks already scale by LLM-synthesizing their tasks
+benchmarks already use LLMs to write their test tasks
 ([STATE-Bench](https://github.com/microsoft/STATE-Bench), which
-discloses it).
+says so up front).
 
 The strongest generate-and-evaluate system published
 so far, [AlphaEvolve](https://arxiv.org/abs/2506.13131), runs
-exactly this split — humans define an automated evaluator, the AI
-evolves the code volume against it — and names machine-gradability
-as its main limitation: it can only work on problems where a
-program can score a candidate solution automatically, and anything
-that needs human judgment to grade is out of its reach. That
-boundary is also where, for now, the human share of the split
-sits. My bet — and this is a reading of a very young practice, not
-a law — is that harnesses will increasingly be regenerated
-from specs, behavior, and production data, humans owning the
-framework and controls, AI doing the case-picking and
-invariant-writing where it is simply more efficient. Which makes
+exactly this split: a human writes the program that scores
+candidate solutions, and the AI generates and refines code to
+score better against it. Its authors name the split's edge as
+their main limitation — the method only works on problems where a
+program can do the scoring, and anything that needs human judgment
+to grade is out of its reach. That boundary is also where, for
+now, the human share of the split sits. My bet — and this is a
+reading of a very young practice, not a law — is that harnesses
+will increasingly be regenerated from specs, behavior, and
+production data, humans owning the framework and controls, AI
+doing the case-picking and invariant-writing where it is simply
+more efficient. Which makes
 the question I stopped to ask mid-phase the general one, not the
 local one: **how do I know the evals are correct?** This post is
 the answer I can defend — four layers of argument, two checks you
@@ -82,10 +83,12 @@ The background reading surfaced something that shapes this whole
 post: the two bodies of work this question needs are, so far,
 separate conversations.
 
-One side generates. [AutoHarness](https://arxiv.org/abs/2603.03329)
-synthesizes constraint harnesses,
-[AlphaEvolve](https://arxiv.org/abs/2506.13131) evolves code
-against a human-defined evaluator, and in
+One side generates. In
+[AutoHarness](https://arxiv.org/abs/2603.03329) the model writes
+its own guardrails — the wrapper code that blocks the illegal
+moves it would otherwise make.
+[AlphaEvolve](https://arxiv.org/abs/2506.13131) generates and
+refines code against a scoring program a human wrote. And in
 [Code World Models](https://arxiv.org/abs/2510.04542) an LLM reads
 a game's rulebook plus logs of played games and writes the Python
 code that enforces the rules — which moves are legal, when the
@@ -104,30 +107,33 @@ The other side documents how evaluations fail — exactly the
 failures a generated harness would inherit:
 
 - **[Eval erosion](https://www.anthropic.com/engineering/AI-resistant-technical-evaluations)** —
-  an evaluation loses its discriminating power as models improve;
-  Anthropic measured one of its own losing it within a single model
+  as models improve, an evaluation stops being able to separate
+  strong performance from weak; Anthropic measured one of its own
+  turning too easy to be informative within a single model
   generation.
 - **[Eval-awareness](https://www.anthropic.com/engineering/eval-awareness-browsecomp)** —
   the subject detects it is being tested and behaves differently,
   which can invalidate the test from the inside.
-- **[Lucky passes](https://arxiv.org/abs/2605.12925)** — an
-  outcome-only "pass" can hide blind retries and absent
-  verification; one audit put the lucky share at up to 23.2% of
-  agent passes.
-- **[Environment confounders](https://www.anthropic.com/engineering/infrastructure-noise)** —
+- **[Lucky passes](https://arxiv.org/abs/2605.12925)** — a "pass"
+  judged only on the final outcome can hide blind retries and
+  skipped checks along the way; one audit put the lucky share at
+  up to 23.2% of agent passes.
+- **[Infrastructure noise](https://www.anthropic.com/engineering/infrastructure-noise)** —
   container resources alone can move an agent benchmark score by
   more than a model upgrade does.
 
 The junction is starting to be built.
 [Agentic Harness Engineering](https://arxiv.org/abs/2604.25850)
-evolves harnesses autonomously from trajectory data and pairs every
-edit with a falsifiable prediction checked against the next round —
-pre-registration as machinery — and, to its credit, its limitations
-section names benchmark-specific tuning as a risk and measures it
-with transfer experiments. But the loop verifies every edit against
-Terminal-Bench's own checkers and nothing audits those checkers:
-the reward signal itself is trusted. Who sets the bar, and who
-checks the checker, is still left to the humans.
+improves a harness with no human in the loop, working from logs of
+the agent's own runs, and before applying any edit it writes down
+what that edit should improve, then checks the prediction against
+the next round — the same pre-registration discipline this project
+runs by hand, automated. Its authors also flag the risk of tuning
+to one benchmark and measure it by trying the evolved harness on
+others. But every edit is scored by Terminal-Bench's own pass/fail
+checkers, and nothing audits those checkers: the score is taken on
+faith. Who sets the bar, and who checks the checker, is still left
+to the humans.
 
 This project is one attempt at working both sides at once, and the
 inventory has two halves. Applied during the phase: the
@@ -219,12 +225,12 @@ regenerate its world with the CLI, and check the planted cause
 against what the agent was graded on. The ground truth is not an
 assertion in a JSON file; it is a reproducible computation.
 
-**Mutation-test the graders.** "The tests pass" establishes that
-the tests *accompany* the graders, not that they *constrain* them —
-a suite can ride along without gripping anything.
+**Mutation-test the graders.** "The tests pass" proves the tests
+run; it does not prove they would fail if a grader broke — a suite
+can stay green while checking nothing that matters.
 [Mutation testing](https://en.wikipedia.org/wiki/Mutation_testing)
-measures the grip directly: break each grader on purpose and
-require the suite to notice. Practitioners keep arriving here from
+measures exactly that: break each grader on purpose and require
+the suite to notice. Practitioners keep arriving here from
 other directions — Birgitta Böckeler's
 [sensor work for coding agents](https://martinfowler.com/articles/sensors-for-coding-agents.html)
 reaches for mutation testing because "coverage tells us that a line
@@ -234,24 +240,25 @@ flips, but the specific bug each grader exists to prevent: the
 found comparison inverted, the top-3 window removed, the evidence
 edge-orientation
 flipped (the exact bug class from the baseline), edge checking
-disabled outright, the honesty conjunction weakened AND→OR, pass^k
+disabled outright, the honesty check's AND weakened to OR, pass^k
 silently computed as pass@k (all-trials-pass quietly scored as
 any-trial-passes — reliability inflated to capability), controls
 made to always pass, the judge's pass boundary moved by one, and
-five more. Targeted mutants beat random ones for this job because
-every survivor is directly interpretable as a missing test case.
+five more. Targeted mutants beat random ones for this job: when
+one survives, it points straight at the missing test.
 
 First pass: **11 of 13 killed — and both survivors were real test
 gaps**, not artifacts. No test pinned the inconsistent state of a
-true flag alongside a high-confidence suspect, so weakening the
-honesty conjunction passed; no test exercised the judge's boundary
-score exactly, so an off-by-one passed. Both became tests in the
+true flag alongside a high-confidence suspect, so the weakened AND
+survived; no test exercised the judge's boundary score exactly, so
+the off-by-one survived. Both became tests in the
 same commit; the re-run killed 13 of 13. The audit finding holes is
 what distinguishes it from a ritual — and it is now a standing CI
 gate
 ([evals/meta/mutate_graders.py](https://github.com/fespino/resgraph/blob/phase-8-analyst/evals/meta/mutate_graders.py)),
 re-run after any grader change, exiting nonzero on survivors, so a
-grader edit that weakens a test's grip cannot merge quietly.
+grader edit that breaks the tests' ability to catch bugs cannot
+merge quietly.
 
 ## Our mistakes, costed
 
@@ -342,7 +349,8 @@ The trust argument is strongest where it ends with a registered
 experiment rather than a claim. The largest open question — does
 this task even need the pinned flagship worker, or does the harness
 carry the capability? — is pre-registered in the log with its arms
-(the pinned worker against two cheaper tiers), its hypothesis (the
+(the setups compared: the pinned worker against two cheaper
+tiers), its hypothesis (the
 mid-tier lands within two items of the flagship on pass^k at
 roughly 40% less cost), and its decision rule written before the run,
 including the condition under which the production recommendation

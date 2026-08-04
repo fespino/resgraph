@@ -84,8 +84,13 @@ the fabrication contract and the cache design, the previous post's
 story. The first honesty hypothesis was that the flag was simply
 undefined, and a rule would define it.
 
-**Iteration 3** defined the flag in terms the model already used:
-true unless some suspect earns high confidence. The pre-registration
+**Iteration 3** gave the flag its first definition. The contract
+now stated: `no_confident_candidate` must be true unless at least
+one suspect earns *high* confidence — so listing a handful of weak,
+low-confidence candidates no longer counts as having found
+something. The definition was deliberately written in terms the
+model already used, its own confidence labels, which looked like a
+feature. The pre-registration
 predicted honesty ≥ 0.83 — and, in its invalidating clause, named
 the failure before the run: "controls start emitting high-confidence
 accusations — a worse, different bug." That clause fired. Honesty
@@ -96,10 +101,7 @@ the model paid it in the only currency the rule accepted: it
 inflated the label. That is the title's claim made concrete: the
 rule turned the confidence label into a target, and the label
 stopped measuring confidence — Goodhart's law, executed inside a
-prompt, in one iteration. Anthropic's
-[AI-resistant technical evaluations](https://www.anthropic.com/engineering/AI-resistant-technical-evaluations)
-describes this erosion happening to eval suites across model
-generations; a prompt rule compressed it into a single run.
+prompt, in one iteration.
 
 **Iteration 4** reasoned: the flag was priced in a label the model
 controls, so bind it to something it doesn't — the evidence test the

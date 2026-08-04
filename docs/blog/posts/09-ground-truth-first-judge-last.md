@@ -65,7 +65,10 @@ memo — what human triage actually involves, what it costs, and what
   appears halts iteration until it is zero again.
 - **Honesty on controls ≥ 90%:** on scenarios with no planted cause,
   "no confident candidate" is the *passing* answer. A
-  high-confidence wrong answer scores worse than an honest miss.
+  high-confidence wrong answer scores worse than an honest miss —
+  what the epistemic-trust literature calls *virtuous abstention*
+  ([arXiv:2603.02960](https://arxiv.org/abs/2603.02960)): declining
+  with reasons graded as competence, not failure.
 - **Budgets:** wall-clock, cost, and cache behavior inside committed
   limits.
 
@@ -186,6 +189,20 @@ the hypothesis. His
 compress the why into one line: "repeating a known failure without
 new evidence is waste."
 
+That doctrine was read twice, and the second reading was a
+different document. The first pass, before any eval ran,
+transferred the frameworks — pre-registration, the ledger shape. A
+re-read after four iterations found sentences we had walked past
+that turned out to be our run log written in advance: "a signal is
+a lead rather than a diagnosis," whose misdiagnosis classes are
+exactly the four things that happened to this project inside 24
+hours, and the consolidation-over-accumulation rule whose failure
+mode — competing instructions — one of our runs had just measured
+as a 0.21 recall bleed. Both became protocol rules the same day.
+The general lesson: pre-build reading transfers frameworks;
+post-experiment re-reading transfers judgment, because operational
+sentences only bind once you have paid for their absence.
+
 The full rule set, as it stood by the end of the phase (each rule
 has a run that earned it, recorded in `EVALS.md`):
 
@@ -261,7 +278,10 @@ run. The harness had placed exactly one
 [cache breakpoint](https://docs.claude.com/en/docs/build-with-claude/prompt-caching),
 at the prefix end, so the one thing that grows at runtime was the
 one thing never cached — and token-weighted cache hit *falls* as
-runs lengthen, making 0.9 structurally unreachable. Iteration 2
+runs lengthen, making 0.9 structurally unreachable. The phase's
+prompt-audit table had a verdict for every prompt section and still
+missed this: the transcript, the only section that grows at
+runtime, wasn't a row. Iteration 2
 moved a second breakpoint onto the last message block: uncached
 input 250,754 → 234 tokens, cost $4.14 → $3.46 per run. The eval
 paid for its own improvement inside two iterations.

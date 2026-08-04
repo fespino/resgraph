@@ -72,8 +72,8 @@ That distinction — checkable claims versus self-assessment — is the
 spine of everything that follows, and it matches what the
 calibration literature reports: a model's stated confidence is not
 a readout of an internal credence
-([arXiv:2407.08388](https://arxiv.org/abs/2407.08388) is the
-version of this finding the phase ended up demonstrating
+([On the attribution of confidence to large language models](https://arxiv.org/abs/2407.08388)
+is the version of this finding the phase ended up demonstrating
 experimentally). What this phase adds is the run-by-run mechanics of
 *why* prompting can't fix it, and what does.
 

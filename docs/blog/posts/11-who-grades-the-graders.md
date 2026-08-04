@@ -43,9 +43,10 @@ evolves the code volume against it — and names machine-gradability
 as its main limitation: it can only work on problems where a
 program can score a candidate solution automatically, and anything
 that needs human judgment to grade is out of its reach. That
-boundary matters here, because it marks where the human layer has
-to sit. Harnesses will increasingly be regenerated
-from specs, behavior, and production data — humans owning the
+boundary is also where, for now, the human share of the split
+sits. My bet — and this is a reading of a very young practice, not
+a law — is that harnesses will increasingly be regenerated
+from specs, behavior, and production data, humans owning the
 framework and controls, AI doing the case-picking and
 invariant-writing where it is simply more efficient. Which makes
 the question I stopped to ask mid-phase the general one, not the

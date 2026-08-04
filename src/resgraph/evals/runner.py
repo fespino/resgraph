@@ -265,6 +265,7 @@ def run_eval(
                 row = envpin | {
                     "scenario_id": spec.id,
                     "scenario_type": spec.scenario_type.value,
+                    "source": spec.provenance.get("source", "planted"),
                     "tags": spec.tags,
                     "trial": trial,
                     "dims": {d.dim: {"passed": d.passed, "detail": d.detail} for d in dims},

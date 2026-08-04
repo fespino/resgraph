@@ -155,3 +155,23 @@ def test_set_covers_taxonomy_with_control_share():
     assert len({g.spec.id for g in items}) == 30
     depths = {g.spec.depth for g in items if g.spec.scenario_type is ScenarioType.TRANSITIVE}
     assert depths == {2, 3}
+
+
+def test_derive_regression_same_world_new_identity():
+    from resgraph.gen.scenarios import derive_regression
+
+    g = generate_scenario(ScenarioType.DECOY, 7)
+    item = derive_regression(g.spec, run_id="20260803T000000Z", bucket="decoy_seduction")
+    assert item.id == f"{g.spec.id}-r1"
+    assert item.provenance["source"] == "failure_derived"
+    assert item.provenance["derived_from"] == g.spec.id
+    assert item.provenance["exposed_by_run"] == "20260803T000000Z"
+    assert item.provenance["bucket"] == "decoy_seduction"
+    assert "regression" in item.tags and "bucket:decoy_seduction" in item.tags
+    r = rebuild(item)
+    assert [m.model_dump_json() for m in r.messages] == [m.model_dump_json() for m in g.messages]
+
+
+def test_generator_stamps_planted_source():
+    for kind in (ScenarioType.DIRECT, ScenarioType.CONTROL):
+        assert generate_scenario(kind, 7).spec.provenance["source"] == "planted"

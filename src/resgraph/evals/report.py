@@ -39,6 +39,7 @@ def aggregate(rows: list[dict[str, Any]]) -> dict[str, Any]:
     for row in rows:
         by_item[row["scenario_id"]].append(item_passed(row))
         slice_hits[row["scenario_type"]].append(item_passed(row))
+        slice_hits[f"source:{row.get('source', 'planted')}"].append(item_passed(row))
         for dim, res in row["dims"].items():
             dim_hits[dim].append(bool(res.get("passed")))
             if dim == "evidence" and not res.get("passed"):

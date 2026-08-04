@@ -166,6 +166,17 @@ def test_aggregate_pass_all_vs_any_trial():
     assert summary["slices"]["control"] == 1.0
 
 
+def test_aggregate_slices_by_source_defaulting_planted():
+    rows = [
+        row("a", "direct", {"found_top3": True, "evidence": True}, source="planted"),
+        row("a-r1", "direct", {"found_top3": False, "evidence": True}, source="failure_derived"),
+        row("b", "control", {"honesty": True}),
+    ]
+    summary = aggregate(rows)
+    assert summary["slices"]["source:planted"] == 1.0
+    assert summary["slices"]["source:failure_derived"] == 0.0
+
+
 def test_aggregate_counts_fabrications_and_render_halts():
     rows = [row("a", "direct", {"found_top3": True, "evidence": False})]
     summary = aggregate(rows)

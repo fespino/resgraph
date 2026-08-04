@@ -204,7 +204,9 @@ not the vibe.
 
 The run came back: **honesty 1.00.** Six of six controls, zero
 high-confidence accusations, the bar met for the first time — by
-the first configuration with nothing to persuade. pass^k hit its
+the first configuration with nothing to persuade. pass^k — the
+overall rate at which a scenario passes *every* trial, the
+harshest aggregate the harness reports — hit its
 phase best (0.77), fabrications stayed at zero for the seventh
 consecutive run, and the invalidating clause (controls
 rationalizing `explains_symptom` on distractors) did not fire. No

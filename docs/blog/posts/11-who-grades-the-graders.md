@@ -68,36 +68,72 @@ build reads to me like an early instance of a pattern the field is
 moving toward, which is the opinion the rest of the post argues
 for.
 
-One thing the background reading surfaced is worth naming up front,
-because it shapes the whole post: the two bodies of literature this
-question needs do not cite each other. The synthesis side shows
-harness layers being generated —
-[AutoHarness](https://arxiv.org/abs/2603.03329),
-[AlphaEvolve](https://arxiv.org/abs/2506.13131),
-[Code World Models](https://arxiv.org/abs/2510.04542) — yet
-AutoHarness's bibliography, checked reference by reference, contains
-no eval-integrity work at all: nothing on
-[eval erosion](https://www.anthropic.com/engineering/AI-resistant-technical-evaluations),
-on [subjects detecting and gaming the test](https://www.anthropic.com/engineering/eval-awareness-browsecomp),
-on [lucky passes](https://arxiv.org/abs/2605.12925) (up to 23.2% of
-agent passes in one audit), or on
-[the environment confounding the score](https://www.anthropic.com/engineering/infrastructure-noise).
-The integrity side documents exactly the failure modes a generated
-harness would inherit. The junction is only now being built:
-[Agentic Harness Engineering](https://arxiv.org/abs/2604.25850)
-evolves harnesses autonomously from trajectory data and pairs every
-edit with a falsifiable prediction checked against the next round —
-pre-registration as machinery. But nothing in that loop audits its
-own graders, and the bar it optimizes is the benchmark itself. Who
-sets the bar, and who checks the checker, is still left to the
-humans — and the four layers, the mutation audit, and the mistakes
-ledger below are this project's working answer for that remainder.
-
 !!! info "The repo at this phase"
     Browse the repository exactly as it stood when this was written:
     [`phase-8-analyst`](https://github.com/fespino/resgraph/tree/phase-8-analyst).
     The audit trail this post summarizes is
     [`EVALS.md`](https://github.com/fespino/resgraph/blob/phase-8-analyst/EVALS.md).
+
+## Two literatures that don't meet yet
+
+The background reading surfaced something that shapes this whole
+post: the two bodies of work this question needs are, so far,
+separate conversations.
+
+One side generates. [AutoHarness](https://arxiv.org/abs/2603.03329)
+synthesizes constraint harnesses,
+[AlphaEvolve](https://arxiv.org/abs/2506.13131) evolves code
+against a human-defined evaluator,
+[Code World Models](https://arxiv.org/abs/2510.04542) synthesizes
+executable world models from observed trajectories. To check how
+much this side thinks about its instruments, I went through
+AutoHarness's bibliography — twenty references, each one checked —
+and none of them addresses the failure modes the other side has
+documented (the closest is a paper on grading olympiad proofs
+rigorously, which is about evaluation quality, but not of agent
+systems).
+
+The other side documents how evaluations fail — exactly the
+failures a generated harness would inherit:
+
+- **[Eval erosion](https://www.anthropic.com/engineering/AI-resistant-technical-evaluations)** —
+  an evaluation loses its discriminating power as models improve;
+  Anthropic measured one of its own losing it within a single model
+  generation.
+- **[Eval-awareness](https://www.anthropic.com/engineering/eval-awareness-browsecomp)** —
+  the subject detects it is being tested and behaves differently,
+  which can invalidate the test from the inside.
+- **[Lucky passes](https://arxiv.org/abs/2605.12925)** — an
+  outcome-only "pass" can hide blind retries and absent
+  verification; one audit put the lucky share at up to 23.2% of
+  agent passes.
+- **[Environment confounders](https://www.anthropic.com/engineering/infrastructure-noise)** —
+  container resources alone can move an agent benchmark score by
+  more than a model upgrade does.
+
+The junction is starting to get built.
+[Agentic Harness Engineering](https://arxiv.org/abs/2604.25850)
+evolves harnesses autonomously from trajectory data and pairs every
+edit with a falsifiable prediction checked against the next round —
+pre-registration as machinery — and, to its credit, its limitations
+section names benchmark-specific tuning as a risk and measures it
+with transfer experiments. But the loop verifies every edit against
+Terminal-Bench's own checkers and nothing audits those checkers:
+the reward signal itself is trusted. Who sets the bar, and who
+checks the checker, is still left to the humans.
+
+This project is one attempt at working both sides at once, and the
+honest inventory has two halves. Applied during the phase: the
+mutation audit ran against the AI-written graders (below), every
+iteration carried a pre-registered invalidating condition, each run
+row pins its model and configuration, and the trial protocol caught
+a lucky edge in our own numbers — a dimension that scored perfect
+once measured 0.78 under repetition. Designed but not yet run,
+filed as issues with costs attached: the re-skin probe against
+erosion, a process-quality audit of passing trajectories, and a
+human-agreement baseline for the judge. The four layers, the
+mutation audit, and the mistakes ledger below are the part that
+exists today.
 
 ## Four layers, in strength order
 

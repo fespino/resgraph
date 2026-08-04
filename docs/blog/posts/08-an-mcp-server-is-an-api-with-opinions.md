@@ -55,7 +55,17 @@ authority, structurally. One `TOOL_REGISTRY` declares the surface,
 and both consumers derive from it in a loop: the MCP server
 registers its tools from the registry, and the HTTP API mounts
 `/tools/{name}` routes from the same entries. The transport is
-never the truth-bearing module.
+never the truth-bearing module: the truth about a tool — its name,
+its schemas, its behavior — lives in the registry, and a transport
+only carries it. You could delete both transports without losing a
+single definition.
+
+The failure mode this kills is easy to picture: an MCP server that
+hand-writes its tool schemas inline, an HTTP layer that declares
+its own request models — and six months later "what does
+`blast_radius` accept?" has the answer "depends which surface you
+ask," because each transport bears its own version of the truth
+and the versions drift independently.
 
 "Derive from one source" is a rule that decays unless something
 enforces it, so the phase ships a drift guard: CI assertions that

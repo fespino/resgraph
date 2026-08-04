@@ -93,25 +93,38 @@ manufacturing's mistake-proofing idea — a connector that only fits
 the right way up — applied to a tool surface: make the mistake
 structurally hard, not instructed-against.
 
-The interesting part is the alternative that *almost* wins.
-Microsoft's Azure SRE team
+Two serious alternatives to this shape were considered, rejected —
+and recorded in the spec with the condition that would reopen each.
+
+The first is *wide* tools. Microsoft's Azure SRE team
 [reported](https://techcommunity.microsoft.com/blog/appsonazureblog/context-engineering-lessons-from-building-azure-sre-agent/4481200/)
-collapsing 100+ narrow tools into roughly five *wide* ones — whole
-CLI ecosystems like `az` and `kubectl` handed to the model as
-single tools. That endorses the small count while disputing the
-shape, and their winning argument — lean on the model's
-training-data knowledge of those CLIs — simply does not transfer to
-a bespoke surface no model has ever seen. So task-shaped stands,
-but the alternative is recorded in the spec *with a trigger*: if
-agent traces show improvisation around the surface — questions the
-five tools cannot compose — a wide/files-based arm gets tested
-before tool six gets added. Same treatment for composition-in-code:
-Anthropic's
+collapsing 100+ narrow tools into roughly five — but each of their
+five is an entire CLI ecosystem handed over as a single tool: the
+model composes its own `az` or `kubectl` command line. Both designs
+agree the tool count should be small; they disagree about what one
+tool should *be* — a whole command language, or one investigator's
+question. Wide tools won for Azure for a specific reason: models
+have seen millions of `az` and `kubectl` invocations in their
+training data, so the knowledge of how to drive those CLIs is
+already in the weights. That reasoning does not transfer here —
+resgraph's tools are bespoke, no model has ever seen them, so there
+is no trained fluency to lean on, and task-shaped stands. The
+condition that would reopen it, written in the spec: if agent
+traces show the model improvising around the surface — asking
+questions the five tools cannot express or combine — a wide-tool
+variant gets measured before a sixth tool gets added.
+
+The second alternative is composing tools *in code*. In Anthropic's
 [code execution with MCP](https://www.anthropic.com/engineering/code-execution-with-mcp)
-keeps intermediate results in an execution environment instead of
-the context window (their benchmark: 150k → 2k tokens, a 98.7%
-reduction), and the trigger is written down — when traces show rote
-multi-tool sequences or in-context set operations over ref lists,
+pattern, the model doesn't call tools one at a time with every
+intermediate result flowing through its context window; it writes a
+small script, the script calls the tools inside an execution
+environment, and only the final result reaches the context — their
+benchmark cut 150k tokens to 2k, a 98.7% reduction. Rejected here
+for now (it requires a sandbox this phase doesn't have), with its
+reopening condition also written down: when traces show the model
+running the same tool sequences by rote, or combining ref lists in
+its head that a three-line script would combine exactly, the
 composition moves server-side. A rejected alternative with a named
 trigger is a decision; a rejected alternative without one is a
 mood.

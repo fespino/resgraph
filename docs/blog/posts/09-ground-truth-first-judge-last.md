@@ -182,14 +182,26 @@ through it. What cannot be pinned stays variable — which is one
 reason the judge carries the smallest weight: it is the least
 pinnable instrument in the stack.
 
-Scoring uses the pass^k trial protocol — k=3 runs per scenario, pass
-only if all three pass — but not from day one. Trials on a harness
-that is still changing every run would measure noise at triple
-price, so trials start after the fabrication halt clears and the
-big failure buckets are fixed. STATE-Bench's headline pairing of
-pass@1 with pass^5 is the same reasoning at benchmark scale:
-capability and reliability are different numbers, and reliability
-is the one that costs money to know.
+Scoring uses a trial protocol: each scenario runs k=3 times and
+passes only if all three trials pass — the pass^k defined above.
+Trials exist because an agent run is stochastic, so a single pass
+can be the lucky edge of a distribution; the phase's later
+certification run caught exactly that, when a dimension that
+scored perfect in one run measured 0.78 under repetition. But
+trials don't start on day one. While the harness is still changing
+every run, each run's job is attribution — did the one registered
+change do what it predicted? — and repeating every scenario three
+times would triple the price of precisely measuring configurations
+about to be discarded. So trials begin once the fabrication halt
+clears and the big failure buckets are fixed. The same split shows
+up at benchmark scale:
+[STATE-Bench](https://github.com/microsoft/STATE-Bench) — the
+450-task enterprise benchmark from above — reports its headline
+results as a *pair*, pass@1 (can the agent do the task at all)
+alongside pass^5 (does it do the task every time), because
+capability and reliability are different numbers, the gap between
+them is what an operator actually lives with, and the reliability
+number is the one that costs k times more to know.
 
 ## The protocol that makes a run mean something
 

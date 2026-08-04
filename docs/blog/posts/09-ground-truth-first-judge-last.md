@@ -192,14 +192,17 @@ trials don't start on day one. While the harness is still changing
 every run, each run's job is attribution — did the one registered
 change do what it predicted? — and repeating every scenario three
 times would triple the price of precisely measuring configurations
-about to be discarded. So the rule is: single runs while known
-defects are being fixed — fabricated evidence above zero stops
-everything anyway, per the bar's halt rule, and a dimension
-scoring 0.00 needs design work, not a precise measurement of how
-broken it is. Once fabrications hold at zero and no dimension is
-failing outright, the configuration is stable enough to be worth
-measuring precisely, and the k=3 trials begin. The same split
-shows up at benchmark scale:
+about to be discarded. So the process runs in two gears. During
+iteration, every run is single: the baseline halts on fabricated
+evidence, the next run fixes that one contract, the run after
+fixes the cache design — each paid run exists to check one
+registered change, and running it three times would triple the
+bill to re-answer the same question. The trials belong to the
+other gear, certification: when an iteration finally produces a
+configuration worth keeping — fabrications holding at zero, no
+dimension failing outright — k=3 measures whether its numbers
+survive repetition before they are allowed to mean anything. The
+same split shows up at benchmark scale:
 [STATE-Bench](https://github.com/microsoft/STATE-Bench) — the
 450-task enterprise benchmark from above — reports its headline
 results as a *pair*, pass@1 (can the agent do the task at all)

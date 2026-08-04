@@ -88,8 +88,10 @@ wants `blast_radius(db-42)`, not five REST calls it must
 orchestrate itself. Anthropic's
 [Building Effective Agents](https://www.anthropic.com/research/building-effective-agents)
 calls the discipline agent-computer-interface design, and the
-principle is poka-yoke: make the mistake structurally hard, not
-instructed-against.
+principle is [poka-yoke](https://en.wikipedia.org/wiki/Poka-yoke),
+manufacturing's mistake-proofing idea — a connector that only fits
+the right way up — applied to a tool surface: make the mistake
+structurally hard, not instructed-against.
 
 The interesting part is the alternative that *almost* wins.
 Microsoft's Azure SRE team

@@ -80,8 +80,7 @@ def _default_depth(scenario_type: ScenarioType) -> int:
             return 2
         case ScenarioType.CONTROL:
             raise ValueError("control scenarios have no planted depth")
-        case _:
-            return assert_never(scenario_type)
+    return assert_never(scenario_type)
 
 
 CAUSAL_TYPES = tuple(t for t in ScenarioType if t is not ScenarioType.CONTROL)

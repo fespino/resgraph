@@ -9,10 +9,12 @@ PR time.
 
 Functional by design: a TextValidator is a named pure function over
 one string, and `check_fields` runs any validator set over any
-(field, text) selection — so the same validators apply to a future
-dataset by pairing them with that dataset's columns
-(`record_fields(row, columns=[...])`). Only `scenario_fields` and
-`lineage_findings` know the Scenario shape.
+(field, text) selection. Only `scenario_fields` and
+`lineage_findings` know the Scenario shape — so the scanners lift
+unchanged if a second dataset family ever appears. Deliberately no
+cross-dataset API until that day: a real consumer must force the
+open semantics (e.g. what a missing column means) before code
+answers them.
 
 Findings are structured — validator name, field, detail — so a
 failure names the check that fired and where. The secret validator
@@ -20,7 +22,7 @@ never echoes its match: quoting it would copy the leak into logs.
 """
 
 import re
-from collections.abc import Callable, Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 
 from resgraph.gen.scenarios import Scenario
@@ -98,20 +100,13 @@ _LINEAGE_KEYS = ("derived_from", "exposed_by_run", "bucket")
 def check_fields(
     fields: Iterable[tuple[str, str]], validators: Sequence[TextValidator]
 ) -> list[Finding]:
-    """Run every validator over every (field, text) pair. The same
-    validators serve any dataset; the caller chooses the columns."""
+    """Run every validator over every (field, text) pair."""
     return [
         Finding(validator.name, field, detail)
         for field, text in fields
         for validator in validators
         for detail in validator.scan(text)
     ]
-
-
-def record_fields(record: Mapping[str, object], columns: Sequence[str]) -> list[tuple[str, str]]:
-    """Column selection for plain dict records: a future dataset needs
-    only this plus its column list."""
-    return [(column, str(record[column])) for column in columns if column in record]
 
 
 def scenario_fields(spec: Scenario) -> list[tuple[str, str]]:

@@ -10,10 +10,8 @@ import pytest
 
 from resgraph.evals.sanitize import (
     Finding,
-    check_fields,
     local_env,
     model_names,
-    record_fields,
     sanitize_findings,
     secrets,
 )
@@ -45,19 +43,6 @@ def test_secret_findings_never_echo_the_match():
     details = secrets.scan(f"leaked {token}")
     assert details
     assert all(token not in detail for detail in details)
-
-
-def test_same_validators_compose_over_any_record_and_columns():
-    ledger_row = {
-        "entry_id": "GL-0001",
-        "amount": "125.00",
-        "memo": "reimbursed /Users/dev laptop, reviewed on opus",
-    }
-    findings = check_fields(record_fields(ledger_row, columns=["memo"]), [secrets, local_env])
-    assert {f.validator for f in findings} == {"local-env"}
-    assert all(f.field == "memo" for f in findings)
-    with_models = check_fields(record_fields(ledger_row, columns=["memo", "amount"]), [model_names])
-    assert [f.detail for f in with_models] == ["model: opus"]
 
 
 def test_findings_name_validator_and_field():

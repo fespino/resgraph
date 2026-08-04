@@ -24,7 +24,7 @@
 | src/resgraph/evals/graders.py                |       42 |        2 |     95% |    76, 84 |
 | src/resgraph/evals/judge.py                  |       11 |        0 |    100% |           |
 | src/resgraph/evals/report.py                 |       51 |        2 |     96% |   29, 110 |
-| src/resgraph/evals/runner.py                 |      122 |       81 |     34% |44, 50-65, 74-84, 103-129, 133-139, 151, 176-261, 266-267 |
+| src/resgraph/evals/runner.py                 |      134 |       83 |     38% |48, 54-69, 78-88, 107-133, 137-143, 155-156, 177, 202-289, 294-295 |
 | src/resgraph/gen/\_\_init\_\_.py             |        0 |        0 |    100% |           |
 | src/resgraph/gen/churn.py                    |       65 |        4 |     94% |47-49, 108 |
 | src/resgraph/gen/cli.py                      |       75 |       13 |     83% |89-94, 105-110, 149-150 |
@@ -57,7 +57,7 @@
 | src/resgraph/tools/context.py                |        6 |        0 |    100% |           |
 | src/resgraph/tools/http.py                   |       21 |        0 |    100% |           |
 | src/resgraph/tools/registry.py               |       20 |        0 |    100% |           |
-| **TOTAL**                                    | **2510** |  **211** | **92%** |           |
+| **TOTAL**                                    | **2522** |  **213** | **92%** |           |
 
 
 ## Setup coverage badge

@@ -177,12 +177,14 @@ contribution to someone else's security decision.
 The operational metadata is per-tool `timeout_s` and an
 error-action map — for each failure class, whether the productive
 response is to rephrase the call, retry it unchanged, or give up.
-Both exist because an
+Both fields answer gaps that an
 [enterprise MCP deployment field report](https://arxiv.org/abs/2603.13417)
-named their absence among the gaps that hurt in production: a tool
-without a declared timeout leaves every client guessing how long to
-wait, and an error without a declared action invites retry loops on
-failures no retry will fix.
+observed in production — the timeout is the laptop-scale
+simplification of the adaptive budgeting they describe. The
+reasoning behind them is plain on its own: a tool without a
+declared timeout leaves every client guessing how long to wait, and
+an error without a declared action invites retry loops on failures
+no retry will fix.
 
 ## Budgets are enforced, not requested
 

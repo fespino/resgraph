@@ -40,7 +40,11 @@ discloses it). The strongest generate-and-evaluate system published
 so far, [AlphaEvolve](https://arxiv.org/abs/2506.13131), runs
 exactly this split — humans define an automated evaluator, the AI
 evolves the code volume against it — and names machine-gradability
-as its main limitation. Harnesses will increasingly be regenerated
+as its main limitation: it can only work on problems where a
+program can score a candidate solution automatically, and anything
+that needs human judgment to grade is out of its reach. That
+boundary matters here, because it marks where the human layer has
+to sit. Harnesses will increasingly be regenerated
 from specs, behavior, and production data — humans owning the
 framework and controls, AI doing the case-picking and
 invariant-writing where it is simply more efficient. Which makes

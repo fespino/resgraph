@@ -23,8 +23,8 @@ Meanwhile the model's *checkable* claims stayed clean the whole
 time: it never invented an edge or an event in any run of the phase
 (the baseline's two evidence failures were real edges in an
 orientation the contract hadn't defined — the previous post's
-story).
-Then one structural change — deriving the field by arithmetic from
+story). Then one structural change — deriving the field by
+arithmetic from
 three verifiable booleans instead of asking for it — took it from
 worst to perfect in a single run, with no learning in between. Only
 the interface changed. This post is that arc, run by run, because it
@@ -172,7 +172,9 @@ add with numbers attached: for judgment-shaped behavior,
 demonstrations locate postures, not boundaries.
 
 Six runs in, the trade-off had a shape. Honesty and found_top3, per
-run: 0.00/0.92 → 0.17/0.83 → 0.33/0.71 → 0.83/0.67 → 0.17/0.71.
+run: 0.00/0.92 → 0.17/0.83 → 0.33/0.71 → 0.83/0.67 → 0.17/0.71
+(iteration 3's truncated run graded controls only, so it carries no
+found number and sits outside the list).
 Three rules, one example, one pair — every intervention moved the
 operating point along a seesaw without ever holding both ends. The
 judgment "does this window explain this symptom?" fit in
@@ -244,8 +246,9 @@ run. Structure contains judgment to exactly the bits you can
 verify. At least one unverifiable bit remains, and pressure finds
 it.
 
-The change was reverted the same day, on the protocol's own terms:
-one transitive item gained, two controls lost, and the quality bar
+The change was reverted before anything shipped, on the protocol's
+own terms: one transitive item gained, two controls lost, and the
+quality bar
 ranks control honesty above transitive recall. The certified
 configuration is iteration 7's: honesty 1.00, found_top3 0.71,
 pass^k 0.77, fabrications zero on every run ever executed — a

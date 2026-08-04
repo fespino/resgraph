@@ -24,11 +24,15 @@ merges. The volume under that framework — the planted cases, the
 grader implementations, the invariants and post-conditions, the
 thirteen mutants — was generated, under review, by the same kind of
 system the harness exists to grade. I think that split is not a
-quirk of this project but the coming shape of the work. Evals
-measurably erode within a single model generation
-([Anthropic's numbers](https://www.anthropic.com/engineering/AI-resistant-technical-evaluations)),
-synthesized harnesses already outperform hand-configured ones in
-controlled settings
+quirk of this project but the coming shape of the work. An eval's
+numbers are pinned to a specific model-harness pairing — across
+5,194 agent trajectories,
+[Harness-Bench](https://arxiv.org/abs/2605.27922) measured
+variation large enough to conclude that capability "should be
+reported at the model-harness configuration level rather than
+attributed to the base model alone" — so every model release makes
+yesterday's measurements stale. Synthesized harnesses already
+outperform hand-configured ones in controlled settings
 ([AutoHarness](https://arxiv.org/abs/2603.03329)), and large
 benchmarks already scale by LLM-synthesizing their tasks
 ([STATE-Bench](https://github.com/microsoft/STATE-Bench), which

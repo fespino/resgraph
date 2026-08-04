@@ -277,12 +277,21 @@ Three findings, one per failure class, all from run one and the two
 registered iterations that followed.
 
 **The predicted failure arrived on schedule.** All six controls got
-an accusation — with correctly hedged medium/low confidence labels,
-which makes it more interesting, not less: the model hedged honestly
-while the *conclusion field* was wrong. The taxonomy's ~20% control
-share existed because of exactly this failure mode, and the baseline
-measured the design sentence at its maximum. What it took to
-actually fix it is the next post; it is the best story in the phase.
+an accusation — and the confidence labels on those accusations were
+correctly hedged: medium and low, never high. That detail makes the
+failure more interesting, not less, because it rules out the
+ordinary diagnosis. An overconfident model would be a calibration
+problem — a known disease with known treatments. This model's
+calibration was fine: it knew its candidates were weak, said so,
+and accused anyway, because nothing in its behavior treated
+"conclude nothing" as an available answer. The failure lives in one
+field's semantics, not in the model's self-assessment — a
+distinction the next post spends six iterations learning the hard
+way. The taxonomy's ~20% control share existed because of exactly
+this failure mode, and the baseline measured the design sentence —
+an agent never shown "nothing" learns to always accuse something —
+at its worst possible value, 0 of 6. What it took to actually fix
+it is the next post; it is the best story in the phase.
 
 **A fabricated path was subsidizing the accuracy score.** The two
 evidence failures were real edges cited in an orientation the output
@@ -303,7 +312,10 @@ the honesty.
 
 **The metric that couldn't be reached was the design review that
 worked.** Discipline scored 0/30, entirely on one check: cache hit
-rate ≥ 0.9. The token columns showed why, and the wrong-looking
+rate ≥ 0.9 — the share of input tokens the API serves from its
+prompt cache at a fraction of full price instead of re-processing
+them, which the bar requires to stay above 90% on multi-turn runs.
+The token columns showed why, and the wrong-looking
 number was the diagnostic: `cache_creation` was zero and
 `cache_read` was always an exact multiple of 4,126 — the prompt
 prefix, read once per turn, while the growing conversation re-billed
@@ -326,8 +338,11 @@ token owes before it can ever be read. That is a metric-definition
 bug, not a runtime bug: the gate was penalizing cost, and a gate may
 only penalize what the harness can avoid. The fix is a dated
 amendment — discipline now gates on the uncached *re-read* fraction
-(≤ 0.1), the waste the metric was built to catch, with cache hit
-still reported. The unreachable target did its job by being
+(≤ 0.1): the share of tokens paid at full price that the model had
+already been shown earlier in the run. Paying once for a new token
+is cost; paying again for a token you already processed is waste,
+and the waste is what the metric was built to catch. Cache hit
+stays reported, ungated. The unreachable target did its job by being
 unreachable: a metric you can't game surfaces the design error the
 design review missed.
 

@@ -36,7 +36,9 @@ outperform hand-configured ones in controlled settings
 ([AutoHarness](https://arxiv.org/abs/2603.03329)), and large
 benchmarks already scale by LLM-synthesizing their tasks
 ([STATE-Bench](https://github.com/microsoft/STATE-Bench), which
-discloses it). The strongest generate-and-evaluate system published
+discloses it).
+
+The strongest generate-and-evaluate system published
 so far, [AlphaEvolve](https://arxiv.org/abs/2506.13131), runs
 exactly this split — humans define an automated evaluator, the AI
 evolves the code volume against it — and names machine-gradability
@@ -111,7 +113,7 @@ failures a generated harness would inherit:
   container resources alone can move an agent benchmark score by
   more than a model upgrade does.
 
-The junction is starting to get built.
+The junction is starting to be built.
 [Agentic Harness Engineering](https://arxiv.org/abs/2604.25850)
 evolves harnesses autonomously from trajectory data and pairs every
 edit with a falsifiable prediction checked against the next round —
@@ -123,7 +125,7 @@ the reward signal itself is trusted. Who sets the bar, and who
 checks the checker, is still left to the humans.
 
 This project is one attempt at working both sides at once, and the
-honest inventory has two halves. Applied during the phase: the
+inventory has two halves. Applied during the phase: the
 mutation audit ran against the AI-written graders (below), every
 iteration carried a pre-registered invalidating condition, each run
 row pins its model and configuration, and the trial protocol caught
@@ -224,16 +226,15 @@ reaches for mutation testing because "coverage tells us that a line
 was executed, but not that its impact was verified." The phase's
 audit used thirteen targeted semantic mutants — not random token
 flips, but the specific bug each grader exists to prevent: the
-found comparison
-inverted, the top-3 window removed, the evidence edge-orientation
+found comparison inverted, the top-3 window removed, the evidence
+edge-orientation
 flipped (the exact bug class from the baseline), edge checking
 disabled outright, the honesty conjunction weakened AND→OR, pass^k
 silently computed as pass@k (all-trials-pass quietly scored as
 any-trial-passes — reliability inflated to capability), controls
 made to always pass, the judge's pass boundary moved by one, and
-five more. Targeted mutants
-beat random ones for this job because every survivor is directly
-interpretable as a missing test case.
+five more. Targeted mutants beat random ones for this job because
+every survivor is directly interpretable as a missing test case.
 
 First pass: **11 of 13 killed — and both survivors were real test
 gaps**, not artifacts. No test pinned the inconsistent state of a
@@ -346,9 +347,8 @@ attributable — swap models mid-loop and the next delta is
 confounded, and at $4 a run, model cost was never the bottleneck;
 attribution quality was. Which model to run is an eval slice, not a
 preference. The k=3 certification completes first — its partial
-results already corrected one flattering number, moving control
-honesty
-from a single-run 1.00 to 0.78 under repeated trials. Whatever
+results already supplied the corrected honesty number quoted
+earlier, 0.78 where a single run had said 1.00. Whatever
 these runs return, the answer will be a measurement with a
 pre-committed interpretation, which is the only kind of answer this
 phase has learned to trust.

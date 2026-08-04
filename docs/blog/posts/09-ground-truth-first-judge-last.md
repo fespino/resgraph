@@ -192,9 +192,14 @@ trials don't start on day one. While the harness is still changing
 every run, each run's job is attribution — did the one registered
 change do what it predicted? — and repeating every scenario three
 times would triple the price of precisely measuring configurations
-about to be discarded. So trials begin once the fabrication halt
-clears and the big failure buckets are fixed. The same split shows
-up at benchmark scale:
+about to be discarded. So the rule is: single runs while known
+defects are being fixed — fabricated evidence above zero stops
+everything anyway, per the bar's halt rule, and a dimension
+scoring 0.00 needs design work, not a precise measurement of how
+broken it is. Once fabrications hold at zero and no dimension is
+failing outright, the configuration is stable enough to be worth
+measuring precisely, and the k=3 trials begin. The same split
+shows up at benchmark scale:
 [STATE-Bench](https://github.com/microsoft/STATE-Bench) — the
 450-task enterprise benchmark from above — reports its headline
 results as a *pair*, pass@1 (can the agent do the task at all)

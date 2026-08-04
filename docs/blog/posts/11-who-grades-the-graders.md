@@ -74,10 +74,15 @@ on [lucky passes](https://arxiv.org/abs/2605.12925) (up to 23.2% of
 agent passes in one audit), or on
 [the environment confounding the score](https://www.anthropic.com/engineering/infrastructure-noise).
 The integrity side documents exactly the failure modes a generated
-harness would inherit. If generated harnesses are the coming default,
-those halves have to meet — and the four layers, the mutation
-audit, and the mistakes ledger below are this project's working
-attempt at that junction.
+harness would inherit. The junction is only now being built:
+[Agentic Harness Engineering](https://arxiv.org/abs/2604.25850)
+evolves harnesses autonomously from trajectory data and pairs every
+edit with a falsifiable prediction checked against the next round —
+pre-registration as machinery. But nothing in that loop audits its
+own graders, and the bar it optimizes is the benchmark itself. Who
+sets the bar, and who checks the checker, is still left to the
+humans — and the four layers, the mutation audit, and the mistakes
+ledger below are this project's working answer for that remainder.
 
 !!! info "The repo at this phase"
     Browse the repository exactly as it stood when this was written:
@@ -158,7 +163,12 @@ the tests *accompany* the graders, not that they *constrain* them —
 a suite can ride along without gripping anything.
 [Mutation testing](https://en.wikipedia.org/wiki/Mutation_testing)
 measures the grip directly: break each grader on purpose and
-require the suite to notice. The phase's audit used thirteen
+require the suite to notice. Practitioners keep arriving here from
+other directions — Birgitta Böckeler's
+[sensor work for coding agents](https://martinfowler.com/articles/sensors-for-coding-agents.html)
+reaches for mutation testing because "coverage tells us that a line
+was executed, but not that its impact was verified."
+The phase's audit used thirteen
 targeted semantic mutants — not random token flips, but the
 specific bug each grader exists to prevent: the found comparison
 inverted, the top-3 window removed, the evidence edge-orientation

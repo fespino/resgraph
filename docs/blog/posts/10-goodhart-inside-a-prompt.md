@@ -77,6 +77,21 @@ is the version of this finding the phase ended up demonstrating
 experimentally). What this phase adds is the run-by-run mechanics of
 *why* prompting can't fix it, and what does.
 
+One piece of machinery to hold while reading, because every
+iteration below is an edit to a specific artifact. The agent ends
+every investigation by emitting a JSON report — ranked suspects,
+evidence, confidence labels, and the flag — which the harness
+validates against a typed schema (a Pydantic model). A report that
+violates the schema or its rules is rejected, and the validator's
+error message goes back to the model as feedback for a retry. The
+system prompt, for its part, carries an *output contract* — the
+prose section that specifies the report and its rules — plus any
+worked examples, and ships the investigation playbook as a markdown
+skill file. So there are exactly four editable surfaces: a sentence
+in the contract, a demonstration in the prompt, the
+schema-and-validator code, and the playbook. The iterations below
+work through them in that order.
+
 ## Rules: gamed, then rationalized
 
 The honesty work starts at iteration 3 — iterations 1 and 2 fixed
@@ -90,7 +105,8 @@ one suspect earns *high* confidence — so listing a handful of weak,
 low-confidence candidates no longer counts as having found
 something. The definition was deliberately written in terms the
 model already used, its own confidence labels, which looked like a
-feature. The pre-registration
+feature. As a change it was pure prose: one paragraph added to the
+output contract, no code touched. The pre-registration
 predicted honesty ≥ 0.83 — and, in its invalidating clause, named
 the failure before the run: "controls start emitting high-confidence
 accusations — a worse, different bug." That clause fired. Honesty
@@ -105,7 +121,9 @@ prompt, in one iteration.
 
 **Iteration 4** reasoned: the flag was priced in a label the model
 controls, so bind it to something it doesn't — the evidence test the
-graders own. The new rule: the flag may only be false for a suspect
+graders own. The new rule — again contract prose, layered onto
+iteration 3's residue rather than replacing it, a stacking that
+later earned its own protocol rule: the flag may only be false for a suspect
 with a graph-verified mechanism path *and* the exact change event
 whose content plausibly explains the symptom. Honesty: 0.33 again.
 Two controls rationalized distractors as meeting the bar — because
@@ -211,10 +229,20 @@ carries an **evidence verdict** of three booleans:
   alert? The one genuine judgment bit, now isolated and named.
 
 And the flag is no longer chosen: `no_confident_candidate` is false
-exactly when some suspect has all three booleans true — arithmetic,
-validated by the harness with descriptive feedback on violation.
-The worked examples stayed, but now they demonstrate the structure,
-not the vibe.
+exactly when some suspect has all three booleans true — arithmetic.
+Unlike everything before it, this iteration is a *code* change, on
+two of the four surfaces at once. The report schema gains the
+per-suspect verdict object, and the harness's validation step — the
+same machinery that already bounced malformed reports — now
+recomputes the flag from the verdicts, rejects any report where
+they disagree, checks `event_found` against the sequence numbers
+that actually appeared in this run's tool results, and sends the
+specific violation back as the retry message. The contract prose
+shrank rather than grew: the rules the flag no longer needs came
+out, and the worked examples stayed but now demonstrate the
+structure, not the vibe. One more thing deliberately did not
+change: the graders. The instrument held still, so runs six and
+seven differ by exactly one thing.
 
 The run came back: **honesty 1.00.** Six of six controls, zero
 high-confidence accusations, the bar met for the first time — by
@@ -256,7 +284,10 @@ item concluded flag-true, hedged, with 7+ tool calls unspent. The
 playbook said "widen the window if the diff is empty" but never
 "deepen the radius if the intersection is empty," and the model
 stopped where its playbook stopped. **Iteration 8** added that one
-step. Prediction: recall recovers, honesty holds — the arithmetic
+step — an edit to the fourth surface, the markdown playbook file:
+two sentences of instruction (deepen the radius once before
+concluding a window quiet, plus the matching anti-pattern), no
+schema, no code. Prediction: recall recovers, honesty holds — the arithmetic
 is structurally immune to an instruction about digging deeper.
 
 Both halves missed, and the miss is the finding. Transitive

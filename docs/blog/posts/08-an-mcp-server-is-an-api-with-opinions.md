@@ -171,7 +171,7 @@ that post puts it, "risk profile is a property of the session, not
 of any single server": the model's session may combine this
 read-only server with someone else's write-capable one, and the
 client can only reason about what that *combination* can do if
-every server labels itself truthfully. Honest labels here are a
+every server labels itself truthfully. The labels here are a
 contribution to someone else's security decision.
 
 The operational metadata is per-tool `timeout_s` and an
@@ -189,7 +189,7 @@ no retry will fix.
 ## Budgets are enforced, not requested
 
 The question this section answers: what stops an agent from hurting
-itself — or the platform — with an *honest* query? A blast radius
+itself — or the platform — with a *legitimate* query? A blast radius
 on a well-connected host is a 53,775-token answer if serialized
 naively (measured below); an unbounded `depth` parameter is a
 traversal the stores pay for; a twenty-minute-old payload about a
@@ -218,7 +218,7 @@ controls, each paired with the failure it exists to prevent:
   not context.
 - **A hard token cap on every response — against the answer no
   refs-only shaping can bound**, because fan-out is unbounded.
-  Overflow paginates with `truncated: true`, an honest
+  Overflow paginates with `truncated: true`, an exact
   `total_count`, and the next move written in prose —
   `pagination_hint: "call again with offset=N"` — because the
   consumer is a language model, so the payload itself teaches the
@@ -249,7 +249,7 @@ Per this series' standing rule, a design claim about payload size
 needs a number, a method, and a hardware label. The payload
 benchmark measures the canonical refs-and-cap response against the
 same traversal serialized fat, across 1k/10k/100k-resource worlds —
-and the honest headline is that **at natural radii the cap barely
+and the headline is that **at natural radii the cap barely
 matters**: seed-42 blast radii top out around 30 nodes, refs-vs-fat
 is a 3–4× constant factor at p95 and above, and both fit any
 context window.
@@ -350,8 +350,8 @@ which means pages are independent reads of a churning world, not a
 snapshot. The card says so and tells the consumer what to do about
 it (compare `fetched_at` across pages), with the RC's
 explicit-handle pattern recorded as the upgrade path if consistent
-pagination is ever needed. Honesty about consistency is a feature
-of the contract, not a caveat buried in code.
+pagination is ever needed. A consistency limit stated in the
+contract is a feature; buried in code, it is a trap.
 
 ## What I'd take to the next project
 
@@ -362,9 +362,9 @@ of the contract, not a caveat buried in code.
 - **Shape tools around the consumer's questions, and record the
   rival shape with a trigger.** Wide tools and code-composition are
   real alternatives; writing down *what evidence would flip the
-  decision* is what keeps the choice honest.
+  decision* is what keeps the choice falsifiable.
 - **Put the budget in the response, not the prompt.** Clamps that
-  explain themselves, caps with honest counts, errors that steer —
+  explain themselves, caps with exact counts, errors that steer —
   every control this phase added works even on an agent that read
   none of the documentation, which is the only agent you should
   design for.

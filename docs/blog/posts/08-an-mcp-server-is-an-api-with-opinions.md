@@ -139,11 +139,17 @@ intermediate result flowing through its context window; it writes a
 small script, the script calls the tools inside an execution
 environment, and only the final result reaches the context — their
 benchmark cut 150k tokens to 2k, a 98.7% reduction. Rejected here
-for now (it requires a sandbox this phase doesn't have), with its
-reopening condition also written down: when traces show the model
-running the same tool sequences by rote, or combining ref lists in
-its head that a three-line script would combine exactly, the
-composition moves server-side. A rejected alternative with a named
+for now for a concrete reason: it requires a sandboxed execution
+environment — secure execution, resource limits, monitoring — that
+this phase doesn't have. But a sandbox is a planned later phase of
+this platform, and when it lands this option graduates from
+recorded trigger to measured experiment: the same evaluation
+scenarios, a composition arm against the tool-call arm, tokens and
+pass rates side by side. Until then the early-warning condition is
+written down: when traces show the model running the same tool
+sequences by rote, or combining ref lists in its head that a
+three-line script would combine exactly, the composition question
+jumps the queue. A rejected alternative with a named
 trigger is a decision; a rejected alternative without one is a
 mood.
 

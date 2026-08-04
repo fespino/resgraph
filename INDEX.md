@@ -6,6 +6,15 @@
 - src/resgraph/analyst/ — the triage agent (D22–D23): harness loop, report models, prompts + cache audit, registry-derived Anthropic tool surface
 - src/resgraph/evals/ — the analyst's eval harness (D24): deterministic graders, pinned judge, store-isolated runner, report; datasets + runs live in evals/
 - BENCHMARKS.md — measured numbers with hardware + method (D4)
+- EVALS.md — the analyst's iteration log (D24): protocol rules, per-run
+  pre-registrations and outcomes, conclusions with receipts, honest review
+- evals/ — eval artifacts: scenarios/ (committed recipes), runs/ (envpinned
+  row files), baseline.json, meta/ (grader mutation gate, also a CI step)
+- docs/discovery/ — problem-discovery memos written before code (the
+  quality bar's git history is the witness)
+- docs/prompt-audit.md — PREFIX/SUFFIX verdict table + cache diagnosis
+  branches (D23)
+- docs/blog/ — published-post assets
 - docs/stream-contract.md — why consumers must not assume referential integrity
 - tests/ — schema + per-component tests
 - compose.yaml — local stores (grows with the platform)

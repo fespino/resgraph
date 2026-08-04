@@ -85,9 +85,13 @@ separate conversations.
 One side generates. [AutoHarness](https://arxiv.org/abs/2603.03329)
 synthesizes constraint harnesses,
 [AlphaEvolve](https://arxiv.org/abs/2506.13131) evolves code
-against a human-defined evaluator,
-[Code World Models](https://arxiv.org/abs/2510.04542) synthesizes
-executable world models from observed trajectories. To check how
+against a human-defined evaluator, and
+[Code World Models](https://arxiv.org/abs/2510.04542) translates
+game rules and observed trajectories into executable checkers —
+legal-move enumeration, termination tests — that its own abstract
+trusts only "contingent on the correctness of the synthesized
+model", a correctness checked by unit tests generated from the
+same trajectories. To check how
 much this side thinks about its instruments, I went through
 AutoHarness's bibliography — twenty references, each one checked —
 and none of them addresses the failure modes the other side has

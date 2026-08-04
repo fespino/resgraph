@@ -28,7 +28,7 @@
 | src/resgraph/gen/\_\_init\_\_.py             |        0 |        0 |    100% |           |
 | src/resgraph/gen/churn.py                    |       65 |        4 |     94% |47-49, 108 |
 | src/resgraph/gen/cli.py                      |       75 |       13 |     83% |89-94, 105-110, 149-150 |
-| src/resgraph/gen/scenarios.py                |      215 |       12 |     94% |123, 126, 128, 262, 275-277, 311, 320, 329, 395, 423 |
+| src/resgraph/gen/scenarios.py                |      223 |       13 |     94% |83, 130, 133, 135, 269, 282-284, 318, 327, 336, 402, 430 |
 | src/resgraph/gen/sinks.py                    |       20 |        0 |    100% |           |
 | src/resgraph/gen/world.py                    |      115 |        0 |    100% |           |
 | src/resgraph/graph/\_\_init\_\_.py           |        0 |        0 |    100% |           |
@@ -57,7 +57,7 @@
 | src/resgraph/tools/context.py                |        6 |        0 |    100% |           |
 | src/resgraph/tools/http.py                   |       21 |        0 |    100% |           |
 | src/resgraph/tools/registry.py               |       20 |        0 |    100% |           |
-| **TOTAL**                                    | **2502** |  **210** | **92%** |           |
+| **TOTAL**                                    | **2510** |  **211** | **92%** |           |
 
 
 ## Setup coverage badge

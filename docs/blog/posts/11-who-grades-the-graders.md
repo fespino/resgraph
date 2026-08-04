@@ -100,8 +100,8 @@ wrote that code, but no AI runs at grading time, which reduces the
 question from "do I trust a model's judgment?" to "is this code
 correct?" —
 [89 readable lines](https://github.com/fespino/resgraph/blob/phase-8-analyst/src/resgraph/evals/graders.py)
-whose job is to compare identifiers. That is an ordinary code-review problem, and
-ordinary code-review tools apply.
+whose job is to compare identifiers. That is an ordinary
+code-review problem, and ordinary code-review tools apply.
 
 **Layer 2: the correctness checks don't trust their author.** The
 evidence grader — the one that decides whether a cited mechanism
@@ -163,9 +163,8 @@ and the
 [generator](https://github.com/fespino/resgraph/blob/phase-8-analyst/src/resgraph/gen/scenarios.py)
 is deterministic by construction. Take any row in any run log,
 regenerate its world with the CLI, and check the planted cause
-against what the agent was graded on. The ground
-truth is not an assertion in a JSON file; it is a reproducible
-computation.
+against what the agent was graded on. The ground truth is not an
+assertion in a JSON file; it is a reproducible computation.
 
 **Mutation-test the graders.** "The tests pass" establishes that
 the tests *accompany* the graders, not that they *constrain* them —
@@ -178,15 +177,15 @@ other directions — Birgitta Böckeler's
 reaches for mutation testing because "coverage tells us that a line
 was executed, but not that its impact was verified." The phase's
 audit used thirteen targeted semantic mutants — not random token
-flips, but the
-specific bug each grader exists to prevent: the found comparison
+flips, but the specific bug each grader exists to prevent: the
+found comparison
 inverted, the top-3 window removed, the evidence edge-orientation
 flipped (the exact bug class from the baseline), edge checking
 disabled outright, the honesty conjunction weakened AND→OR, pass^k
 silently computed as pass@k (all-trials-pass quietly scored as
 any-trial-passes — reliability inflated to capability), controls
-made to always pass, the
-judge's pass boundary moved by one, and five more. Targeted mutants
+made to always pass, the judge's pass boundary moved by one, and
+five more. Targeted mutants
 beat random ones for this job because every survivor is directly
 interpretable as a missing test case.
 
@@ -199,9 +198,8 @@ same commit; the re-run killed 13 of 13. The audit finding holes is
 what distinguishes it from a ritual — and it is now a standing CI
 gate
 ([evals/meta/mutate_graders.py](https://github.com/fespino/resgraph/blob/phase-8-analyst/evals/meta/mutate_graders.py)),
-re-run after any grader
-change, exiting nonzero on survivors, so a grader edit that weakens
-a test's grip cannot merge quietly.
+re-run after any grader change, exiting nonzero on survivors, so a
+grader edit that weakens a test's grip cannot merge quietly.
 
 ## Our mistakes, costed
 
@@ -282,9 +280,9 @@ deferred item filed as an issue with its cost attached — is
 **$50–55**. A five-dimension eval program for an infrastructure
 agent, with a baseline, eight pre-registered iterations, a
 trial-protocol certification, and a grader audit, costs about as
-much as a team lunch. The expensive input was never
-the tokens. It was the discipline — pre-registration, one change
-per run, per-item diffs — that made each $4 run mean something.
+much as a team lunch. The expensive input was never the tokens. It
+was the discipline — pre-registration, one change per run, per-item
+diffs — that made each $4 run mean something.
 
 ## What's still open, on the record
 
@@ -301,8 +299,9 @@ reason worth stating: with one change per run, every delta is
 attributable — swap models mid-loop and the next delta is
 confounded, and at $4 a run, model cost was never the bottleneck;
 attribution quality was. Which model to run is an eval slice, not a
-preference. The k=3 certification completes first — its partial results
-already corrected one flattering number, moving control honesty
+preference. The k=3 certification completes first — its partial
+results already corrected one flattering number, moving control
+honesty
 from a single-run 1.00 to 0.78 under repeated trials. Whatever
 these runs return, the answer will be a measurement with a
 pre-committed interpretation, which is the only kind of answer this

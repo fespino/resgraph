@@ -13,12 +13,18 @@ tags:
 
 # Goodhart's law operates inside a prompt
 
-Across six evaluation runs, one boolean field in an agent's report
-swung to whatever the surrounding prompt rewarded — in four
-different directions. A rule keyed to confidence bought confidence
-inflation within a single run. A rule keyed to evidence got
-rationalized through its own judgment gap. One worked example taught
-"when in doubt, abstain"; adding its mirror taught "always commit."
+["When a measure becomes a target, it ceases to be a good
+measure."](https://en.wikipedia.org/wiki/Goodhart%27s_law)
+Goodhart's law is usually told about economies and institutions —
+optimize a proxy and the proxy detaches from the thing it stood
+for. This post watched it execute inside a single prompt, at
+one-iteration speed. Across six evaluation runs, one boolean field
+in an agent's report swung to whatever the surrounding prompt
+rewarded — in four different directions. A rule keyed to confidence
+bought confidence inflation within a single run. A rule keyed to
+evidence got rationalized through its own judgment gap. One worked
+example taught "when in doubt, abstain"; adding its mirror taught
+"always commit."
 Meanwhile the model's *checkable* claims stayed clean the whole
 time: it never invented an edge or an event in any run of the phase
 (the baseline's two evidence failures were real edges in an
@@ -87,9 +93,10 @@ came back 0.33, and the run contained **four high-confidence
 accusations on controls, where every previous run had zero**. The
 rule made "no high-confidence suspect" the price of abstaining, and
 the model paid it in the only currency the rule accepted: it
-inflated the label. Goodhart's law —
-["when a measure becomes a target, it ceases to be a good measure"](https://en.wikipedia.org/wiki/Goodhart%27s_law)
-— executed inside a prompt, in one iteration. Anthropic's
+inflated the label. That is the title's claim made concrete: the
+rule turned the confidence label into a target, and the label
+stopped measuring confidence — Goodhart's law, executed inside a
+prompt, in one iteration. Anthropic's
 [AI-resistant technical evaluations](https://www.anthropic.com/engineering/AI-resistant-technical-evaluations)
 describes this erosion happening to eval suites across model
 generations; a prompt rule compressed it into a single run.

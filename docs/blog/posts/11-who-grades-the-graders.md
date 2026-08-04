@@ -128,7 +128,14 @@ dated amendment rather than a quiet edit. Anthropic's
 [demystifying-evals guide](https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents)
 treats instrument error as a first-class eval failure mode — the
 question is never whether your instrument has errors, it is whether
-the errors surface and get corrected on the record.
+the errors surface and get corrected on the record. And this layer
+is not a project-scale nicety: the same conflict now operates at
+market scale, where vendors sell both the capability and its
+governance, and — as a
+[Thoughtworks analysis of that gap](https://www.thoughtworks.com/insights/blog/technology-strategy/ai-vendors-governance-gap-adopters-risk)
+puts it — "no vendor can credibly recommend against their own
+products." A record of dissent is the only credential an evaluator
+can offer that its author cannot fake, at any scale.
 
 **Layer 4: what rests on trust is named, not hidden.** Three things
 still depend on judgment. The LLM judge — deliberately the smallest

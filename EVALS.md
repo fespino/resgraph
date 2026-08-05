@@ -785,3 +785,35 @@ judgment:
   cost per passed triage, latency percentiles. Each non-Opus arm is a
   new worker epoch: its failures get fresh attribution, never
   back-ported assumptions.
+
+## Phase 9 — certification completion and probes
+
+### Pre-registered probe — re-skins against template-reading (#103; registered 2026-08-05, run pending)
+
+The eval-erosion check run from inside the harness: a re-skin holds
+an item's causal structure fixed (type, depth) and regenerates every
+surface detail under a shifted seed. If scores drop on re-skins, the
+original scores were partly memorized generator surface, not graph
+reasoning.
+
+- **Arms:** the 30-item companion set
+  (`evals/scenarios/reskin-100k.jsonl`, seed +100,000, built by
+  `scripts/make_reskins.py`, recipe-committed and sanitize-swept)
+  against the originals' first-trial rows from run
+  `20260803T221121Z`. Same pinned worker and judge, trials=1 — the
+  probe measures capability delta; reliability is the originals'
+  k=3 job. Estimated ~$4.
+- **Hypothesis:** no template-reading — each found/evidence
+  dimension's re-skin rate lands within 2 items of the originals'
+  first-trial rate (denominator 24 causal items), and honesty
+  within 1 item (denominator 6 controls).
+- **Decision rule, stated before the run:** a drop beyond that
+  margin does NOT conclude erosion by itself — it escalates to k=3
+  on the re-skin set (~$10) to separate variance from signal. A
+  k=3-confirmed drop beyond the margin declares template-reading in
+  that slice, and re-skin rotation becomes a standing part of every
+  baseline refresh.
+- **Invalidating condition for the probe itself:** if the re-skin
+  run fires the fabrication halt, the probe result is void —
+  fabrication cleanup precedes erosion measurement, same as the
+  phase-8 ladder.

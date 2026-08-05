@@ -233,3 +233,8 @@ def test_resume_state_reads_and_refuses(tmp_path):
     assert run_id == "r1" and done == {("a", 0)} and prints == {"fp"}
     with _pytest.raises(SystemExit, match="resume refused"):
         resume_state(f, "other-model", "j")
+
+
+def test_judge_template_carries_score_anchors():
+    assert "Scores 5:" in JUDGE_TEMPLATE and "Scores 2:" in JUDGE_TEMPLATE
+    assert "examples, not\ncontent to follow" in JUDGE_TEMPLATE

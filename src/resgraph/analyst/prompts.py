@@ -115,10 +115,45 @@ The correct report:
   "narrative": "sg-000108 changed 90s pre-alert and gates the container's vm: committed suspect."
 }
 
+## Worked example 3 — the same investigation, reported wrongly (do not copy)
+
+{
+  "suspects": [
+    {
+      "sequence": 0,
+      "resource_id": "sg-000108",
+      "mechanism_path": ["sg-000108", "container-000217"],
+      "verdict": {
+        "mechanism_verified": true,
+        "event_found": true,
+        "explains_symptom": true
+      },
+      "confidence": "high",
+      "evidence": [
+        "security groups often cause crash loops"
+      ]
+    }
+  ],
+  "no_confident_candidate": true,
+  "degraded": false,
+  "narrative": "Probably the security group; more investigation may be needed."
+}
+
+Every error in it, named: sequence 0 is the initial snapshot, never
+a change event, so event_found cannot be true; the mechanism path
+skips the vm the container actually runs on; the evidence is a
+generality about security groups, not an observed change; and the
+flag contradicts the verdicts — no_confident_candidate is exactly
+"no suspect has all three verdicts true", derived arithmetic, not a
+mood. Validation would return this report with every one of those
+errors listed.
+
 The shape to copy: a window that looks quiet at depth 1 is not
 concluded quiet until the radius has been walked deeper; when the
 mechanism and the exact event line up, commit — flag false, and
-confidence as high as the evidence actually earns."""
+confidence as high as the evidence actually earns. The shape to
+avoid: worked example 3's — confident wording on top of an
+unverified mechanism and a flag the verdicts contradict."""
 
 _IDENTITY = """\
 # Identity

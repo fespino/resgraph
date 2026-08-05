@@ -11,7 +11,7 @@
 | src/resgraph/analyst/prompts.py              |       32 |        0 |    100% |           |
 | src/resgraph/analyst/tools.py                |       58 |       22 |     62% |72-80, 89-107, 111 |
 | src/resgraph/api/\_\_init\_\_.py             |        0 |        0 |    100% |           |
-| src/resgraph/api/app.py                      |      149 |       10 |     93% |135-137, 175, 184, 219-220, 253, 270, 299 |
+| src/resgraph/api/app.py                      |      153 |       11 |     93% |143-146, 184, 193, 228-229, 262, 279, 308 |
 | src/resgraph/cli.py                          |       81 |        0 |    100% |           |
 | src/resgraph/cold/\_\_init\_\_.py            |        0 |        0 |    100% |           |
 | src/resgraph/cold/cli.py                     |       49 |        1 |     98% |        48 |
@@ -58,7 +58,7 @@
 | src/resgraph/tools/context.py                |        6 |        0 |    100% |           |
 | src/resgraph/tools/http.py                   |       21 |        0 |    100% |           |
 | src/resgraph/tools/registry.py               |       20 |        0 |    100% |           |
-| **TOTAL**                                    | **2558** |  **214** | **92%** |           |
+| **TOTAL**                                    | **2562** |  **215** | **92%** |           |
 
 
 ## Setup coverage badge

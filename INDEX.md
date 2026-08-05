@@ -37,6 +37,7 @@
   grafana provisioning + the resgraph-overview dashboard as JSON
 - scripts/drill-hotstore-loss.sh — the INC-001 chaos drill, scripted
 - docs/incidents/ — incident notes (induced drills labeled as such)
+- docs/reviews/ — recorded system reviews (harnessability, checklist walks)
 - benchmarks/ — measurement scripts (methods in BENCHMARKS.md)
 - src/resgraph/tools/ — canonical tool layer (D19/D20): registry as the
   single source of truth, budgets, refs+fetch shaping, HTTP projection

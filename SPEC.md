@@ -1364,6 +1364,31 @@ platform instead of a dark one.
 | 9 | runtime hardening: bounding what the agent may do | needs an agent worth bounding | the difference between a demo and something left running unattended |
 | 10 | cost accounting on the token path | needs real agent traffic to meter | turns "the agent works" into "the agent is worth running" |
 
+**Amendment (2026-08-05) — the experiment spine inside phases 9–10.**
+Both phases carry registered experiments whose order is dependency,
+not preference: each consumes the previous one's baseline or
+protocol verdict.
+
+- **Phase 9** opens on the intake batch already merged (tripwire,
+  envpin depth, failure-derived regression items, runner hardening,
+  the sanitization boundary) and closes its eval thread in order:
+  #99 (the k=3 certification completes and refreshes the baseline)
+  then #115 (one agent-proposed harness iteration under the
+  unchanged gate — the certified configuration is the comparison
+  the experiment needs).
+- **Phase 10** runs its eval cluster strictly ordered:
+  #100 (model arms) and #101 (skill paired arm, producing the
+  four-stage ledger baseline) before #132 (one agent-proposed
+  *skill* edit from failure traces, gated by that ledger). #132 is
+  additionally conditional on #115's outcome: if the gate handles a
+  self-proposed harness change cleanly, the same protocol runs one
+  level up; if #115 is gamed or regresses, #132's protocol is
+  revised before any spend. Provenance for #132: the reflection
+  loop named as an open industry problem by
+  [Stripe's Kai platform](https://stripe.dev/blog/meet-stripes-knowledge-ai-platform),
+  mapped onto the D21 playbook (skills as prompts) with a
+  measurement gate their description lacks.
+
 Beyond 10 the themes are named but deliberately unordered: misuse
 detection, API platformization, a serving dashboard, sandboxing,
 compliance-as-code, agent memory, ambient and reactive automation,

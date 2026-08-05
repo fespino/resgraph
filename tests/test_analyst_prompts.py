@@ -111,3 +111,10 @@ def test_cache_fingerprint_stable_across_runs():
     b = cache_fingerprint(prompt(OTHER_SUMMARY, rid="db-000001"), Tools())
     assert a == b
     assert cache_fingerprint(prompt(), Tools(description="edited")) != a
+
+
+def test_worked_examples_include_a_labeled_negative():
+    text = prefix_text()
+    assert "do not copy" in text
+    assert "sequence 0 is the initial snapshot" in text
+    assert "derived arithmetic" in " ".join(text.split())

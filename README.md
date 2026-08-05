@@ -20,11 +20,11 @@
 | src/resgraph/cold/store.py                   |       59 |        1 |     98% |       122 |
 | src/resgraph/consumer.py                     |      155 |        7 |     95% |84, 99, 111, 114, 130, 132-133 |
 | src/resgraph/evals/\_\_init\_\_.py           |        0 |        0 |    100% |           |
-| src/resgraph/evals/cli.py                    |       23 |       23 |      0% |      3-64 |
+| src/resgraph/evals/cli.py                    |       23 |       23 |      0% |      3-72 |
 | src/resgraph/evals/graders.py                |       42 |        2 |     95% |    76, 84 |
 | src/resgraph/evals/judge.py                  |       11 |        0 |    100% |           |
 | src/resgraph/evals/report.py                 |       52 |        2 |     96% |   29, 111 |
-| src/resgraph/evals/runner.py                 |      134 |       83 |     38% |48, 54-69, 78-88, 107-133, 137-143, 155-156, 177, 202-290, 295-296 |
+| src/resgraph/evals/runner.py                 |      164 |       96 |     41% |58, 64-79, 88-98, 117-143, 147-153, 165-166, 228, 255-361, 366-367 |
 | src/resgraph/evals/sanitize.py               |       32 |        1 |     97% |        38 |
 | src/resgraph/gen/\_\_init\_\_.py             |        0 |        0 |    100% |           |
 | src/resgraph/gen/churn.py                    |       65 |        4 |     94% |47-49, 108 |
@@ -58,7 +58,7 @@
 | src/resgraph/tools/context.py                |        6 |        0 |    100% |           |
 | src/resgraph/tools/http.py                   |       21 |        0 |    100% |           |
 | src/resgraph/tools/registry.py               |       20 |        0 |    100% |           |
-| **TOTAL**                                    | **2562** |  **215** | **92%** |           |
+| **TOTAL**                                    | **2592** |  **228** | **91%** |           |
 
 
 ## Setup coverage badge

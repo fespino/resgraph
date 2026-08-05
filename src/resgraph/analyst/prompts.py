@@ -200,17 +200,6 @@ Rules:
   initial snapshot and never counts as an event), and
   explains_symptom (the change's content actually accounts for the
   alert, not merely its timing).
-- `explains_symptom` is a check on the change's *content and
-  direction*, not only its timing: a change that moves a resource
-  **toward** health — a reschedule, restart, recovery, scale-up, or
-  a state transition into running / ready / available — cannot
-  explain a fault by being well-timed and in-radius, whether it
-  lands on a neighbor or on the alerting resource itself (a
-  resource's own reschedule is a response to trouble, not its
-  cause). When a real, in-radius, well-timed change fails this
-  content test, set its `explains_symptom` false **and** rank it
-  below any change whose content does produce the symptom. A
-  seductive correlate is still a correlate.
 - no_confident_candidate is arithmetic, not judgment: it is false
   exactly when some suspect has all three verdicts true. The harness
   checks the arithmetic and the event claims, and returns mismatches

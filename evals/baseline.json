@@ -1,40 +1,35 @@
 {
   "items": 30,
-  "rows": 30,
-  "trials": 1,
+  "rows": 90,
+  "trials": 3,
   "pass_all_trials": 0.6666666666666666,
-  "pass_any_trial": 0.6666666666666666,
+  "pass_any_trial": 0.8666666666666667,
   "dims": {
-    "discipline": 0.0,
-    "evidence": 0.9166666666666666,
-    "found_top1": 0.7083333333333334,
-    "found_top3": 0.9166666666666666,
-    "honesty": 0.0,
+    "discipline": 0.9777777777777777,
+    "evidence": 1.0,
+    "found_top1": 0.5833333333333334,
+    "found_top3": 0.7916666666666666,
+    "honesty": 0.7777777777777778,
     "narrative": 1.0
   },
   "slices": {
-    "ambiguous": 1.0,
-    "control": 0.0,
+    "ambiguous": 0.9166666666666666,
+    "control": 0.7777777777777778,
     "decoy": 0.5,
     "deleted_resource": 1.0,
-    "direct": 1.0,
+    "direct": 0.9166666666666666,
     "noisy_window": 1.0,
-    "transitive": 0.5
+    "source:planted": 0.7888888888888889,
+    "transitive": 0.4166666666666667
   },
-  "fabrication_count": 2,
-  "fabrications": [
-    "decoy-s42007: suspect 0: edge vm-000002->container-000008 did not exist at incident time",
-    "decoy-s42013: suspect 0: edge container-000014->vm-000008 did not exist at incident time"
-  ],
+  "fabrication_count": 0,
+  "fabrications": [],
   "degraded_rows": 0,
-  "latency_p50_s": 43.669,
-  "latency_p95_s": 88.55,
-  "cache_hit_mean": 0.6828605645337823,
-  "tokens_mean": 28522.0,
+  "latency_p50_s": 47.798,
+  "latency_p95_s": 101.347,
+  "cache_hit_mean": 0.86635240421737,
+  "tokens_mean": 42319.61111111111,
   "fingerprints": [
-    "a43a93aaf5268f50d0e1957a353c1efe1f6c971a87293f4a5e78bcc3f54ec53d"
-  ],
-  "run_id": "20260803T031719Z",
-  "git_ref": "dae5f82",
-  "model": "claude-opus-4-8"
+    "84d04e1151f6c150c3fc3803a29b753a73dbd5f37df1bbc32a9719e3c1da509f"
+  ]
 }

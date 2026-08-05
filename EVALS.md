@@ -788,6 +788,48 @@ judgment:
 
 ## Phase 9 — certification completion and probes
 
+### k=3 certification — completed 2026-08-05, run `20260803T221121Z` (resumed 71 rows, ≈$10.63 worker estimate)
+
+**Certified: pass^k 0.67, pass@k 0.87; honesty 0.78 — the number
+the truncated first attempt predicted.** 90/90 rows, one prompt/tool
+fingerprint across the Aug-3 banked portion and the Aug-5 resumed
+portion, zero degraded rows, zero fabrications (evidence 1.00).
+Deltas against the committed (original) baseline: honesty
+0.00 → 0.78, discipline 0.00 → 0.98, evidence 0.92 → 1.00,
+found_top1 −0.12, found_top3 −0.12 — the honesty trade, now
+measured under repetition. Latency p50 47.8s / p95 101.4s; cache
+0.87; 3.8M tokens.
+
+What only k=3 shows, on the record:
+
+- **The 0.20 reliability gap is 6 flaky + 4 always-failing items.**
+  Flaky: ambiguous-s42018 PPF, control-s42005 FPP, decoy-s42019
+  FPP, decoy-s42025 FPF, direct-s42027 FPP, transitive-s42017 PFP.
+  Always failing: control-s42004, decoy-s42007, transitive-s42011,
+  transitive-s42029.
+- **control-s42004 fails all three trials identically** — a
+  high-confidence accusation on a quiet window every time. The
+  single-run honesty 1.00 did not just overstate; it hid a
+  reproducible per-world failure mode. A k=1 number can be wrong in
+  kind, not only in size.
+- **The failure-derived regression items track real persistence:**
+  four of the six mined from iteration 7 are still failing or flaky
+  here (s42007/s42011/s42029 FFF, s42017 flaky).
+- **Gate implication, quantified:** 6 of 30 items flip verdicts
+  between trials — a trials=1 release gate would flap on 20% of
+  items. D29's gate consumes pass^k.
+- Discipline 0.98 = two blips in 90 rows: one repeated call
+  (decoy-s42019 t0) and the program's first parse retry
+  (transitive-s42023 t1).
+- Provenance note: trial-0 rows for 11 items are the banked Aug-3
+  portion; trials 1–2 are Aug-5. Same pin, same fingerprint —
+  protocol-valid; three FPP patterns sit on that seam, recorded
+  without being claimed as signal.
+
+**Labeled baseline refresh:** `baseline.json` now aggregates this
+run (was: the original phase-8 baseline). Every future diff reads
+against certified k=3 numbers.
+
 ### Pre-registered probe — re-skins against template-reading (#103; registered 2026-08-05, run pending)
 
 The eval-erosion check run from inside the harness: a re-skin holds
@@ -817,3 +859,16 @@ reasoning.
   run fires the fabrication halt, the probe result is void —
   fabrication cleanup precedes erosion measurement, same as the
   phase-8 ladder.
+
+**Run `20260805T121641Z` (30/30, $4.20): no template-reading — every
+dimension within margin, none dropped.** Fabrication check first:
+zero evidence failures, probe valid. Against the originals'
+first-trial rows: found_top1 14/24 vs 14/24 (±0), found_top3 20/24
+vs 18/24 (+2), evidence 24/24 vs 24/24, honesty 5/6 vs 4/6 (+1),
+discipline 30/30 vs 29/30 (+1), narrative 30/30 both. The re-skins
+scored marginally BETTER — consistent with fresh-surface variance
+and inconsistent with memorized generator surface. Decision rule
+outcome: hypothesis holds, escalation not triggered, re-skin
+rotation stays a probe rather than becoming a standing refresh
+step. The certified scores measure graph reasoning, not template
+recall — checked from inside the harness, $4.20 on the ledger.

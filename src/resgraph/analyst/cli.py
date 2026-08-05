@@ -39,7 +39,8 @@ def _summary(kind: str, p: dict[str, Any]) -> str:
         case "cutoff":
             return f"{p['reason']} exhausted at call {p['calls_used']}"
         case _:
-            return ""
+            pass
+    return ""
 
 
 def _cost(e: dict[str, Any]) -> str:

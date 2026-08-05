@@ -353,6 +353,67 @@
      "legendFormat": "total (run)"
     }
    ]
+  },
+  {
+   "id": 11,
+   "type": "timeseries",
+   "title": "Analyst SLO ratios (5m) \u2014 latency/cost >=0.95 (agent scraped, #145)",
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 0,
+    "y": 40
+   },
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "percentunit"
+    },
+    "overrides": []
+   },
+   "targets": [
+    {
+     "expr": "slo:analyst_latency:ratio_5m",
+     "refId": "A",
+     "legendFormat": "latency <=152s"
+    },
+    {
+     "expr": "slo:analyst_cost:ratio_5m",
+     "refId": "B",
+     "legendFormat": "cost <=$0.30"
+    }
+   ]
+  },
+  {
+   "id": 12,
+   "type": "timeseries",
+   "title": "Analyst degraded ratio (5m) \u2014 objective <=0.05 (agent scraped, #145)",
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 12,
+    "y": 40
+   },
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "percentunit"
+    },
+    "overrides": []
+   },
+   "targets": [
+    {
+     "expr": "slo:analyst_degraded:ratio_5m",
+     "refId": "A",
+     "legendFormat": "degraded"
+    }
+   ]
   }
  ],
  "templating": {

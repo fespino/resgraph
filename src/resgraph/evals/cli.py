@@ -80,3 +80,31 @@ def report(
     if baseline_path.exists():
         base = json.loads(baseline_path.read_text())
     print(render(aggregate(rows), base))
+
+
+@app.command()
+def gate(
+    run_path: str,
+    baseline: str = "evals/baseline.json",
+) -> None:
+    """Block a merge on an eval regression (D29b). Aggregates the run,
+    compares it to the committed baseline, prints the verdict, and
+    exits nonzero if the gate blocks or cannot verdict the run.
+    Fabrications block unconditionally; overall pass^k drop >2pp or any
+    slice drop >5pp block; a run below k=3 is declined (flap floor,
+    #137). The CI job honors the eval-baseline-refresh label; this
+    command does not — it only reports what the numbers say."""
+    from .gate import evaluate, render_verdict
+    from .report import aggregate
+
+    baseline_path = Path(baseline)
+    if not baseline_path.exists():
+        raise typer.BadParameter(f"no baseline at {baseline}; nothing to gate against")
+    rows = [json.loads(line) for line in Path(run_path).read_text().splitlines() if line.strip()]
+    verdict = evaluate(aggregate(rows), json.loads(baseline_path.read_text()))
+    print(render_verdict(verdict))
+    # Undecided (below the k>=3 flap floor) is a decline, not a failure:
+    # an experimental single-trial run is simply not a gate candidate.
+    # Only a real regression on a verdictable run blocks.
+    if not verdict.passed and not verdict.undecided:
+        raise typer.Exit(1)

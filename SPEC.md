@@ -1474,6 +1474,50 @@ runner exists (same trigger as D27's served-store move). If cost
 estimation needs the judge's own token spend (today's meter is
 worker-side and undercounts), the meter and the ledger merge.
 
+## D29b — Agent SLOs and the CI eval gate (phase 9)
+
+The release-gate half of D29, consuming the certified k=3 baseline.
+
+- **SLO objectives from the certified baseline** (D18
+  budgets-from-baselines): triage latency (good <= 152 s, 1.5x the
+  measured p95), cost/run (good <= $0.30, 2x the measured mean),
+  degraded rate (<= 5%), each with a 6x fast-burn alert mirroring
+  D18's shape. The eval floor (pass^k >= 0.65) is the gate itself,
+  not a scraped series. The `analyst_*` metrics are wired now and
+  populate when the agent runs as a scraped service (#145) —
+  instrument-before-subject, the phase's own ordering.
+- **The CI eval gate blocks a regression.** On PRs touching the
+  analyst/tools/prompts/evals globs, the gate aggregates a run and
+  compares it to the committed baseline: fabrications block
+  unconditionally (no threshold, no label); overall pass^k drop
+  > 2pp blocks; any slice drop > 5pp blocks (asymmetric because a
+  slice regression hides inside a flat overall). The regression
+  slice (`source:failure_derived`) and the budget-starved slice are
+  compared under their own names, not folded into the causal set.
+- **Flap floor (#137):** the gate declines to verdict a run below
+  k=3 — certification measured a 20% single-trial item-flip rate, so
+  a k=1 diff on marginal items reads noise. Declined is distinct
+  from blocked: an experimental single-trial run is simply not a
+  gate candidate.
+- **The comparison is free; the run is not.** CI runs the offline
+  comparison, never the paid suite — a ~$4 run per PR does not scale,
+  so a real behavior change ships its own fresh run and the gate
+  checks committed evidence. The only override is an
+  `eval-baseline-refresh` label (the CI job's concern, not the gate
+  module's) that downgrades a block to a report for a PR committing a
+  refreshed baseline; the label signals the gate, it does not bypass
+  review, and fabrications are never overridable.
+
+**Rejected:** running the paid suite on every PR (unaffordable and
+needs API secrets in CI — the free comparison gates committed
+evidence instead); a symmetric per-slice threshold (a slice
+regression is exactly what a flat overall hides, so the slice bar is
+looser in points and stricter in reach); a label that clears
+fabrications (the honesty property is not a threshold to negotiate).
+**Reversal condition:** a self-hosted runner with a scoped key makes
+per-PR suite runs viable — the gate mechanism is unchanged, only its
+trigger moves from committed-run to fresh-run.
+
 ## Phase contracts
 - The generator MUST emit D2 messages exactly and expose `--seed`
   for reproducibility.

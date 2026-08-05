@@ -1,0 +1,85 @@
+# promtool unit tests for the agent SLO rules — synthetic series prove
+# each burn alert fires under breach and stays quiet on a healthy run.
+rule_files:
+  - agent_slo.yml
+
+evaluation_interval: 15s
+
+tests:
+  # Latency breach: 10 runs/interval, only 5 within 152s (0.50 < 0.70).
+  - interval: 15s
+    input_series:
+      - series: 'analyst_run_seconds_bucket{le="152.0"}'
+        values: "0+5x40"
+      - series: "analyst_run_seconds_count"
+        values: "0+10x40"
+    alert_rule_test:
+      - eval_time: 8m
+        alertname: AnalystLatencyFastBurn
+        exp_alerts:
+          - exp_labels:
+              slo: analyst-latency
+            exp_annotations:
+              summary: >-
+                Analyst latency burning >=6x sustainable rate: under 70%
+                of triage runs answer within 152s.
+
+  # Latency healthy: 9 of 10 within 152s (0.90 > 0.70) — no alert.
+  - interval: 15s
+    input_series:
+      - series: 'analyst_run_seconds_bucket{le="152.0"}'
+        values: "0+9x40"
+      - series: "analyst_run_seconds_count"
+        values: "0+10x40"
+    alert_rule_test:
+      - eval_time: 8m
+        alertname: AnalystLatencyFastBurn
+        exp_alerts: []
+
+  # Cost breach: 10 runs/interval, only 4 within $0.30 (0.40 < 0.70).
+  - interval: 15s
+    input_series:
+      - series: 'analyst_run_cost_usd_bucket{le="0.3"}'
+        values: "0+4x40"
+      - series: "analyst_run_cost_usd_count"
+        values: "0+10x40"
+    alert_rule_test:
+      - eval_time: 8m
+        alertname: AnalystCostFastBurn
+        exp_alerts:
+          - exp_labels:
+              slo: analyst-cost
+            exp_annotations:
+              summary: >-
+                Analyst cost burning >=6x sustainable rate: under 70% of
+                triage runs cost <= $0.30.
+
+  # Degraded breach: 4 of 10 runs degraded (0.40 > 0.30).
+  - interval: 15s
+    input_series:
+      - series: 'analyst_runs_total{degraded="true"}'
+        values: "0+4x40"
+      - series: 'analyst_runs_total{degraded="false"}'
+        values: "0+6x40"
+    alert_rule_test:
+      - eval_time: 8m
+        alertname: AnalystDegradedFastBurn
+        exp_alerts:
+          - exp_labels:
+              slo: analyst-degraded
+            exp_annotations:
+              summary: >-
+                Analyst degraded ratio burning >=6x sustainable rate:
+                over 30% of triage runs are ending degraded.
+
+  # Degraded healthy: 1 of 10 degraded (0.10 < 0.30) — no alert.
+  - interval: 15s
+    input_series:
+      - series: 'analyst_runs_total{degraded="true"}'
+        values: "0+1x40"
+      - series: 'analyst_runs_total{degraded="false"}'
+        values: "0+9x40"
+    alert_rule_test:
+      - eval_time: 8m
+        alertname: AnalystDegradedFastBurn
+        exp_alerts: []

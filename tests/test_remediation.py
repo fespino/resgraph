@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 import pytest
 
 from resgraph.analyst.remediation import (
+    ROLLBACK_IRREVERSIBLE,
     PlannedStep,
     StepEvent,
     StepMachine,
@@ -136,6 +137,41 @@ def test_cancel_terminal_with_irreversible_step_named_in_summary():
     m._apply = apply
     m.execute()
     assert m.summary()["step_0"] == "irreversible"
+
+
+def test_rollback_can_discover_irreversibility():
+    def rollback(s):
+        return ROLLBACK_IRREVERSIBLE if s.target == "t0" else None
+
+    def apply(s):
+        if s.target == "t2":
+            raise RuntimeError("boom")
+        return "ref"
+
+    m = machine(apply=apply, rollback=rollback)
+    m.execute()
+    assert statuses(m, 1)[-1] == StepStatus.ROLLED_BACK
+    assert statuses(m, 0)[-1] == StepStatus.IRREVERSIBLE  # world moved under t0
+    assert m.summary()["step_0"] == "irreversible"
+
+
+def test_cancel_during_unwind_is_dropped():
+    m = machine()
+    rolled = []
+
+    def rollback(s):
+        m.cancel("fran")  # arrives mid-unwind; the unwind must finish
+        rolled.append(s.target)
+
+    def apply(s):
+        if s.target == "t2":
+            raise RuntimeError("boom")
+        return "ref"
+
+    m._apply, m._rollback = apply, rollback
+    m.execute()
+    assert rolled == ["t1", "t0"]  # both executed steps unwound
+    assert statuses(m, 0)[-1] == StepStatus.ROLLED_BACK
 
 
 def test_event_invariants_reject_bad_shapes():

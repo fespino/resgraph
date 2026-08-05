@@ -85,3 +85,21 @@ def test_bad_since_rejected(db):
         app, ["audit", "--tool", "world_diff", "--since", "fortnight", "--db", db]
     )
     assert result.exit_code != 0
+
+
+def test_verify_reports_intact_chain(db):
+    result = runner.invoke(app, ["audit", "r1", "--verify", "--db", db])
+    assert result.exit_code == 0
+    assert "chain ok" in result.output
+
+
+def test_verify_fails_loud_on_tampering(db):
+    import sqlite3
+
+    conn = sqlite3.connect(db)
+    conn.execute("UPDATE events SET payload = '{\"forged\": true}' WHERE seq=2")
+    conn.commit()
+    conn.close()
+    result = runner.invoke(app, ["audit", "r1", "--verify", "--db", db])
+    assert result.exit_code == 1
+    assert "chain broken at seq 2" in result.output

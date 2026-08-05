@@ -1429,6 +1429,51 @@ If plans grow beyond single-owner linear sequences (partial
 remediation toward a least-degraded state becomes a goal), the
 re-plan question reopens inside the machine, not outside it.
 
+## D29a — Hard budgets with graceful cutoff, and the judge spend breaker (phase 9)
+
+The runtime half of D29 (the SLOs and the CI eval gate are D29b,
+#140). Two budgets, both enforced in code, both honest about what a
+budget breach is:
+
+- **Cost and wall-clock ceilings, checked at the turn boundary.**
+  `run_triage` takes `max_cost_usd` (with a `cost_fn` meter — the
+  ceiling needs its meter, so they come as a pair) and `max_wall_s`.
+  The check runs between agent-loop turns, never mid-call — the same
+  boundary philosophy as D28's cancel, for the same reason: an
+  interrupt mid-commit recreates the partial-state class. On breach
+  the harness injects ONE final "conclude now" turn and marks the
+  run degraded with a `cutoff_reason` (tool_calls / tokens / cost /
+  wall_clock). **An exception is not a conclusion:** a starved run
+  still ends in a report, and that report's claims stay graded.
+- **The cutoff path is graded, not just implemented.** A
+  `budget_starved` dataset (one item per scenario type, same worlds
+  as their originals — the graded question changes, not the
+  scenario) runs under a tool-call floor that cannot reach the
+  cause. The `cutoff` dimension passes an honest degradation
+  (report produced, admits degraded) and fails a confident
+  conclusion under starvation; any fabricated claim it makes still
+  fails the evidence dimension. Starved items report in their own
+  slice — folding them into the causal-type slices would read a
+  by-design miss as a regression.
+- **The judge dimension gets a daily spend circuit breaker.** A
+  per-UTC-day ledger of estimated judge spend, warn once at 90%,
+  trip loudly at the cap (a SystemExit, not a skipped dimension — a
+  run silently missing judge rows would poison comparisons against
+  fully-judged baselines). Eval infrastructure has a bill; the cap
+  is how a retry loop is noticed before the invoice, the phase-8
+  spend-cap surprise promoted to enforcement on the eval side.
+
+**Rejected:** raising an exception on budget breach (loses the
+graded honest-degradation path — the whole point is that a starved
+run concludes honestly); mid-call cost checks (D28's partial-state
+class); a judge breaker that skips the dimension silently on trip
+(a partially-judged run is not comparable to a baseline and hides
+the overrun). **Reversal conditions:** the laptop-atomic JSON
+ledger moves to a real atomic counter the day a second concurrent
+runner exists (same trigger as D27's served-store move). If cost
+estimation needs the judge's own token spend (today's meter is
+worker-side and undercounts), the meter and the ledger merge.
+
 ## Phase contracts
 - The generator MUST emit D2 messages exactly and expose `--seed`
   for reproducibility.

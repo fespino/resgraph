@@ -23,12 +23,19 @@ def run(
     resume: str = "",
     max_cost: float = 0.0,
     skip_preflight: bool = False,
+    max_item_cost: float = 0.0,
+    max_item_seconds: float = 0.0,
+    judge_daily_cap: float = 10.0,
 ) -> None:
     """Run every scenario x trials against docker stores + the API;
     one JSONL row per (item, trial) lands in out_dir. --resume PATH
     appends to a truncated run file, skipping completed rows.
     --max-cost USD stops the run (resume-ready) once the estimated
-    worker spend reaches the cap; 0 means no cap. Run with a
+    worker spend reaches the cap; 0 means no cap. --max-item-cost /
+    --max-item-seconds are per-run harness ceilings (D29): breach
+    injects a final conclude-now turn and the row lands degraded with
+    its cutoff_reason. --judge-daily-cap USD trips the judge spend
+    breaker (ledger in data/judge-spend.json). Run with a
     project-scoped API key that carries its own spend cap — the key
     is read from the environment and never written anywhere."""
     from anthropic import Anthropic
@@ -52,6 +59,9 @@ def run(
         resume_path=Path(resume) if resume else None,
         max_cost=max_cost or None,
         skip_preflight=skip_preflight,
+        max_item_cost=max_item_cost or None,
+        max_item_seconds=max_item_seconds or None,
+        judge_daily_cap=judge_daily_cap,
     )
     print(out)
 

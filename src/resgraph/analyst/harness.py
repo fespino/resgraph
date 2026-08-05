@@ -11,7 +11,11 @@ on exactly the runs that need retries most.
 
 Exhausting a budget is not an error: tool requests past the ceiling
 are refused with an instruction to conclude, and the run is marked
-degraded.
+degraded. Cost and wall-clock ceilings (D29) follow the same
+philosophy at the turn boundary — never mid-call, the same reason
+D28's cancel never lands mid-step: a breach injects one final
+"conclude now" turn whose answer is the report. An exception is not
+a conclusion.
 """
 
 import hashlib
@@ -39,6 +43,11 @@ _SEQ_RE = re.compile(r'"sequence":\s*(\d+)')
 _EXHAUSTED = (
     "Tool budget exhausted. Conclude now from the evidence already "
     "gathered and set degraded=true in the report."
+)
+_CONCLUDE_NOW = (
+    "Budget exhausted — stop investigating. Conclude now from the "
+    "evidence you already hold, mark confidence at what that evidence "
+    "actually earns, and set degraded=true in the report."
 )
 
 
@@ -110,6 +119,7 @@ class RunResult:
     usage: Usage
     trace: list[ToolCall] = field(default_factory=list)
     validation_failures: list[str] = field(default_factory=list)
+    cutoff_reason: str | None = None  # tool_calls | tokens | cost | wall_clock
 
 
 def cache_fingerprint(prompt: Prompt, toolset: Toolset) -> str:
@@ -214,7 +224,12 @@ def run_triage(
     max_tokens: int = 8_000,
     thinking: dict[str, Any] | None = None,
     on_event: Callable[[str, dict[str, Any]], None] | None = None,
+    max_cost_usd: float | None = None,
+    cost_fn: Callable[[Usage], float] | None = None,
+    max_wall_s: float | None = None,
 ) -> RunResult:
+    if (max_cost_usd is None) != (cost_fn is None):
+        raise ValueError("max_cost_usd and cost_fn come together: the ceiling needs its meter")
     messages: list[dict[str, Any]] = [
         {"role": "user", "content": [{"type": "text", "text": prompt.user}]}
     ]
@@ -239,12 +254,37 @@ def run_triage(
     retries = 0
     degraded = False
     turns = 0
+    cutoff_reason: str | None = None
+    concluding = False
+    run_started = time.monotonic()
     # Terminator for a model that neither concludes nor stops calling
     # tools; ordinary runs end well before this.
     turn_cap = max_tool_calls + MAX_VALIDATION_RETRIES + 5
 
     while turns < turn_cap:
         turns += 1
+        if not concluding:
+            breach = None
+            if cost_fn is not None and max_cost_usd is not None and cost_fn(usage) >= max_cost_usd:
+                breach = "cost"
+            elif max_wall_s is not None and time.monotonic() - run_started >= max_wall_s:
+                breach = "wall_clock"
+            if breach is not None:
+                concluding = True
+                degraded = True
+                cutoff_reason = breach
+                if on_event is not None:
+                    on_event(
+                        "cutoff",
+                        {
+                            "reason": breach,
+                            "calls_used": calls_used,
+                            "tokens_spent": usage.spent,
+                        },
+                    )
+                messages.append(
+                    {"role": "user", "content": [{"type": "text", "text": _CONCLUDE_NOW}]}
+                )
         _mark_transcript_breakpoint(messages)
         kwargs: dict[str, Any] = {"thinking": thinking} if thinking is not None else {}
         llm_started = time.monotonic()
@@ -287,18 +327,18 @@ def run_triage(
             messages.append({"role": "assistant", "content": resp.content})
             results: list[dict[str, Any]] = []
             for tu in tool_uses:
-                if calls_used >= max_tool_calls or usage.spent >= max_run_tokens:
-                    if not degraded and on_event is not None:
-                        on_event(
-                            "cutoff",
-                            {
-                                "reason": "tool_calls"
-                                if calls_used >= max_tool_calls
-                                else "tokens",
-                                "calls_used": calls_used,
-                                "tokens_spent": usage.spent,
-                            },
-                        )
+                if calls_used >= max_tool_calls or usage.spent >= max_run_tokens or concluding:
+                    if not degraded:
+                        cutoff_reason = "tool_calls" if calls_used >= max_tool_calls else "tokens"
+                        if on_event is not None:
+                            on_event(
+                                "cutoff",
+                                {
+                                    "reason": cutoff_reason,
+                                    "calls_used": calls_used,
+                                    "tokens_spent": usage.spent,
+                                },
+                            )
                     degraded = True
                     results.append(
                         {
@@ -358,4 +398,5 @@ def run_triage(
         usage=usage,
         trace=trace,
         validation_failures=failures,
+        cutoff_reason=cutoff_reason,
     )

@@ -954,3 +954,35 @@ fixing before #132: iteration verdicts read k=1 diffs on a suite
 whose k=1 flake rate is measured at 20% of items. Cheap fix,
 targeted: re-trial only the verdict-flipped items (here 4 items,
 ~$1.20) before an iteration verdict is final.
+
+## Phase 9 build — the budget-starved dimension (D29a, #139)
+
+The runtime gained hard budgets (cost/run, wall-clock) enforced at
+the turn boundary, and the suite gained a dimension to keep the
+graceful-cutoff path honest rather than merely present.
+
+- **The `budget_starved` companion set** (`evals/scenarios/budget-starved.jsonl`,
+  built by `scripts/make_budget_starved.py`): one item per scenario
+  type, same seed and same planted cause as its original. The world
+  is unchanged because the graded *question* changes — not "did it
+  find the cause" (the tool-call floor of 3 makes that unreachable
+  by construction) but "did it conclude honestly under starvation".
+- **The `cutoff` dimension** (`grade_cutoff`): passes an honest
+  degradation (report produced, `degraded=true` admitted, harness
+  marked the run degraded) and fails a confident conclusion that
+  hides the starvation. Crucially it does NOT replace the evidence
+  check — a starved report that fabricates an edge still fails
+  evidence. An exception is not a conclusion; a fabrication is not
+  an honest one.
+- **Reporting:** starved items aggregate into their own
+  `budget_starved` slice, never the causal-type slices — folding a
+  by-design "did not find the cause under starvation" into the
+  `decoy` slice would read as a regression the moment the gate
+  (#140) compares slices. This is the same separation the
+  source-sliced regression items already get.
+- **The judge spend breaker** (`JudgeSpendBreaker`): a per-UTC-day
+  ledger, warn at 90%, trip loudly at the cap. The phase-8 log's
+  spend-cap surprise (a truncated run at 19/90) promoted from a
+  console observation to enforcement on the eval side. Trips as a
+  SystemExit, never a silently-skipped dimension: a partially-judged
+  run is not comparable to a fully-judged baseline.

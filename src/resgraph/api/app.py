@@ -8,6 +8,7 @@ store — laziness as an observable property, not a claim.
 
 import json
 import logging
+import threading
 import time
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
@@ -123,17 +124,25 @@ def create_app() -> FastAPI:
 app = create_app()
 
 
+_init_lock = threading.Lock()
+
+
 def get_ctx(request: Request):
     st = request.app.state
 
     def hot_session():
-        if st.driver is None:
-            st.driver = hot_client.get_driver()
+        # sync endpoints run in a threadpool: two concurrent first
+        # requests must not race two drivers into existence (#80,
+        # same class as the MCP server's init lock)
+        with _init_lock:
+            if st.driver is None:
+                st.driver = hot_client.get_driver()
         return st.driver.session()
 
     def cold_catalog():
-        if st.catalog is None:
-            st.catalog = cold_store.get_catalog()
+        with _init_lock:
+            if st.catalog is None:
+                st.catalog = cold_store.get_catalog()
         return st.catalog
 
     ctx = QueryContext(session_factory=hot_session, catalog_factory=cold_catalog)

@@ -48,7 +48,7 @@ def test_non_read_only_tool_is_refused_at_construction():
         name="mutate_things", hints=SimpleNamespace(read_only=False), privileged=False
     )
     with pytest.raises(RuntimeError, match="refuses"):
-        RegistryToolset(lambda: QueryContext(), entries=(write_tool,))
+        RegistryToolset(QueryContext, entries=(write_tool,))
 
 
 def test_lazy_context_caches_driver_and_catalog(monkeypatch):

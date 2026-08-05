@@ -17,6 +17,8 @@ degraded.
 import hashlib
 import json
 import re
+import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
@@ -211,6 +213,7 @@ def run_triage(
     max_run_tokens: int = MAX_RUN_TOKENS,
     max_tokens: int = 8_000,
     thinking: dict[str, Any] | None = None,
+    on_event: Callable[[str, dict[str, Any]], None] | None = None,
 ) -> RunResult:
     messages: list[dict[str, Any]] = [
         {"role": "user", "content": [{"type": "text", "text": prompt.user}]}
@@ -244,6 +247,7 @@ def run_triage(
         turns += 1
         _mark_transcript_breakpoint(messages)
         kwargs: dict[str, Any] = {"thinking": thinking} if thinking is not None else {}
+        llm_started = time.monotonic()
         resp = client.messages.create(
             model=model,
             max_tokens=max_tokens,
@@ -254,12 +258,34 @@ def run_triage(
         )
         usage.add(resp.usage)
         tool_uses = [b for b in resp.content if getattr(b, "type", None) == "tool_use"]
+        if on_event is not None:
+            on_event(
+                "llm_call",
+                {
+                    "turn": turns,
+                    "tool_uses": len(tool_uses),
+                    "latency_ms": int((time.monotonic() - llm_started) * 1000),
+                    "tokens": (getattr(resp.usage, "input_tokens", 0) or 0)
+                    + (getattr(resp.usage, "output_tokens", 0) or 0),
+                },
+            )
 
         if tool_uses:
             messages.append({"role": "assistant", "content": resp.content})
             results: list[dict[str, Any]] = []
             for tu in tool_uses:
                 if calls_used >= max_tool_calls or usage.spent >= max_run_tokens:
+                    if not degraded and on_event is not None:
+                        on_event(
+                            "cutoff",
+                            {
+                                "reason": "tool_calls"
+                                if calls_used >= max_tool_calls
+                                else "tokens",
+                                "calls_used": calls_used,
+                                "tokens_spent": usage.spent,
+                            },
+                        )
                     degraded = True
                     results.append(
                         {
@@ -272,11 +298,23 @@ def run_triage(
                     continue
                 calls_used += 1
                 args = dict(tu.input)
+                tool_started = time.monotonic()
                 outcome = toolset.execute(tu.name, args)
                 trace.append(ToolCall(tu.name, args, outcome.ok, outcome.payload))
                 if outcome.ok:
                     seen |= _ids(outcome.payload)
                     seen_sequences |= {int(m) for m in _SEQ_RE.findall(outcome.payload)}
+                if on_event is not None:
+                    on_event(
+                        "tool_call",
+                        {
+                            "tool": tu.name,
+                            "args": args,
+                            "ok": outcome.ok,
+                            "ids": sorted(_ids(outcome.payload)) if outcome.ok else [],
+                            "latency_ms": int((time.monotonic() - tool_started) * 1000),
+                        },
+                    )
                 results.append(
                     {
                         "type": "tool_result",

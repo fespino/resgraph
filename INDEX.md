@@ -3,7 +3,7 @@
 - SPEC.md — decisions (D-NN) + phase contracts
 - src/resgraph/schema.py — D2 update-message schema (pydantic)
 - src/resgraph/gen/ — deterministic world generator (D5–D7) + causal-scenario planting (D25): world, churn, scenarios, sinks, CLI
-- src/resgraph/analyst/ — the triage agent (D22–D23): harness loop, report models, prompts + cache audit, registry-derived Anthropic tool surface
+- src/resgraph/analyst/ — the triage agent (D22–D23) and its safe runtime (D26–D28): harness loop, report models, prompts + cache audit, registry-derived Anthropic tool surface, remediation step machine, approval gate, audit store + `resgraph-analyst` CLI
 - src/resgraph/evals/ — the analyst's eval harness (D24): deterministic graders, pinned judge, store-isolated runner, report; datasets + runs live in evals/
 - BENCHMARKS.md — measured numbers with hardware + method (D4)
 - EVALS.md — the analyst's iteration log (D24): protocol rules, per-run

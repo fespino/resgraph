@@ -1276,6 +1276,60 @@ taxonomy would drift from what the world model can express);
 LLM-generated ground truth (the eval would inherit the grader's
 blind spots).
 
+## D26 — Permission boundary and the typed approval gate (phase 9)
+
+Two tiers, structurally enforced: the agent's entire tool surface is
+read-only (D19), and the one privileged capability —
+`apply_remediation` — lives outside the agent loop entirely (D28's
+proposal boundary). Between the proposal and the execution sits a
+human gate with a specific shape:
+
+- **Approval is typed, not clicked.** The approver types the count
+  of steps being applied; a mismatched count re-asks with the true
+  count. A y/n prompt is reflex-compatible — a plan that grew a step
+  since the approver last looked sails through on muscle memory; a
+  typed count cannot.
+- **`skip N` drops a step; numbering never shifts.** Step numbers
+  stay stable across skips so a skipped step can be discussed by
+  number afterwards. Skipping every step is a rejection.
+- **The decision is itself an audit record:** approver, plan hash,
+  applied and skipped indices, time-to-decision. A 900ms approval of
+  a five-step plan is a reviewable fact.
+
+**Rejected:** y/n confirmation (reflex-compatible, see above);
+renumbering after a skip (makes the post-hoc conversation ambiguous:
+"step 2" would mean different steps before and after the skip).
+**Reversal condition:** if plans routinely exceed a dozen steps, a
+typed count stops proving the plan was read — the gate then needs a
+per-step acknowledgement, redesigned alongside the render.
+
+## D27 — Audit posture: the store owns payloads, surfaces own hashes (phase 9)
+
+One writer, embedded SQLite (`data/analyst-audit.db`): a `runs` table
+and a seq-ordered `events` table (llm_call / tool_call / step /
+approval / cutoff). The division of labor with D28:
+
+- **The audit store is the system of record and owns payloads** —
+  tool arguments, the resource ids each result surfaced, step
+  targets. Progress surfaces (StepEvents, metrics, traces) carry
+  status, hashes, and sizes only.
+- **The bar is: incident questions answered from the store alone,
+  with the agent stopped.** `audit --touched` ("what did the agent
+  look at before it proposed this?") reads one SQLite file. If
+  answering needs the agent re-run, it's logs, not an audit trail.
+- **The harness seam is additive:** `run_triage(on_event=...)`, a
+  plain callback — absent, nothing changes; present, every LLM call
+  carries its own latency and token count into the trail.
+- **No secrets in rows**, same rule the eval runner enforces: keys
+  live in the environment, never in run artifacts.
+
+**Rejected:** a composed Postgres service (laptop scale is the
+declared scale, and a trail that depends on a service being up is a
+trail with gaps exactly when it matters); structured logging as the
+audit surface (no seq contract, no queryable store of record).
+**Reversal condition:** a second concurrent writer or cross-machine
+runs — move to a served store, keeping the schema and the CLI.
+
 ## D28 — Execution protocol for the privileged tool (phase 9)
 
 Phase 9 adds the platform's first privileged capability —

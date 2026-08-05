@@ -35,13 +35,23 @@ from resgraph.cold import store as cold_store
 from resgraph.gen.scenarios import GeneratedScenario, Scenario, log_state, rebuild
 from resgraph.graph.ingest import apply_batch
 from resgraph.graph.loader import load_snapshot
-from resgraph.graph.schema import init_schema, wipe
+from resgraph.graph.schema import init_schema, node_count, wipe
 from resgraph.query.executor import QueryContext
 
 from .graders import DimResult, grade_discipline, grade_evidence, grade_found, grade_honesty
 from .judge import judge_narrative
+from .sanitize import secrets
 
 NEIGHBORHOOD_CAP = 12
+PREFLIGHT_NODE_CAP = 5_000
+
+# USD per 1M tokens (input, output), checked 2026-08-05; cache read
+# bills at 0.1x input, cache write at 1.25x input.
+PRICES_PER_MTOK: dict[str, tuple[float, float]] = {
+    "claude-opus-4-8": (5.0, 25.0),
+    "claude-sonnet-4-6": (3.0, 15.0),
+    "claude-haiku-4-5": (1.0, 5.0),
+}
 
 
 def load_scenarios(path: Path) -> list[Scenario]:
@@ -165,6 +175,47 @@ def _host() -> dict[str, Any]:
     }
 
 
+def preflight_store(driver: Any, *, cap: int = PREFLIGHT_NODE_CAP) -> None:
+    """Refuse a hot store that is clearly not an eval scratch store
+    (#94: the first paid run wiped a memgraph holding 32 hours of
+    data, and the delete OOM'd the store). A scenario world is ~60
+    resources plus churn; anything near the cap is someone's data."""
+    with driver.session() as session:
+        count = node_count(session)
+    if count > cap:
+        raise SystemExit(
+            f"preflight refused: hot store holds {count} nodes (cap {cap}) — "
+            "that looks like real data, not an eval scratch store. Wipe it "
+            "yourself or point the runner elsewhere; --skip-preflight overrides."
+        )
+
+
+def estimate_cost(tokens: dict[str, int], model: str) -> float:
+    """Worker-side estimate from a row's token block. The judge's own
+    calls are not in it, so this undercounts slightly: the guard is a
+    brake, not a bill — the ledger still comes from the console."""
+    if model not in PRICES_PER_MTOK:
+        raise SystemExit(f"--max-cost has no pricing for {model}; extend PRICES_PER_MTOK")
+    input_rate, output_rate = PRICES_PER_MTOK[model]
+    return (
+        tokens["input"] * input_rate
+        + tokens["output"] * output_rate
+        + tokens["cache_read"] * input_rate * 0.1
+        + tokens["cache_creation"] * input_rate * 1.25
+    ) / 1_000_000
+
+
+def assert_row_clean(row_json: str) -> None:
+    """No run row is written with secret-shaped content anywhere in it
+    (a model can echo its environment). Reuses the dataset secret
+    validator; details carry spans, never the match."""
+    details = secrets.scan(row_json)
+    if details:
+        raise SystemExit(
+            "refusing to write run row with secret-shaped content: " + "; ".join(details)
+        )
+
+
 def resume_state(
     path: Path, model: str, judge_model: str | None
 ) -> tuple[str, set[tuple[str, int]], set[str]]:
@@ -198,7 +249,14 @@ def run_eval(
     max_tool_calls: int = MAX_TOOL_CALLS,
     thinking: dict[str, Any] | None = None,
     resume_path: Path | None = None,
+    max_cost: float | None = None,
+    skip_preflight: bool = False,
 ) -> Path:
+    if max_cost is not None:
+        estimate_cost({"input": 0, "output": 0, "cache_read": 0, "cache_creation": 0}, model)
+    if not skip_preflight:
+        preflight_store(driver)
+    spent_usd = 0.0
     done: set[tuple[str, int]] = set()
     prior_fingerprints: set[str] = set()
     if resume_path is not None:
@@ -262,6 +320,13 @@ def run_eval(
                         judge_client=client if judge_model else None,
                         judge_model=judge_model,
                     )
+                tokens = {
+                    "input": result.usage.input_tokens,
+                    "output": result.usage.output_tokens,
+                    "cache_read": result.usage.cache_read_tokens,
+                    "cache_creation": result.usage.cache_creation_tokens,
+                    "total": result.usage.spent,
+                }
                 row = envpin | {
                     "scenario_id": spec.id,
                     "scenario_type": spec.scenario_type.value,
@@ -272,21 +337,27 @@ def run_eval(
                     "degraded": result.degraded,
                     "tool_calls": result.tool_calls,
                     "turns": result.turns,
-                    "tokens": {
-                        "input": result.usage.input_tokens,
-                        "output": result.usage.output_tokens,
-                        "cache_read": result.usage.cache_read_tokens,
-                        "cache_creation": result.usage.cache_creation_tokens,
-                        "total": result.usage.spent,
-                    },
+                    "tokens": tokens,
                     "cache_hit_rate": result.usage.cache_hit_rate,
                     "cache_fingerprint": fingerprint,
                     "latency_s": round(latency, 3),
                     "validation_failures": result.validation_failures,
                     "report": result.report.model_dump() if result.report else None,
                 }
-                f.write(json.dumps(row) + "\n")
+                row_json = json.dumps(row)
+                assert_row_clean(row_json)
+                f.write(row_json + "\n")
                 f.flush()
+                if max_cost is not None:
+                    spent_usd += estimate_cost(tokens, model)
+                    if spent_usd >= max_cost:
+                        print(
+                            f"stopping: estimated ${spent_usd:.2f} reached "
+                            f"--max-cost {max_cost:.2f}; completed rows are banked. "
+                            f"Resume with: resgraph-evals run --trials {trials} "
+                            f"--resume {out}"
+                        )
+                        return out
     return out
 
 

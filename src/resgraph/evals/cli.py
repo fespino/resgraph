@@ -21,10 +21,16 @@ def run(
     max_tool_calls: int = 15,
     thinking: str = "adaptive",
     resume: str = "",
+    max_cost: float = 0.0,
+    skip_preflight: bool = False,
 ) -> None:
     """Run every scenario x trials against docker stores + the API;
     one JSONL row per (item, trial) lands in out_dir. --resume PATH
-    appends to a truncated run file, skipping completed rows."""
+    appends to a truncated run file, skipping completed rows.
+    --max-cost USD stops the run (resume-ready) once the estimated
+    worker spend reaches the cap; 0 means no cap. Run with a
+    project-scoped API key that carries its own spend cap — the key
+    is read from the environment and never written anywhere."""
     from anthropic import Anthropic
 
     from resgraph.graph.client import get_driver
@@ -44,6 +50,8 @@ def run(
         max_tool_calls=max_tool_calls,
         thinking={"type": "adaptive"} if thinking == "adaptive" else None,
         resume_path=Path(resume) if resume else None,
+        max_cost=max_cost or None,
+        skip_preflight=skip_preflight,
     )
     print(out)
 

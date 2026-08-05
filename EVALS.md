@@ -872,3 +872,35 @@ outcome: hypothesis holds, escalation not triggered, re-skin
 rotation stays a probe rather than becoming a standing refresh
 step. The certified scores measure graph reasoning, not template
 recall — checked from inside the harness, $4.20 on the ledger.
+
+### Pre-registered experiment — one self-proposed harness iteration (#115; execution registered 2026-08-05, runs pending)
+
+The protocol is the issue's, unchanged. Execution details registered
+before any result:
+
+- **Sequencing correction, on the record:** #134 (judge anchors +
+  negative worked example) merged after certification and changed
+  both pinned instrument surfaces. Running the agent's proposal
+  directly against the certified baseline would confound two
+  changes. So a **bridge run** (30 scenarios, trials=1, no code
+  change) measures #134's effect alone and becomes the comparison
+  floor; the proposal's per-item diff reads against the bridge, not
+  the certification. One change per run, kept honest at the cost of
+  one extra ~$4 run.
+- **Proposal turn:** the pinned worker (`claude-opus-4-8`), one
+  call, given the iteration history, the certified run's per-item
+  outcomes, and the current prompt prefix. Asked for ONE harness
+  change in the standard pre-registration format, targeting the two
+  named residual buckets. The proposal is committed verbatim
+  (`evals/proposals/115-proposal.md`) before being applied.
+- **Gate, unchanged:** graders, judge, validators, and the mutation
+  gate are untouched by the agent; per-item diffs decide; the
+  honesty ordering ranks controls above recall;
+  consolidate-never-stack applies.
+- **Measure:** the iteration's pass-rate delta vs the bridge,
+  placed against the eight manual iterations' deltas.
+- **Decision rule (from the issue, restated):** non-regressing
+  delta comparable to the manual median → self-proposed iterations
+  graduate to a standing, still human-gated part of the program;
+  gamed or regressed → the writeup documents how the gate caught
+  it, which is its own result.

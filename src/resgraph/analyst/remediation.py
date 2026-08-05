@@ -10,9 +10,12 @@ store owns those.
 Cancel is cooperative and checked between steps only: a step is one
 gated apply, and interrupting mid-commit recreates the partial-state
 bug D12 exists to prevent. Rollback is reverse-order, best-effort,
-honest: a failed rollback is reported with its error and the chain
-continues — strict re-raise would leave later steps silently
-unattempted, the worst of both.
+honest, with a three-way contract: return ROLLBACK_IRREVERSIBLE when
+the world moved and the pre-state no longer restores anything, any
+other return is success, raise is rolled_back_failed — and in every
+case the chain continues; strict re-raise would leave later steps
+silently unattempted, the worst of both. Cancel requests arriving
+during the unwind are dropped: the unwind runs to completion.
 """
 
 from collections.abc import Callable
@@ -32,6 +35,11 @@ class StepStatus(StrEnum):
     IRREVERSIBLE = "irreversible"
     CANCELLED = "cancelled"
 
+
+# Sentinel a rollback callable returns to report that the step turned
+# out unrecoverable at rollback time — the honest middle between lying
+# (plain return) and alarming (raise).
+ROLLBACK_IRREVERSIBLE = object()
 
 _TERMINAL_FORWARD = {StepStatus.SUCCEEDED, StepStatus.FAILED, StepStatus.CANCELLED}
 _TERMINAL_ROLLBACK = {
@@ -98,7 +106,7 @@ class StepMachine:
         run_id: str,
         owner: str,
         apply: Callable[[PlannedStep], str],
-        rollback: Callable[[PlannedStep], None],
+        rollback: Callable[[PlannedStep], object],
     ) -> None:
         self.plan = plan
         self.run_id = run_id
@@ -145,10 +153,14 @@ class StepMachine:
                 self._emit(index, StepStatus.IRREVERSIBLE)
                 continue
             try:
-                self._rollback(step)
-                self._emit(index, StepStatus.ROLLED_BACK)
+                outcome = self._rollback(step)
             except Exception as e:
                 self._emit(index, StepStatus.ROLLED_BACK_FAILED, error=str(e))
+                continue
+            if outcome is ROLLBACK_IRREVERSIBLE:
+                self._emit(index, StepStatus.IRREVERSIBLE)
+            else:
+                self._emit(index, StepStatus.ROLLED_BACK)
 
     def execute(self) -> list[StepEvent]:
         executed: list[int] = []

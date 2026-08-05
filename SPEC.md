@@ -1322,6 +1322,17 @@ approval / cutoff). The division of labor with D28:
   carries its own latency and token count into the trail.
 - **No secrets in rows**, same rule the eval runner enforces: keys
   live in the environment, never in run artifacts.
+- **Tamper-evident, not tamper-proof** (amended, #143): each event
+  row hashes the previous row's hash with its own content — a
+  per-run chain, verified by `audit <run_id> --verify`, which names
+  the first broken seq. One column turns "we trust the file" into
+  "the file can prove itself". Named residual: truncating the tail
+  is silent, as in any head-pointerless chain. Signing (a keyed MAC
+  or per-decision signatures, the fleet-scale shape) stays rejected
+  until there is a second party to distrust — at one writer on one
+  laptop, a key stored next to the database attests nothing the
+  chain doesn't, and the second party is also what a head pointer
+  needs.
 
 **Rejected:** a composed Postgres service (laptop scale is the
 declared scale, and a trail that depends on a service being up is a
@@ -1356,19 +1367,43 @@ read-only-by-construction property meaningful next to it:
   no event), scoped to the run's owner, terminal (post-cancel every
   executed step is rolled_back or irreversible, and the summary says
   which).
-- **Rollback: reverse-order, best-effort, honest.** A failed
-  rollback emits rolled_back_failed WITH the error and the chain
+- **Rollback: reverse-order, best-effort, honest — with a three-way
+  handler contract** (amended, #143). The rollback callable returns
+  ROLLBACK_IRREVERSIBLE when it discovers at rollback time that the
+  pre-state no longer restores anything (the world moved) — the
+  honest middle between lying (plain return) and alarming (raise);
+  any other return emits rolled_back; a raise emits
+  rolled_back_failed WITH the error. In every case the chain
   continues — strict re-raise leaves later steps silently
-  unattempted, the worst of both worlds.
+  unattempted, the worst of both worlds. Cancel requests arriving
+  during the unwind are deliberately dropped: the unwind runs to
+  completion.
 
 **Rejected:** executing steps in a plain loop with exception
 propagation (loses the event surface and the honest-rollback
 property at once); mid-step cancellation (D12's partial-state class);
 prompt-level enforcement of the proposal boundary (the tool's
-absence from the agent's blocks is structural; a paragraph is not).
-**Reversal condition:** if remediation ever needs multi-run
+absence from the agent's blocks is structural; a paragraph is not);
+re-planning from the intermediate state inside the machine, the
+shape of [Stripe's auto-remediation](https://stripe.dev/blog/how-stripe-uses-graph-search-and-state-machines-to-auto-remediate-a-global-database-fleet)
+(#143 — with a human approval gate, a re-plan is a NEW PROPOSAL and
+rides the same gate; after cancel or failure the machine's job is to
+leave an honestly-described state for the next proposal, not to
+plan); a status-discriminated StepEvent union making
+rolled_back_failed carry its error non-optionally, the constructive
+form of parse-don't-validate (#143 — the only value-level invariant
+is that one field pair, and the load-bearing invariants are
+SEQUENCING, which no value type can express; a seven-variant union
+relocating a two-line validator fails the don't-newtype-the-world
+test).
+**Reversal conditions:** if remediation ever needs multi-run
 coordination (two agents, one plan), the per-run owner scope and the
 single-writer event model get redesigned together, as one decision.
+If StepEvent variants accumulate variant-specific payloads, the
+constructive union stops being ceremony and the validator converts.
+If plans grow beyond single-owner linear sequences (partial
+remediation toward a least-degraded state becomes a goal), the
+re-plan question reopens inside the machine, not outside it.
 
 ## Phase contracts
 - The generator MUST emit D2 messages exactly and expose `--seed`

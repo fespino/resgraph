@@ -12,8 +12,17 @@ The harness feeds this through its `on_event` seam; the approval flow
 and the step machine write their own kinds through the same writer.
 SQLite over a composed service on purpose: the trail must outlive the
 run and open anywhere, and laptop scale is the declared scale.
+
+The trail is tamper-EVIDENT, not tamper-proof: each event row hashes
+the previous row's hash together with its own content (a per-run
+chain), so an edited row, an inserted row, or a deletion before the
+tail breaks every hash after it — `verify_chain` names the first
+broken seq. The named residual: truncating the tail is silent, as in
+any head-pointerless hash chain; the answer to that is a second
+party holding the head, which D27 defers until there is one.
 """
 
+import hashlib
 import json
 import sqlite3
 from collections.abc import Callable
@@ -50,6 +59,7 @@ CREATE TABLE IF NOT EXISTS events (
   latency_ms INTEGER,
   tokens INTEGER,
   ts TEXT NOT NULL,
+  row_hash TEXT NOT NULL,
   PRIMARY KEY (run_id, seq)
 );
 CREATE INDEX IF NOT EXISTS events_kind_ts ON events (kind, ts);
@@ -160,10 +170,17 @@ class AuditStore:
         row = self._conn.execute(
             "SELECT COALESCE(MAX(seq), -1) + 1 FROM events WHERE run_id=?", (run_id,)
         ).fetchone()
+        prev = self._conn.execute(
+            "SELECT row_hash FROM events WHERE run_id=? ORDER BY seq DESC LIMIT 1", (run_id,)
+        ).fetchone()
+        seq, body, when = row[0], json.dumps(payload), _iso(ts) or _now()
+        digest = _chain_hash(
+            prev[0] if prev else "", run_id, seq, kind, body, latency_ms, tokens, when
+        )
         self._conn.execute(
-            "INSERT INTO events (run_id, seq, kind, payload, latency_ms, tokens, ts)"
-            " VALUES (?,?,?,?,?,?,?)",
-            (run_id, row[0], kind, json.dumps(payload), latency_ms, tokens, _iso(ts) or _now()),
+            "INSERT INTO events (run_id, seq, kind, payload, latency_ms, tokens, ts, row_hash)"
+            " VALUES (?,?,?,?,?,?,?,?)",
+            (run_id, seq, kind, body, latency_ms, tokens, when, digest),
         )
         self._conn.commit()
 
@@ -220,6 +237,21 @@ class AuditStore:
             for run_id, seq, kind, payload, ts in rows
         ]
 
+    def verify_chain(self, run_id: str) -> int | None:
+        """Recompute the per-run hash chain; return the first seq whose
+        stored hash disagrees, or None if the trail proves itself."""
+        rows = self._conn.execute(
+            "SELECT seq, kind, payload, latency_ms, tokens, ts, row_hash FROM events"
+            " WHERE run_id=? ORDER BY seq",
+            (run_id,),
+        ).fetchall()
+        prev = ""
+        for seq, kind, payload, latency_ms, tokens, ts, row_hash in rows:
+            if _chain_hash(prev, run_id, seq, kind, payload, latency_ms, tokens, ts) != row_hash:
+                return int(seq)
+            prev = row_hash
+        return None
+
     def run_row(self, run_id: str) -> dict[str, Any] | None:
         row = self._conn.execute("SELECT * FROM runs WHERE run_id=?", (run_id,)).fetchone()
         if row is None:
@@ -235,6 +267,20 @@ def parse_since(text: str) -> timedelta:
     if unit not in units or not text[:-1].isdigit():
         raise ValueError(f"--since wants <n>d|<n>h|<n>m, got {text!r}")
     return timedelta(**{units[unit]: int(text[:-1])})
+
+
+def _chain_hash(
+    prev: str,
+    run_id: str,
+    seq: int,
+    kind: str,
+    payload: str,
+    latency_ms: int | None,
+    tokens: int | None,
+    ts: str,
+) -> str:
+    material = json.dumps([prev, run_id, seq, kind, payload, latency_ms, tokens, ts])
+    return hashlib.sha256(material.encode()).hexdigest()
 
 
 def _now() -> str:

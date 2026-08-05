@@ -57,6 +57,7 @@ def audit_cmd(
     run_id: str | None = typer.Argument(None, help="Run to inspect; omit with --tool."),
     touched: bool = typer.Option(False, "--touched", help="Distinct resources read/written."),
     trace: bool = typer.Option(False, "--trace", help="Span tree with per-span latency."),
+    verify: bool = typer.Option(False, "--verify", help="Recompute the tamper-evidence chain."),
     tool: str | None = typer.Option(None, "--tool", help="Cross-run history for one tool."),
     since: str | None = typer.Option(None, "--since", help="Window for --tool: 7d, 24h, 30m."),
     db: str | None = typer.Option(None, "--db", help="Audit store path [data/analyst-audit.db]."),
@@ -74,6 +75,13 @@ def audit_cmd(
             return
         if run_id is None:
             raise typer.BadParameter("give a run_id, or --tool for cross-run history")
+        if verify:
+            broken = store.verify_chain(run_id)
+            if broken is not None:
+                typer.echo(f"chain broken at seq {broken} — the trail was altered there")
+                raise typer.Exit(1)
+            typer.echo(f"chain ok ({len(store.timeline(run_id))} events)")
+            return
         if touched:
             t = store.touched(run_id)
             typer.echo("read:    " + (", ".join(t["read"]) or "(none)"))

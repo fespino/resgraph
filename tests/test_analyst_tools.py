@@ -51,6 +51,27 @@ def test_non_read_only_tool_is_refused_at_construction():
         RegistryToolset(QueryContext, entries=(write_tool,))
 
 
+def test_open_world_tool_is_refused_by_the_composition_rule():
+    web_tool = SimpleNamespace(
+        name="fetch_url",
+        privileged=False,
+        hints=SimpleNamespace(read_only=True, destructive=False, idempotent=True, open_world=True),
+    )
+    with pytest.raises(RuntimeError, match="composition"):
+        RegistryToolset(QueryContext, entries=(web_tool,))
+
+
+def test_privileged_tool_never_reaches_the_agent_surface():
+    gated = SimpleNamespace(
+        name="apply_remediation",
+        privileged=True,
+        hints=SimpleNamespace(read_only=True, destructive=False, idempotent=True, open_world=False),
+    )
+    with pytest.raises(RuntimeError, match="refuses"):
+        RegistryToolset(QueryContext, entries=(gated,))
+    assert "apply_remediation" not in {b["name"] for b in toolset().blocks()}
+
+
 def test_lazy_context_caches_driver_and_catalog(monkeypatch):
     from resgraph.analyst import tools as mod
 

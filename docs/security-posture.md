@@ -141,6 +141,34 @@ accepts SQL text** — that change must revisit both the D15 rejection
 and this paragraph. B608 stays enabled repo-wide precisely so that
 day is loud.
 
+## The agent surface, walked against OWASP LLM06 (2026-08-05, #143)
+
+[LLM06:2025 Excessive Agency](https://genai.owasp.org/llmrisk/llm062025-excessive-agency/)
+is the standard external checklist for agent tool surfaces. Walked
+against the shipped analyst runtime (D19 registry, D26 permission
+boundary, D28 execution protocol) — an external checklist catches
+what self-designed reviews rationalize, so the walk is recorded, per
+item, including the two items that are only partially ours to claim:
+
+| LLM06 item | Our control | Status |
+|---|---|---|
+| 1. Minimize extensions | Five read tools, registry-canonical (D19); the toolset constructor refuses anything more | enforced |
+| 2. Minimize extension functionality | Task-shaped tools (blast_radius, world_diff…), not generic query passthrough; raw query access is a recorded D15/D16 rejection | enforced |
+| 3. Avoid open-ended extensions | No shell, no eval, no open-ended fetch; open-world tools refused at construction by the D26 session composition rule | enforced |
+| 4. Minimize extension permissions | Tools carry `resgraph:read` scope only; `CallerContext` pins scopes per call | enforced |
+| 5. Execute in user's (minimal) context | Single-principal system today — the analyst runs as the operator; no per-user identity to narrow to | partial, honest gap |
+| 6. Require user approval for high-impact actions | The typed approval gate (D26): rendered plan, irreversibility declared before deciding, typed step count, decision as audit record | enforced |
+| 7. Complete mediation | The privileged tool is absent from the agent's tool blocks (D28) — authorization is structural, downstream of the model; a model that requests it anyway gets an error outcome (tested with an injection-shaped run) | enforced |
+| 8. Sanitise inputs/outputs | Referential validation (only observed ids citable), verdict arithmetic checked, SAST in CI (bandit + CodeQL) | enforced |
+| Log & monitor (harm limitation) | D27 audit trail: every llm_call/tool_call/step/approval/cutoff, hash-chained, queryable with the agent stopped | enforced |
+| Rate-limiting (harm limitation) | Tool-call and token budgets in the harness (D20/D22); cost ceilings and the judge spend breaker are D29 scope (#139) | partial until #139 |
+
+The two honest gaps: item 5 has no multi-user story because there are
+no users to separate yet (it becomes real work the day a second
+principal exists), and the rate-limiting row's cost half lands with
+D29. Neither is a finding the checklist missed — both are recorded
+reversal/arrival conditions.
+
 ## Honest limitations
 
 - **Solo review.** One maintainer means no second approver; branch

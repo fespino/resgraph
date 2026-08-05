@@ -11,6 +11,7 @@ from test_analyst_harness import (
     FakeToolset,
     response,
     text,
+    thinking,
     tool_use,
 )
 from test_approval import gate, plan
@@ -132,6 +133,37 @@ def test_approval_recorded_with_time_to_decision(store):
     assert event["kind"] == "approval"
     assert event["payload"]["approved"] and event["payload"]["approver"] == "fran"
     assert event["latency_ms"] == decision.time_to_decision_ms
+
+
+def test_llm_call_records_reasoning_when_returned(store):
+    client = FakeClient(
+        [
+            response(thinking(), tool_use("t1", "fetch_resource", {"resource_id": "host-000001"})),
+            response(text(VALID_REPORT)),
+        ]
+    )
+    run_triage(PROMPT, FakeToolset(), client, model=MODEL, on_event=store.sink("r1"))
+    llm = [e for e in store.timeline("r1") if e["kind"] == "llm_call"]
+    assert llm[0]["payload"]["thinking_form"] == "recorded"
+    assert "considering the host" in llm[0]["payload"]["thinking"]
+    assert llm[1]["payload"]["thinking_form"] == "absent"
+    assert "thinking" not in llm[1]["payload"]
+
+
+def test_llm_call_labels_elided_reasoning(store):
+    from types import SimpleNamespace
+
+    empty = SimpleNamespace(type="thinking", thinking="", signature="sig")
+    client = FakeClient(
+        [
+            response(empty, tool_use("t1", "fetch_resource", {"resource_id": "host-000001"})),
+            response(text(VALID_REPORT)),
+        ]
+    )
+    run_triage(PROMPT, FakeToolset(), client, model=MODEL, on_event=store.sink("r1"))
+    llm = [e for e in store.timeline("r1") if e["kind"] == "llm_call"]
+    assert llm[0]["payload"]["thinking_form"] == "elided"
+    assert "thinking" not in llm[0]["payload"]
 
 
 def test_chain_verifies_across_all_writers(store):

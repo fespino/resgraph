@@ -1295,13 +1295,29 @@ human gate with a specific shape:
 - **The decision is itself an audit record:** approver, plan hash,
   applied and skipped indices, time-to-decision. A 900ms approval of
   a five-step plan is a reviewable fact.
+- **The tier boundary is a SESSION composition rule, not a per-tool
+  judgment** (amended, #143). Risk lives in tool combinations: a
+  session holding private-data reads plus an untrusted-content
+  channel plus a write channel is the
+  [lethal trifecta](https://simonwillison.net/series/prompt-injection/),
+  and each leg alone can look justified. The analyst session reads
+  platform data, so its toolset admits no open-world tool and no
+  write-capable tool — enforced at toolset construction (the
+  registry's annotation hints are the vocabulary; see
+  [Tool Annotations as Risk Vocabulary](https://blog.modelcontextprotocol.io/posts/2026-03-16-tool-annotations/)),
+  refused with the rule named, not just the tool.
 
 **Rejected:** y/n confirmation (reflex-compatible, see above);
 renumbering after a skip (makes the post-hoc conversation ambiguous:
-"step 2" would mean different steps before and after the skip).
+"step 2" would mean different steps before and after the skip);
+per-tool risk assessment as the only gate (a session of three
+individually-defensible tools can compose the trifecta).
 **Reversal condition:** if plans routinely exceed a dozen steps, a
 typed count stops proving the plan was read — the gate then needs a
-per-step acknowledgement, redesigned alongside the render.
+per-step acknowledgement, redesigned alongside the render. If the
+analyst ever legitimately needs an open-world tool (docs lookup),
+the composition rule forces a structural split — a separate session
+without platform reads — rather than an exception.
 
 ## D27 — Audit posture: the store owns payloads, surfaces own hashes (phase 9)
 
@@ -1320,6 +1336,14 @@ approval / cutoff). The division of labor with D28:
 - **The harness seam is additive:** `run_triage(on_event=...)`, a
   plain callback — absent, nothing changes; present, every LLM call
   carries its own latency and token count into the trail.
+- **Reasoning blocks land in the trail when the API returns them**
+  (amended, #143): a monitor can only read what the trail recorded,
+  and monitorability inherits a necessity condition
+  ([arXiv:2507.05246](https://arxiv.org/abs/2507.05246)). The
+  llm_call row labels what the response shape can actually show —
+  recorded (text present; full chain-of-thought vs summary is the
+  model's setting, not distinguishable from the response), elided
+  (blocks without text), absent.
 - **No secrets in rows**, same rule the eval runner enforces: keys
   live in the environment, never in run artifacts.
 - **Tamper-evident, not tamper-proof** (amended, #143): each event

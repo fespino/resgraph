@@ -4,6 +4,12 @@ Same derivation discipline as the MCP and HTTP surfaces — TOOL_REGISTRY
 is the only source, and this surface additionally refuses anything that
 is not read-only: the agent's surface is safe by construction, not by
 prompt.
+
+The refusal is a SESSION composition rule, not a per-tool one (D26):
+this session reads platform data, so no open-world tool (untrusted
+content in) and no write-capable tool (a channel out) may join it —
+holding all three at once is the lethal trifecta. Risk lives in the
+combination; each tool alone can be justified.
 """
 
 import json
@@ -44,6 +50,11 @@ class RegistryToolset:
             if not entry.hints.read_only or entry.privileged:
                 raise RuntimeError(
                     f"tool {entry.name!r} is not a plain read tool; the analyst surface refuses it"
+                )
+            if entry.hints.open_world:
+                raise RuntimeError(
+                    f"tool {entry.name!r} is open-world; a session reading platform "
+                    "data admits no untrusted-content channel (D26 composition rule)"
                 )
         self._entries = {e.name: e for e in entries}
         self._qctx_factory = qctx_factory

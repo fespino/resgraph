@@ -259,16 +259,29 @@ def run_triage(
         usage.add(resp.usage)
         tool_uses = [b for b in resp.content if getattr(b, "type", None) == "tool_use"]
         if on_event is not None:
-            on_event(
-                "llm_call",
-                {
-                    "turn": turns,
-                    "tool_uses": len(tool_uses),
-                    "latency_ms": int((time.monotonic() - llm_started) * 1000),
-                    "tokens": (getattr(resp.usage, "input_tokens", 0) or 0)
-                    + (getattr(resp.usage, "output_tokens", 0) or 0),
-                },
-            )
+            # A monitor can only read what the trail recorded: reasoning
+            # blocks land in the audit row when the API returns them.
+            # The response shape cannot distinguish full CoT from a
+            # summary, so the form labels what we can see: recorded
+            # (text present), elided (blocks without text), absent.
+            reasoning = [
+                t
+                for b in resp.content
+                if getattr(b, "type", None) == "thinking"
+                if (t := getattr(b, "thinking", "") or "")
+            ]
+            had_blocks = any(getattr(b, "type", None) == "thinking" for b in resp.content)
+            event: dict[str, Any] = {
+                "turn": turns,
+                "tool_uses": len(tool_uses),
+                "thinking_form": "recorded" if reasoning else "elided" if had_blocks else "absent",
+                "latency_ms": int((time.monotonic() - llm_started) * 1000),
+                "tokens": (getattr(resp.usage, "input_tokens", 0) or 0)
+                + (getattr(resp.usage, "output_tokens", 0) or 0),
+            }
+            if reasoning:
+                event["thinking"] = "\n\n".join(reasoning)
+            on_event("llm_call", event)
 
         if tool_uses:
             messages.append({"role": "assistant", "content": resp.content})

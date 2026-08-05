@@ -1,97 +1,137 @@
-"""Mutation check for the grading layer: break each grader on purpose
-and require the test suite to notice.
+"""Mutation check for the measurement layer: break each grader and
+harness validator on purpose and require the test suite to notice.
 
-Run after any grader change: `uv run python evals/meta/mutate_graders.py`.
+Run after any grader or validator change:
+`uv run python evals/meta/mutate_graders.py`.
 Exits nonzero if any mutant survives; a survivor is a test gap and
-must become a test before the grader change merges. Results are
-recorded in EVALS.md ("Grader verification").
+must become a test before the change merges. Results are recorded in
+EVALS.md ("Grader verification").
 """
 
 import pathlib
 import subprocess
 import sys
 
-SRC = pathlib.Path(__file__).resolve().parents[2] / "src" / "resgraph" / "evals"
-TESTS = ["tests/test_evals_graders.py"]
+SRC = pathlib.Path(__file__).resolve().parents[2] / "src" / "resgraph"
+
+TESTS_BY_FILE = {
+    "evals/graders.py": ["tests/test_evals_graders.py"],
+    "evals/report.py": ["tests/test_evals_graders.py"],
+    "evals/judge.py": ["tests/test_evals_graders.py"],
+    "analyst/harness.py": [
+        "tests/test_analyst_harness.py",
+        "tests/test_analyst_invariants.py",
+    ],
+}
 
 MUTANTS: list[tuple[str, str, str, str]] = [
     (
-        "graders.py",
+        "evals/graders.py",
         "seqs[0] == truth.causal_sequence",
         "seqs[0] != truth.causal_sequence",
         "found_top1: comparison inverted",
     ),
     (
-        "graders.py",
+        "evals/graders.py",
         "truth.causal_sequence in seqs[:3]",
         "truth.causal_sequence in seqs",
         "found_top3: top-3 window removed (any rank passes)",
     ),
     (
-        "graders.py",
+        "evals/graders.py",
         "if (dependent, dependency) not in edges:",
         "if (dependency, dependent) not in edges:",
         "evidence: edge orientation flipped",
     ),
     (
-        "graders.py",
+        "evals/graders.py",
         "for dependency, dependent in pairwise(s.mechanism_path):",
         "for dependency, dependent in pairwise([]):",
         "evidence: edge checking disabled",
     ),
     (
-        "graders.py",
+        "evals/graders.py",
         "if s.sequence not in log_sequences:",
         "if s.sequence in log_sequences:",
         "evidence: log-existence check inverted",
     ),
     (
-        "graders.py",
+        "evals/graders.py",
         "passed = report.no_confident_candidate and not confident",
         "passed = report.no_confident_candidate or not confident",
         "honesty: AND weakened to OR",
     ),
     (
-        "graders.py",
+        "evals/graders.py",
         'if s.confidence == "high"',
         'if s.confidence == "medium"',
         "honesty: high-confidence detection retargeted",
     ),
     (
-        "graders.py",
+        "evals/graders.py",
         "if calls.count((name, args)) > 1",
         "if calls.count((name, args)) > 99",
         "discipline: repeated-call detection disabled",
     ),
     (
-        "graders.py",
+        "evals/graders.py",
         "result.usage.uncached_fraction > UNCACHED_CEILING",
         "result.usage.uncached_fraction < UNCACHED_CEILING",
         "discipline: uncached-fraction gate inverted",
     ),
     (
-        "graders.py",
+        "evals/graders.py",
         "if result.validation_failures:",
         "if not result.validation_failures:",
         "discipline: parse-first-try check inverted",
     ),
     (
-        "report.py",
+        "evals/report.py",
         "sum(all(v) for v in by_item.values())",
         "sum(any(v) for v in by_item.values())",
         "report: pass^k computed as pass@k",
     ),
     (
-        "report.py",
+        "evals/report.py",
         'return bool(dims.get("honesty", {}).get("passed"))',
         "return True",
         "report: controls always pass",
     ),
     (
-        "judge.py",
+        "evals/judge.py",
         'return DimResult("narrative", score >= PASS_SCORE',
         'return DimResult("narrative", score > PASS_SCORE',
         "judge: pass boundary off by one",
+    ),
+    (
+        "analyst/harness.py",
+        "if report.no_confident_candidate == confident:",
+        "if report.no_confident_candidate != confident:",
+        "harness: abstention-flag arithmetic inverted",
+    ),
+    (
+        "analyst/harness.py",
+        "if s.verdict.event_found and s.sequence == 0:",
+        "if s.verdict.event_found and s.sequence < 0:",
+        "harness: sequence-0 exclusion removed",
+    ),
+    (
+        "analyst/harness.py",
+        "if rid not in seen",
+        "if False and rid not in seen",
+        "harness: referential check disabled",
+    ),
+    (
+        "analyst/harness.py",
+        "elif s.verdict.event_found and s.sequence not in seen_sequences:",
+        "elif s.verdict.event_found and s.sequence in seen_sequences:",
+        "harness: event_found log check inverted",
+    ),
+    (
+        "analyst/harness.py",
+        'last[-1]["cache_control"] = {"type": "ephemeral"}',
+        "pass",
+        "harness: transcript breakpoint marking removed",
     ),
 ]
 
@@ -108,7 +148,17 @@ def main() -> int:
         path.write_text(original.replace(old, new, 1))
         try:
             proc = subprocess.run(
-                ["uv", "run", "pytest", *TESTS, "-q", "-x", "-o", "addopts=", "--no-header"],
+                [
+                    "uv",
+                    "run",
+                    "pytest",
+                    *TESTS_BY_FILE[fname],
+                    "-q",
+                    "-x",
+                    "-o",
+                    "addopts=",
+                    "--no-header",
+                ],
                 capture_output=True,
                 text=True,
             )

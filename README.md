@@ -23,12 +23,13 @@
 | src/resgraph/evals/cli.py                    |       23 |       23 |      0% |      3-64 |
 | src/resgraph/evals/graders.py                |       42 |        2 |     95% |    76, 84 |
 | src/resgraph/evals/judge.py                  |       11 |        0 |    100% |           |
-| src/resgraph/evals/report.py                 |       51 |        2 |     96% |   29, 110 |
-| src/resgraph/evals/runner.py                 |      134 |       83 |     38% |48, 54-69, 78-88, 107-133, 137-143, 155-156, 177, 202-289, 294-295 |
+| src/resgraph/evals/report.py                 |       52 |        2 |     96% |   29, 111 |
+| src/resgraph/evals/runner.py                 |      134 |       83 |     38% |48, 54-69, 78-88, 107-133, 137-143, 155-156, 177, 202-290, 295-296 |
+| src/resgraph/evals/sanitize.py               |       32 |        1 |     97% |        38 |
 | src/resgraph/gen/\_\_init\_\_.py             |        0 |        0 |    100% |           |
 | src/resgraph/gen/churn.py                    |       65 |        4 |     94% |47-49, 108 |
 | src/resgraph/gen/cli.py                      |       75 |       13 |     83% |89-94, 105-110, 149-150 |
-| src/resgraph/gen/scenarios.py                |      223 |       13 |     94% |83, 130, 133, 135, 269, 282-284, 318, 327, 336, 402, 430 |
+| src/resgraph/gen/scenarios.py                |      226 |       13 |     94% |83, 130, 133, 135, 269, 282-284, 319, 328, 337, 403, 431 |
 | src/resgraph/gen/sinks.py                    |       20 |        0 |    100% |           |
 | src/resgraph/gen/world.py                    |      115 |        0 |    100% |           |
 | src/resgraph/graph/\_\_init\_\_.py           |        0 |        0 |    100% |           |
@@ -57,7 +58,7 @@
 | src/resgraph/tools/context.py                |        6 |        0 |    100% |           |
 | src/resgraph/tools/http.py                   |       21 |        0 |    100% |           |
 | src/resgraph/tools/registry.py               |       20 |        0 |    100% |           |
-| **TOTAL**                                    | **2522** |  **213** | **92%** |           |
+| **TOTAL**                                    | **2558** |  **214** | **92%** |           |
 
 
 ## Setup coverage badge

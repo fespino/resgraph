@@ -29,6 +29,7 @@ dependencies = [
 
 [project.scripts]
 resgraph = "resgraph.cli:app"
+resgraph-analyst = "resgraph.analyst.cli:app"
 resgraph-evals = "resgraph.evals.cli:app"
 resgraph-gen = "resgraph.gen.cli:app"
 resgraph-mcp = "resgraph.mcp.server:main"

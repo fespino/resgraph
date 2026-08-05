@@ -13,9 +13,7 @@ RESKIN = Path("evals/scenarios/reskin-100k.jsonl")
 
 def load(path):
     return [
-        Scenario.model_validate_json(line)
-        for line in path.read_text().splitlines()
-        if line.strip()
+        Scenario.model_validate_json(line) for line in path.read_text().splitlines() if line.strip()
     ]
 
 

@@ -1276,6 +1276,46 @@ taxonomy would drift from what the world model can express);
 LLM-generated ground truth (the eval would inherit the grader's
 blind spots).
 
+## D28 — Execution protocol for the privileged tool (phase 9)
+
+Phase 9 adds the platform's first privileged capability —
+`apply_remediation` — and this decision is the shape that keeps the
+read-only-by-construction property meaningful next to it:
+
+- **The model proposes; harness code executes.** The privileged tool
+  is never in the agent's tool blocks. The agent emits a plan and
+  stops; approval and execution live outside the loop, and the
+  approver sees the rendered plan with every irreversible step
+  declared BEFORE deciding — a step whose pre-state capture fails is
+  marked irreversible at render time, not discovered mid-execution.
+- **A step machine, not a for-loop.** Pydantic-validated StepEvents
+  (status ∈ started / succeeded / failed / rolled_back /
+  rolled_back_failed / irreversible / cancelled) with locked
+  invariants: step_index < total_steps; rolled_back_failed carries
+  its error; per index at most one started, one terminal-forward,
+  one terminal-rollback. Events carry no raw arguments — they are
+  progress surfaces; the audit store owns payloads.
+- **Cooperative cancel, between steps only.** A step is one gated
+  apply; interrupting mid-commit recreates the partial-state bug D12
+  exists to prevent. Five tested invariants: bounded latency (≤ one
+  step), idempotent, stale-safe (cancel after completion: no error,
+  no event), scoped to the run's owner, terminal (post-cancel every
+  executed step is rolled_back or irreversible, and the summary says
+  which).
+- **Rollback: reverse-order, best-effort, honest.** A failed
+  rollback emits rolled_back_failed WITH the error and the chain
+  continues — strict re-raise leaves later steps silently
+  unattempted, the worst of both worlds.
+
+**Rejected:** executing steps in a plain loop with exception
+propagation (loses the event surface and the honest-rollback
+property at once); mid-step cancellation (D12's partial-state class);
+prompt-level enforcement of the proposal boundary (the tool's
+absence from the agent's blocks is structural; a paragraph is not).
+**Reversal condition:** if remediation ever needs multi-run
+coordination (two agents, one plan), the per-run owner scope and the
+single-writer event model get redesigned together, as one decision.
+
 ## Phase contracts
 - The generator MUST emit D2 messages exactly and expose `--seed`
   for reproducibility.

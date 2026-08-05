@@ -134,6 +134,35 @@ def test_approval_recorded_with_time_to_decision(store):
     assert event["latency_ms"] == decision.time_to_decision_ms
 
 
+def test_chain_verifies_across_all_writers(store):
+    store.begin_run("r1", alert={"symptom": "unreachable"}, model=MODEL, git_ref="abc")
+    triage_with_sink(store)
+    decision, _ = gate(plan(), "3")
+    store.record_approval("r1", decision)
+    p = plan(1)
+    m = StepMachine(p, run_id="r1", owner="fran", apply=lambda s: "r", rollback=lambda s: None)
+    m.execute()
+    store.record_step_events("r1", m.events, p)
+    assert store.verify_chain("r1") is None
+
+
+def test_chain_names_the_tampered_row(store):
+    triage_with_sink(store)
+    store._conn.execute(
+        "UPDATE events SET payload = json_set(payload, '$.tool', 'world_diff')"
+        " WHERE run_id='r1' AND seq=1"
+    )
+    store._conn.commit()
+    assert store.verify_chain("r1") == 1
+
+
+def test_chain_breaks_on_mid_trail_deletion(store):
+    triage_with_sink(store)
+    store._conn.execute("DELETE FROM events WHERE run_id='r1' AND seq=1")
+    store._conn.commit()
+    assert store.verify_chain("r1") == 2  # seq 2 chained through the missing row
+
+
 def test_parse_since():
     assert parse_since("7d") == timedelta(days=7)
     assert parse_since("24h") == timedelta(hours=24)

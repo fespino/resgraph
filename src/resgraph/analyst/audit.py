@@ -203,16 +203,18 @@ class AuditStore:
     def tool_history(self, tool: str, *, since: timedelta | None = None) -> list[dict[str, Any]]:
         """Cross-run history for one tool; `apply_remediation` rows are
         the write history."""
-        clauses = ["json_extract(payload, '$.tool') = ?"]
-        params: list[Any] = [tool]
-        if since is not None:
-            clauses.append("ts >= ?")
-            params.append(_iso(datetime.now(UTC) - since))
-        rows = self._conn.execute(
-            f"SELECT run_id, seq, kind, payload, ts FROM events"
-            f" WHERE {' AND '.join(clauses)} ORDER BY ts",
-            params,
-        ).fetchall()
+        if since is None:
+            rows = self._conn.execute(
+                "SELECT run_id, seq, kind, payload, ts FROM events"
+                " WHERE json_extract(payload, '$.tool') = ? ORDER BY ts",
+                (tool,),
+            ).fetchall()
+        else:
+            rows = self._conn.execute(
+                "SELECT run_id, seq, kind, payload, ts FROM events"
+                " WHERE json_extract(payload, '$.tool') = ? AND ts >= ? ORDER BY ts",
+                (tool, _iso(datetime.now(UTC) - since)),
+            ).fetchall()
         return [
             {"run_id": run_id, "seq": seq, "kind": kind, "payload": json.loads(payload), "ts": ts}
             for run_id, seq, kind, payload, ts in rows

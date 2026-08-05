@@ -934,9 +934,23 @@ The iteration, judged by its own pre-registration:
 - Net item pass 22/30 → 22/30. Fabrications 0, ninth consecutive.
 
 **Decision, per the registered rule:** self-proposed iterations do
-NOT graduate. The result is the documented catch: a plausible,
-partially-successful proposal whose own safety argument was wrong,
-stopped by the honesty ordering and per-item diffs — the instrument
-doing exactly the job the experiment existed to test. The change is
-reverted; the proposal, both runs, and this verdict stay on the
-record.
+NOT graduate. The change is reverted; the proposal, both runs, and
+this verdict stay on the record.
+
+**Calibration (added same day, after review challenge):** every
+per-item movement above is a single trial on items the same-day
+certification measured as reliability-marginal (6/30 items flip at
+trials=1; s42004 went cert-FFF → bridge-P → iteration-F; s42011's
+bridge pass was itself anomalous against its certified FFF; the
+recovered decoy s42025 was certified flaky, FPF). The verdict is
+procedurally sound — the clauses were pre-registered in the
+program's k=1 terms, and the honesty ordering makes reverting under
+uncertainty the designed behavior: a false revert costs a re-run, a
+false merge costs the core property. But the mechanism reading
+(confidence redistribution) is one observation, not an established
+effect, and the decoy gain is not distinguishable from that item's
+own flake. What this tension surfaces is a protocol gap worth
+fixing before #132: iteration verdicts read k=1 diffs on a suite
+whose k=1 flake rate is measured at 20% of items. Cheap fix,
+targeted: re-trial only the verdict-flipped items (here 4 items,
+~$1.20) before an iteration verdict is final.

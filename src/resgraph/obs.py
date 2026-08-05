@@ -28,6 +28,13 @@ DEFAULT_TELEMETRY_DIR = "data/telemetry"
 # counted by the bucket, never interpolated from a quantile.
 API_BUCKETS = (0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.6, 1.0, 2.5, 5.0, 10.0)
 BATCH_BUCKETS = (0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0)
+# Analyst SLO boundaries (D29b), objectives from the certified k=3
+# baseline (evals/baseline.json): p95 latency 101.3 s -> 152 s good
+# (1.5x, rounded to a bucket edge); cost/run ~$0.14 -> $0.30 good
+# (2x headroom). The boundary IS a bucket edge so the good-event ratio
+# is counted, never interpolated (D18).
+ANALYST_RUN_BUCKETS = (10.0, 30.0, 60.0, 120.0, 152.0, 240.0, 480.0)
+ANALYST_COST_BUCKETS = (0.02, 0.05, 0.1, 0.2, 0.3, 0.5, 1.0)
 
 
 class EventSink:
@@ -67,6 +74,19 @@ BATCH_SECONDS = _meter.create_histogram(
 )
 API_SECONDS = _meter.create_histogram(
     "api_request_seconds", description="request latency by route and answering store"
+)
+
+# Analyst runtime metrics (D29b). Instrument-before-subject: the SLO
+# rules are wired against these names now; the series populate when the
+# agent runs as a scraped service (#145).
+ANALYST_RUN_SECONDS = _meter.create_histogram(
+    "analyst_run_seconds", description="one triage run, wall clock"
+)
+ANALYST_RUN_COST = _meter.create_histogram(
+    "analyst_run_cost_usd", description="estimated worker cost of one triage run"
+)
+ANALYST_RUNS = _meter.create_counter(
+    "analyst_runs_total", description="triage runs, labeled by degraded + cutoff reason"
 )
 
 # ingest_lag readers, registered per consumer; the gauge callback runs
@@ -128,6 +148,14 @@ def init_metrics(port: int | None = None) -> None:
             instrument_name="ingest_batch_apply_seconds",
             aggregation=ExplicitBucketHistogramAggregation(BATCH_BUCKETS),
         ),
+        View(
+            instrument_name="analyst_run_seconds",
+            aggregation=ExplicitBucketHistogramAggregation(ANALYST_RUN_BUCKETS),
+        ),
+        View(
+            instrument_name="analyst_run_cost_usd",
+            aggregation=ExplicitBucketHistogramAggregation(ANALYST_COST_BUCKETS),
+        ),
     ]
     otel_metrics.set_meter_provider(
         MeterProvider(metric_readers=[PrometheusMetricReader()], views=views)
@@ -148,6 +176,7 @@ def _refresh_instruments() -> None:
     """
     global _meter, READ, APPLIED, SKIPPED, INVALID, DLQ, PHANTOMS_CREATED
     global BATCH_SECONDS, API_SECONDS
+    global ANALYST_RUN_SECONDS, ANALYST_RUN_COST, ANALYST_RUNS
     _meter = otel_metrics.get_meter("resgraph")
     READ = _meter.create_counter("ingest_read", description="entries read from the stream")
     APPLIED = _meter.create_counter("ingest_applied", description="messages applied")
@@ -162,6 +191,15 @@ def _refresh_instruments() -> None:
     )
     API_SECONDS = _meter.create_histogram(
         "api_request_seconds", description="request latency by route and answering store"
+    )
+    ANALYST_RUN_SECONDS = _meter.create_histogram(
+        "analyst_run_seconds", description="one triage run, wall clock"
+    )
+    ANALYST_RUN_COST = _meter.create_histogram(
+        "analyst_run_cost_usd", description="estimated worker cost of one triage run"
+    )
+    ANALYST_RUNS = _meter.create_counter(
+        "analyst_runs_total", description="triage runs, labeled by degraded + cutoff reason"
     )
     _meter.create_observable_gauge(
         "ingest_lag",

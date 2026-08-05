@@ -1,0 +1,64 @@
+name: eval-gate
+# D29b eval gate (SPEC.md). The comparison is free and offline; CI does
+# NOT run the paid suite — a ~$4 run per PR does not scale, so the gate
+# checks the newest committed run against the baseline and a real
+# behavior change ships its own fresh run.
+on:
+  pull_request:
+    paths:
+      - "src/resgraph/analyst/**"
+      - "src/resgraph/tools/**"
+      - "src/resgraph/evals/**"
+      - "evals/**"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9  # v9.0.0
+      - run: uv sync --dev
+      - id: gate
+        shell: bash
+        run: |
+          run=$(ls -1 evals/runs/*.jsonl 2>/dev/null | sort | tail -1)
+          if [ -z "$run" ]; then
+            echo "no committed run to gate against — skipping" | tee gate.out
+            echo "verdict=skip" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "gating $run against evals/baseline.json" | tee gate.out
+          if uv run resgraph-evals gate "$run" >> gate.out 2>&1; then
+            if grep -q UNDECIDED gate.out; then
+              echo "verdict=declined" >> "$GITHUB_OUTPUT"
+            else
+              echo "verdict=pass" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "verdict=block" >> "$GITHUB_OUTPUT"
+          fi
+          cat gate.out
+      - name: Comment gate verdict on PR
+        if: always() && github.event_name == 'pull_request'
+        uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88  # v3.0.5
+        with:
+          header: eval-gate
+          path: gate.out
+      - name: Enforce
+        # eval-baseline-refresh downgrades a block to a report (the PR
+        # commits a fresh baseline); fabrications are named in the
+        # verdict and stay a reason to withhold the label.
+        if: >-
+          steps.gate.outputs.verdict == 'block' &&
+          !contains(github.event.pull_request.labels.*.name, 'eval-baseline-refresh')
+        run: |
+          echo "eval gate blocked — see the PR comment. Override only with a" >&2
+          echo "reviewed eval-baseline-refresh label committing a fresh baseline." >&2
+          exit 1

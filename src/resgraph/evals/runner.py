@@ -243,6 +243,19 @@ def _usage_tokens(usage: Any) -> dict[str, int]:
     }
 
 
+def _record_run_metrics(result: RunResult, latency_s: float, model: str) -> None:
+    """Emit the analyst SLO metrics (D29b); no-ops without init_metrics."""
+    from resgraph import obs
+
+    obs.ANALYST_RUN_SECONDS.record(latency_s)
+    if model in PRICES_PER_MTOK:
+        obs.ANALYST_RUN_COST.record(estimate_cost(_usage_tokens(result.usage), model))
+    obs.ANALYST_RUNS.add(
+        1,
+        {"degraded": str(result.degraded).lower(), "cutoff": result.cutoff_reason or "none"},
+    )
+
+
 def assert_row_clean(row_json: str) -> None:
     """No run row is written with secret-shaped content anywhere in it
     (a model can echo its environment). Reuses the dataset secret
@@ -386,6 +399,7 @@ def run_eval(
                     "cache_creation": result.usage.cache_creation_tokens,
                     "total": result.usage.spent,
                 }
+                _record_run_metrics(result, latency, model)
                 row = envpin | {
                     "scenario_id": spec.id,
                     "scenario_type": spec.scenario_type.value,

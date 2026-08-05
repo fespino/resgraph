@@ -1,0 +1,54 @@
+# D29b agent SLO rules. Objectives from the certified k=3 baseline
+# (evals/baseline.json), per D18 budgets-from-baselines:
+#   latency good <= 152 s (1.5x measured p95 101.3 s, on a bucket edge)
+#   cost good    <= $0.30 (2x the ~$0.14 measured mean per run)
+#   degraded     <= 5% (baseline 0/90)
+# Objective 95% (5% for degraded). Fast-burn thresholds mirror slo.yml:
+# 1 - 6 x (1 - objective) = 0.70; for degraded, 6 x 0.05 = 0.30 ceiling.
+# The analyst_* series populate when the agent runs scraped (#145).
+groups:
+  - name: agent_slo
+    interval: 15s
+    rules:
+      - record: slo:analyst_latency:ratio_5m
+        expr: >
+          sum(rate(analyst_run_seconds_bucket{le="152.0"}[5m]))
+          /
+          sum(rate(analyst_run_seconds_count[5m]))
+      - record: slo:analyst_cost:ratio_5m
+        expr: >
+          sum(rate(analyst_run_cost_usd_bucket{le="0.3"}[5m]))
+          /
+          sum(rate(analyst_run_cost_usd_count[5m]))
+      - record: slo:analyst_degraded:ratio_5m
+        expr: >
+          sum(rate(analyst_runs_total{degraded="true"}[5m]))
+          /
+          sum(rate(analyst_runs_total[5m]))
+      - alert: AnalystLatencyFastBurn
+        expr: slo:analyst_latency:ratio_5m < 0.70
+        for: 2m
+        labels:
+          slo: analyst-latency
+        annotations:
+          summary: >-
+            Analyst latency burning >=6x sustainable rate: under 70% of
+            triage runs answer within 152s.
+      - alert: AnalystCostFastBurn
+        expr: slo:analyst_cost:ratio_5m < 0.70
+        for: 2m
+        labels:
+          slo: analyst-cost
+        annotations:
+          summary: >-
+            Analyst cost burning >=6x sustainable rate: under 70% of
+            triage runs cost <= $0.30.
+      - alert: AnalystDegradedFastBurn
+        expr: slo:analyst_degraded:ratio_5m > 0.30
+        for: 2m
+        labels:
+          slo: analyst-degraded
+        annotations:
+          summary: >-
+            Analyst degraded ratio burning >=6x sustainable rate: over
+            30% of triage runs are ending degraded.

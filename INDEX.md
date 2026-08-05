@@ -33,7 +33,7 @@
 - docs/planner-vocabulary.md — the mini planner mapped to query-engine terms
 - src/resgraph/obs.py — telemetry (D17): wide-event sink + OTel metrics
 - src/resgraph/reconcile.py — hot vs cold vs oracle full-state comparison
-- observability/ — prometheus scrape config, D18 SLO rules (+ promtool tests),
+- observability/ — prometheus scrape config, D18 SLO rules + D29b agent SLO rules (+ promtool tests),
   grafana provisioning + the resgraph-overview dashboard as JSON
 - scripts/drill-hotstore-loss.sh — the INC-001 chaos drill, scripted
 - docs/incidents/ — incident notes (induced drills labeled as such)

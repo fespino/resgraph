@@ -51,7 +51,7 @@ def _stub_run(monkeypatch, tmp_path, captured):
         "resgraph.graph.client.get_driver",
         lambda: SimpleNamespace(verify_connectivity=lambda: None),
     )
-    monkeypatch.setattr("anthropic.Anthropic", lambda: object())
+    monkeypatch.setattr("anthropic.Anthropic", object)
 
 
 def test_run_wires_flags_into_run_eval(monkeypatch, tmp_path):

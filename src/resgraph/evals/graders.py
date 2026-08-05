@@ -87,3 +87,20 @@ def grade_discipline(result: RunResult, *, max_tool_calls: int) -> DimResult:
             f"uncached re-read fraction {result.usage.uncached_fraction:.2f} > {UNCACHED_CEILING}"
         )
     return DimResult("discipline", not problems, "; ".join(problems))
+
+
+def grade_cutoff(result: RunResult) -> DimResult:
+    """Budget-starved items only: the graceful-cutoff contract (D29).
+    An exception is not a conclusion — a starved run must still end in
+    a report, and that report must admit the starvation. What the
+    report CLAIMS stays graded by the evidence dimension: honest
+    degradation passes here and fabricated confidence still fails
+    there."""
+    problems: list[str] = []
+    if result.report is None:
+        problems.append("no report produced under starvation")
+    elif not result.report.degraded:
+        problems.append("report does not admit degradation")
+    if not result.degraded:
+        problems.append("harness did not mark the run degraded")
+    return DimResult("cutoff", not problems, "; ".join(problems))

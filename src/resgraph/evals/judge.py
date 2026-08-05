@@ -9,6 +9,7 @@ Hardened: report content arrives inside tags declared as data.
 import re
 from typing import Any
 
+from .breaker import JudgeSpendBreaker
 from .graders import DimResult
 
 JUDGE_TEMPLATE = """\
@@ -42,7 +43,16 @@ Reply with the single integer and nothing else."""
 PASS_SCORE = 3
 
 
-def judge_narrative(client: Any, *, model: str, narrative: str, alert_line: str) -> DimResult:
+def judge_narrative(
+    client: Any,
+    *,
+    model: str,
+    narrative: str,
+    alert_line: str,
+    breaker: JudgeSpendBreaker | None = None,
+) -> DimResult:
+    if breaker is not None:
+        breaker.check()
     resp = client.messages.create(
         model=model,
         max_tokens=16,
@@ -53,6 +63,8 @@ def judge_narrative(client: Any, *, model: str, narrative: str, alert_line: str)
             }
         ],
     )
+    if breaker is not None:
+        breaker.charge(getattr(resp, "usage", None))
     text = "".join(b.text for b in resp.content if getattr(b, "type", None) == "text")
     match = re.search(r"[1-5]", text)
     score = int(match.group()) if match else 0

@@ -138,11 +138,58 @@ def test_budget_exhaustion_refuses_and_degrades():
     result = run_triage(PROMPT, toolset, client, model=MODEL, max_tool_calls=2)
 
     assert result.degraded
+    assert result.cutoff_reason == "tool_calls"
     assert result.tool_calls == 2
     assert len(toolset.calls) == 2
     refusal = client.requests[3]["messages"][-1]["content"][0]
     assert refusal["is_error"]
     assert "budget exhausted" in refusal["content"].lower()
+
+
+def test_cost_ceiling_injects_conclude_now_and_records_reason():
+    # Turn 1 spends over the ceiling; the next turn boundary trips the
+    # cutoff, injects the conclude-now message, and the model concludes.
+    client = FakeClient(
+        [
+            response(tool_use("t1", "fetch_resource", {}), u=usage(inp=500, out=50)),
+            response(text(HEDGED_REPORT)),
+        ]
+    )
+    # After turn 1 the meter reads over budget, so turn 2's boundary
+    # check trips the cutoff before another tool call is offered.
+    result = run_triage(
+        PROMPT,
+        FakeToolset(),
+        client,
+        model=MODEL,
+        max_cost_usd=1.0,
+        cost_fn=lambda u: 2.0 if u.total_input else 0.0,
+    )
+    assert result.degraded
+    assert result.cutoff_reason == "cost"
+    assert result.report is not None  # an exception is not a conclusion; a report is
+    injected = client.requests[-1]["messages"][-1]
+    assert injected["role"] == "user"
+    assert "conclude now" in injected["content"][0]["text"].lower()
+
+
+def test_wall_clock_ceiling_trips_at_zero():
+    client = FakeClient([response(text(HEDGED_REPORT))])
+    result = run_triage(PROMPT, FakeToolset(), client, model=MODEL, max_wall_s=0.0)
+    assert result.degraded and result.cutoff_reason == "wall_clock"
+    assert result.report is not None
+
+
+def test_cost_ceiling_requires_its_meter():
+    client = FakeClient([response(text(VALID_REPORT))])
+    with pytest.raises(ValueError, match="needs its meter"):
+        run_triage(PROMPT, FakeToolset(), client, model=MODEL, max_cost_usd=1.0)
+
+
+def test_no_ceilings_leaves_cutoff_reason_none():
+    client = FakeClient([response(text(HEDGED_REPORT))])
+    result = run_triage(PROMPT, FakeToolset(), client, model=MODEL)
+    assert result.cutoff_reason is None and not result.degraded
 
 
 def test_token_ceiling_refuses_tools():

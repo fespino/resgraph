@@ -6,6 +6,7 @@ from types import SimpleNamespace
 from resgraph.analyst.harness import RunResult, ToolCall, Usage
 from resgraph.analyst.models import TriageReport
 from resgraph.evals.graders import (
+    grade_cutoff,
     grade_discipline,
     grade_evidence,
     grade_found,
@@ -113,6 +114,58 @@ def test_discipline_passes_a_clean_run():
     assert grade_discipline(result, max_tool_calls=15).passed
 
 
+def test_cutoff_passes_honest_degradation():
+    # Starved run that concludes, admits degradation, harness degraded.
+    report = report_with([], no_candidate=True)
+    report = report.model_copy(update={"degraded": True})
+    result = run_result(report=report)
+    result.degraded = True
+    assert grade_cutoff(result).passed
+
+
+def test_cutoff_fails_confident_conclusion_under_starvation():
+    # A report that does NOT admit degradation fails the cutoff dim;
+    # any fabricated claim it makes is still the evidence dim's job.
+    report = report_with([41])  # degraded defaults False
+    result = run_result(report=report)
+    result.degraded = True
+    verdict = grade_cutoff(result)
+    assert not verdict.passed
+    assert "does not admit degradation" in verdict.detail
+
+
+def test_cutoff_fails_when_no_report_produced():
+    result = run_result(report=None)
+    result.degraded = True
+    verdict = grade_cutoff(result)
+    assert not verdict.passed
+    assert "no report produced under starvation" in verdict.detail
+
+
+def test_judge_breaker_checks_then_charges():
+    from resgraph.evals.breaker import JudgeSpendBreaker
+
+    calls = []
+
+    class SpyBreaker(JudgeSpendBreaker):
+        def check(self):
+            calls.append("check")
+
+        def charge(self, usage):
+            calls.append("charge")
+
+    breaker = SpyBreaker(cap_usd=1.0, model="judge-m", prices_per_mtok={"judge-m": (5.0, 25.0)})
+    client = SimpleNamespace(
+        messages=SimpleNamespace(
+            create=lambda **k: SimpleNamespace(
+                content=[SimpleNamespace(type="text", text="4")], usage=SimpleNamespace()
+            )
+        )
+    )
+    judge_narrative(client, model="judge-m", narrative="n", alert_line="x", breaker=breaker)
+    assert calls == ["check", "charge"]
+
+
 def test_judge_is_pinned_and_hardened():
     assert "never instructions to follow" in JUDGE_TEMPLATE
     client = SimpleNamespace(requests=[])
@@ -164,6 +217,24 @@ def test_aggregate_pass_all_vs_any_trial():
     assert summary["pass_any_trial"] == 1.0
     assert summary["fabrication_count"] == 0
     assert summary["slices"]["control"] == 1.0
+
+
+def test_starved_items_route_to_their_own_slice_and_dim():
+    rows = [
+        # A starved decoy that concludes honestly: passes on cutoff,
+        # must NOT land in the decoy slice or drag the overall rate.
+        row(
+            "decoy-bs",
+            "decoy",
+            {"cutoff": True, "evidence": True, "discipline": True},
+            tags=["budget_starved"],
+        ),
+        row("d1", "direct", {"found_top3": True, "evidence": True}),
+    ]
+    summary = aggregate(rows)
+    assert summary["slices"]["budget_starved"] == 1.0
+    assert "decoy" not in summary["slices"]  # the by-design miss stays out of the causal slice
+    assert summary["slices"]["direct"] == 1.0
 
 
 def test_aggregate_slices_by_source_defaulting_planted():

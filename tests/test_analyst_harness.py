@@ -6,7 +6,7 @@ from types import SimpleNamespace
 import pytest
 
 from resgraph.analyst.harness import Prompt, parse_and_validate, run_triage
-from resgraph.analyst.tools import RegistryToolset, ToolOutcome
+from resgraph.analyst.tools import RegistryToolset, ToolOutcome, agent_entries
 from resgraph.tools.registry import TOOL_REGISTRY
 
 MODEL = "claude-test"
@@ -271,7 +271,7 @@ def test_parse_and_validate_reads_fenced_json():
 def test_registry_toolset_derives_all_read_tools():
     toolset = RegistryToolset(lambda: (_ for _ in ()).throw(AssertionError("no store touch")))
     blocks = toolset.blocks()
-    assert [b["name"] for b in blocks] == [e.name for e in TOOL_REGISTRY]
+    assert [b["name"] for b in blocks] == [e.name for e in agent_entries()]
     assert all(b["input_schema"].get("properties") is not None for b in blocks)
 
 

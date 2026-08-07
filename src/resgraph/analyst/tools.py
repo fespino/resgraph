@@ -40,12 +40,25 @@ def _error(error_class: str, message: str, action: str) -> ToolOutcome:
     )
 
 
+def agent_entries(
+    entries: tuple[ToolRegistration, ...] = TOOL_REGISTRY,
+) -> tuple[ToolRegistration, ...]:
+    """The registry subset an agent session may hold. Selection, not
+    exclusion: a tool joins the surface by satisfying every condition,
+    so a new registration is off the agent's surface until it earns a
+    place there."""
+    return tuple(
+        e for e in entries if e.hints.read_only and not e.privileged and not e.hints.open_world
+    )
+
+
 class RegistryToolset:
     def __init__(
         self,
         qctx_factory: Callable[[], QueryContext],
-        entries: tuple[ToolRegistration, ...] = TOOL_REGISTRY,
+        entries: tuple[ToolRegistration, ...] | None = None,
     ) -> None:
+        entries = agent_entries() if entries is None else entries
         for entry in entries:
             if not entry.hints.read_only or entry.privileged:
                 raise RuntimeError(
@@ -119,4 +132,4 @@ def _query_context() -> QueryContext:
 
 
 def default_toolset() -> RegistryToolset:
-    return RegistryToolset(_query_context)
+    return RegistryToolset(_query_context, agent_entries())

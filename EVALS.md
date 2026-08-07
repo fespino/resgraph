@@ -892,6 +892,32 @@ The grader rule that caught this — a run whose fault never fired FAILS
 as evidence. It cost four lines and prevented a published finding
 computed from runs where nothing was ever lost.
 
+**Outcome — attempt 2, run `20260807T215014Z` ($2.98): the fix was
+wrong, and disproving it produced the finding.** Counting hot
+acquisitions instead of tool calls made the misfire total — 0 of 21
+runs fired, against 5 of 21 before — and `found_top3` came back
+identical on 19 of 21 (item, trial) cells. The fault was not changing
+the outcome because it was not touching anything.
+
+`tool_trace` settled it. `fetch_resource` and `blast_radius` are hot
+only when `at is None`; triage investigates a PAST alert, so the agent
+passes `at=<fired_at>` and both read cold. The only unconditionally-hot
+tool is `dependency_path` — **1 call in 132**.
+
+**The finding, which the drill was not looking for: for its real
+workload the analyst is almost entirely insulated from hot-store loss.**
+Time-travel triage reads the cold store by construction (D13, D16), so
+killing the graph removes a capability it had barely been using. That
+inverts the drill's premise rather than answering it.
+
+Consequence for the pre-registration above: **the degraded-honesty
+question is still unanswered.** It cannot be posed by killing the hot
+store. A redesigned fault targets the cold store, or both. Assumptions
+audited and "what we should have done differently" are in
+[INC-002](docs/incidents/INC-002-degraded-drill-misfire.md); the
+cheapest missing step was a $0.15 single-item pilot to check the fault
+fires at all, before either $3 run.
+
 ### Pre-registered probe — re-skins against template-reading (#103; registered 2026-08-05, run pending)
 
 The eval-erosion check run from inside the harness: a re-skin holds

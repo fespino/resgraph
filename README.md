@@ -25,11 +25,12 @@
 | src/resgraph/consumer.py                     |      155 |        7 |     95% |84, 99, 111, 114, 130, 132-133 |
 | src/resgraph/evals/\_\_init\_\_.py           |        0 |        0 |    100% |           |
 | src/resgraph/evals/breaker.py                |       38 |        0 |    100% |           |
-| src/resgraph/evals/cli.py                    |       23 |        1 |     96% |        81 |
+| src/resgraph/evals/cli.py                    |       42 |        1 |     98% |        81 |
+| src/resgraph/evals/gate.py                   |       87 |        3 |     97% |86, 127, 147 |
 | src/resgraph/evals/graders.py                |       51 |        3 |     94% |76, 84, 105 |
 | src/resgraph/evals/judge.py                  |       16 |        0 |    100% |           |
-| src/resgraph/evals/report.py                 |       58 |        2 |     97% |   37, 125 |
-| src/resgraph/evals/runner.py                 |      181 |       24 |     87% |137-145, 147-150, 157, 163, 181-182, 194-195, 238, 266, 341, 348, 426-427 |
+| src/resgraph/evals/report.py                 |       58 |        2 |     97% |   37, 127 |
+| src/resgraph/evals/runner.py                 |      188 |       23 |     88% |137-145, 147-150, 157, 163, 181-182, 194-195, 279, 354, 361, 440-441 |
 | src/resgraph/evals/sanitize.py               |       32 |        1 |     97% |        38 |
 | src/resgraph/gen/\_\_init\_\_.py             |        0 |        0 |    100% |           |
 | src/resgraph/gen/churn.py                    |       65 |        4 |     94% |47-49, 108 |
@@ -47,7 +48,7 @@
 | src/resgraph/mcp/\_\_init\_\_.py             |        0 |        0 |    100% |           |
 | src/resgraph/mcp/server.py                   |       65 |        2 |     97% |  137, 141 |
 | src/resgraph/mcp/skills.py                   |       38 |        0 |    100% |           |
-| src/resgraph/obs.py                          |       82 |        2 |     98% |   137-139 |
+| src/resgraph/obs.py                          |       90 |        2 |     98% |   165-167 |
 | src/resgraph/query/\_\_init\_\_.py           |        0 |        0 |    100% |           |
 | src/resgraph/query/dsl.py                    |       42 |        0 |    100% |           |
 | src/resgraph/query/executor.py               |       91 |        7 |     92% |70, 73-77, 111, 152 |
@@ -63,7 +64,7 @@
 | src/resgraph/tools/context.py                |        6 |        0 |    100% |           |
 | src/resgraph/tools/http.py                   |       21 |        0 |    100% |           |
 | src/resgraph/tools/registry.py               |       20 |        0 |    100% |           |
-| **TOTAL**                                    | **3029** |  **120** | **96%** |           |
+| **TOTAL**                                    | **3150** |  **122** | **96%** |           |
 
 
 ## Setup coverage badge

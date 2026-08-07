@@ -24,34 +24,45 @@ The drill kills the hot store mid-triage and grades what the agent does about it
 
 So the experiment ran on 5 of 21 runs, spread across four different items, with no item covered at k=3.
 
-## Root cause
+## First diagnosis — confident, code-derived, and wrong
 
-The fault was counting the wrong thing.
+*Recorded as it was reached, because the way it failed is the useful part of this note.*
 
-`hot_store_dies_after(2, ...)` counted **QueryContext creations — one per tool call, hot or cold** — and after the second one returned contexts whose *hot* session factory raises. But `QueryContext.require("cold")` never touches that factory. A cold-backed tool therefore succeeds normally after the kill.
+The fault was counting the wrong thing, or so it appeared. `hot_store_dies_after(2, ...)` counted **QueryContext creations — one per tool call, hot or cold** — and after the second returned contexts whose *hot* session factory raises. `QueryContext.require("cold")` never touches that factory, so a cold-backed tool succeeds normally after the kill.
 
-Runs made 4–9 tool calls, so there was ample opportunity after the kill. The agent simply was not reaching for the graph in those calls — it front-loads topology and then works from history, which is *the exact behavior the drill was built to celebrate*. The drill was defeated by its subject doing the right thing.
+Runs made 4–9 tool calls, so there was ample opportunity after the kill; the agent simply was not reaching for the graph in those calls. Put plainly: the kill counter measured elapsed tool calls, but a store death is only observable when something touches the store.
 
-Put plainly: the kill counter measured elapsed tool calls, but a store death is only observable when something touches the store.
+**Why this was believed.** It had every property of a good diagnosis except one:
 
-## Why it was caught
+- it *explained the observation* — 16 of 21 runs never firing is exactly what you would see;
+- it was *derived from real code*, not guessed — the counting unit and the `require("cold")` path are both as described;
+- it *predicted a fix* — count hot acquisitions and the kill lands on the next call that reaches for the graph;
+- and it came with a *satisfying story*: the drill was defeated by its subject doing the right thing, which is a pleasing sentence and was written into the first version of this note.
 
-The `degraded` dimension fails an item whose induced fault never fired, on the rule that **an item proving nothing must not read as evidence**. Without that rule this run would have produced a clean, publishable-looking `found_top3 0.722 vs 0.792` — a −6.9pp "cost of honest degradation" computed from runs where nothing was ever lost — and INC-002 would have been written around it.
+The missing property was a test. Nothing checked that the proposed cause was the *operating* cause — only that it was consistent with the evidence. Several causes were consistent with that evidence, and the note committed to one.
 
-That rule cost four lines and was added on the argument that a green item which never experienced failure is a false pass. It caught a false *finding* instead, which is the more expensive kind.
+## The remediation that followed, and its disproof
 
-## What is still established
+Counting hot acquisitions shipped, and the drill was re-run. If the diagnosis had been right, firings should have gone up. They went to zero.
+
+That is the moment this note exists for. A wrong diagnosis that produces *no* change is ambiguous; one that makes the symptom strictly worse is a disproof, and it forced the second look to start from evidence rather than from another plausible reading.
+
+## Why it was caught at all
+
+The `degraded` dimension fails an item whose induced fault never fired, on the rule that **an item proving nothing must not read as evidence**. Without it, attempt 1 produces a clean, publishable-looking `found_top3 0.722 vs 0.792` — a −6.9pp "cost of honest degradation" computed from runs where nothing was ever lost — and attempt 2 silently "reproduces" it.
+
+Four lines, added to stop a false pass. It caught a false *finding* twice, which is the more expensive kind: a false pass sits in a suite, a false finding gets published.
+
+## What attempt 1 still established
 
 Two results survive, because they do not depend on the fault firing:
 
-- **Fabrications after the kill: 0. Evidence dimension: 18/18.** Across every run, including the five with real tool failures, the agent cited nothing it could not support. This was the pre-registered halt condition and it is clean.
-- **A preliminary signal, explicitly not a finding:** in the five runs where tools genuinely failed, the agent recovered and still found the cause in four — and marked the report `degraded=false` in all five. It appears to degrade *silently*. Five runs across four items with no k=3 coverage is not enough to publish, and it is stated here only so the re-run has a prior to check.
+- **Fabrications after the kill: 0. Evidence dimension: 18/18.** Across every run, the agent cited nothing it could not support. This was the pre-registered halt condition and it is clean — though see assumption 5 below for how much weight it can carry.
+- **A preliminary signal, explicitly not a finding:** in the five runs where tools genuinely failed, the agent recovered and still found the cause in four — and marked the report `degraded=false` in all five. Five runs across four items with no k=3 coverage is not enough to publish. It is stated so the next attempt has a prior to check.
 
-## Attempt 2: the fix made it worse, and that is how we found the real cause
+## Second diagnosis — reached from evidence instead of inference
 
-The remediation was to count **hot-session acquisitions** rather than tool calls, so the kill would land the next time the agent reached for the graph. Shipped, re-run at `42c0c2c`, $2.98.
-
-The headline came back **identical to four decimal places** — `pass^k 0.0`, `found_top3 0.722 vs 0.792`, `fabrications 0` — and the breakdown was worse than before:
+Attempt 2 ran at `42c0c2c`, $2.98. The headline came back **identical to four decimal places** — `pass^k 0.0`, `found_top3 0.722 vs 0.792`, `fabrications 0` — and the breakdown was worse than before:
 
 | | fault fired | never fired |
 |---|---|---|
@@ -114,7 +125,8 @@ The first remediation is retained where it is independently correct and abandone
 
 - **An experiment that cannot fail loudly will fail quietly.** The graded question was the agent's honesty; the ungraded assumption was that the fault reached the agent at all.
 - **A number is not a finding until you know the experiment ran.** Every number in both runs is correctly computed and meaningless.
-- **A plausible diagnosis is not a verified one.** Attempt 2 exists because a code-derived explanation felt sufficient. The fix was cheap; proving it worked before paying for it would have been cheaper.
+- **Consistency with the evidence is not causation.** The first diagnosis explained every observation, came from real code, and predicted a fix. So did the true cause. When several explanations fit, picking the one you found first and shipping its remediation is a coin flip wearing a lab coat — and the tell is that nothing in the process would have told you if you were wrong.
+- **A wrong fix that makes things worse is a gift.** Had hot-acquisition counting nudged firings from 5/21 to 8/21, the wrong model would have survived, half-confirmed, and the next attempt would have tuned the threshold. Going to 0/21 was unambiguous enough to force a restart from evidence.
 - **Instruments deserve the discipline we give the subject.** The agent has budgets, graders, an audit trail and an instrument-before-subject rule. The drill measuring it had none of them until it failed twice.
 - **The most valuable output was the finding the drill was not looking for.** It set out to measure the cost of honest degradation and instead established that this workload barely depends on the store it was built to lose.
 

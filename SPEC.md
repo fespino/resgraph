@@ -1544,7 +1544,7 @@ The release-gate half of D29, consuming the certified k=3 baseline.
   populate when the agent runs as a scraped service (#145) —
   instrument-before-subject, the phase's own ordering.
 - **The CI eval gate blocks a regression.** On PRs touching the
-  analyst/tools/prompts/evals globs, the gate aggregates a run and
+  analyst/tools/evals/skills globs, the gate aggregates a run and
   compares it to the committed baseline: fabrications block
   unconditionally (no threshold, no label); overall pass^k drop
   > 2pp blocks; any slice drop > 5pp blocks (asymmetric because a
@@ -1577,7 +1577,16 @@ The release-gate half of D29, consuming the certified k=3 baseline.
   `eval-baseline-refresh` label (the CI job's concern, not the gate
   module's) that downgrades a block to a report for a PR committing a
   refreshed baseline; the label signals the gate, it does not bypass
-  review, and fabrications are never overridable. The workflow listens
+  review, and fabrications are never overridable.
+- **The trigger is tested, not maintained by memory** (amended, #152).
+  The filter shipped without `skills/**` while the skill body was
+  being loaded straight into the system prompt, so editing the agent's
+  investigative discipline changed its behavior and the gate never
+  ran. The globs are now asserted against the prompt builder's own
+  inputs, discovered from the modules rather than listed, so a new
+  input that escapes the filter fails the suite. A control that
+  silently stops covering something is worse than no control: the
+  green check still appears. The workflow listens
   for `labeled`/`unlabeled` because a re-run replays the original
   event payload — without a fresh event the new label is invisible and
   the override cannot be applied at all.

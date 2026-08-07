@@ -14,6 +14,9 @@ on:
       - "src/resgraph/tools/**"
       - "src/resgraph/evals/**"
       - "evals/**"
+      # the skill body is loaded straight into the system prompt, so a
+      # change here is a behavior change (test_eval_gate_scope.py)
+      - "skills/**"
   workflow_dispatch:
 permissions:
   contents: read

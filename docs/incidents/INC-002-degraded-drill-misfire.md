@@ -3,6 +3,7 @@
 **Status:** remediated · **Induced:** yes (chaos drill, `scripts/drill-analyst-degraded.sh`, run 2026-08-07)
 **Impact:** no production impact — the subject is the *instrument*. A $2.90 measurement returned a headline number that looked like a finding and was an artifact. Caught before publication by a grader written to catch exactly this.
 **Evidence:** run `evals/runs/20260807T204629Z.jsonl` (21 rows, committed), pre-registration in EVALS.md.
+**Code under test:** `304b660` — the misfiring counter, as it ran. Every run row carries its own `git_ref`, host class and store digests, so the version that produced a number is recoverable from the number; no tag needed, and none added. Read the defect at `git show 304b660:src/resgraph/evals/faults.py`.
 
 ## What was supposed to happen
 

@@ -160,8 +160,8 @@ def test_crash_looped_entries_quarantined_by_delivery_cap(redis_client, stream):
 
 
 def test_store_outage_under_load_keeps_dlq_flat(redis_client, stream):
-    """The D14-supersession acceptance test, time-compressed: the
-    chapter-scale version is a 2-minute outage; here the 'store' rejects
+    """The D14-supersession acceptance test, time-compressed: a
+    real outage runs to minutes; here the 'store' rejects
     every apply for the first second of wall time, then recovers. Under
     the pre-supersession behavior every in-flight entry would walk
     retry -> split -> DLQ; now the DLQ must stay flat and everything

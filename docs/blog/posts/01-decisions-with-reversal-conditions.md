@@ -106,8 +106,8 @@ model *enforces* the normative rules the spec states:
   forward-compatibility, so it's refused.
 - Messages are immutable once constructed.
 
-The distinction I kept coming back to: the guide I was loosely following
-*documented* these semantics; the code *enforces* them. Day one, I
+The distinction I kept coming back to: these semantics are usually
+*documented*; here the code *enforces* them. Day one, I
 disagreed with "documented" and moved them into the validator, and
 recorded that I'd done so. Recording the disagreement is the discipline
 visibly working — a later reader sees not just what the code does but

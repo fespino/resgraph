@@ -7,7 +7,7 @@ from test_approval import gate, plan
 from typer.testing import CliRunner
 
 from resgraph.analyst.audit import AuditStore
-from resgraph.analyst.cli import app
+from resgraph.analyst.cli import _summary, app
 from resgraph.analyst.remediation import StepMachine
 
 runner = CliRunner()
@@ -103,3 +103,9 @@ def test_verify_fails_loud_on_tampering(db):
     result = runner.invoke(app, ["audit", "r1", "--verify", "--db", db])
     assert result.exit_code == 1
     assert "chain broken at seq 2" in result.output
+
+
+def test_an_unrecognised_event_kind_renders_blank_rather_than_raising():
+    """The timeline must survive an event kind added later by another
+    writer — a KeyError here would take down the audit surface."""
+    assert _summary("something_new", {"whatever": 1}) == ""

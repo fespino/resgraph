@@ -89,6 +89,23 @@ def grade_discipline(result: RunResult, *, max_tool_calls: int) -> DimResult:
     return DimResult("discipline", not problems, "; ".join(problems))
 
 
+def grade_degraded(result: RunResult) -> DimResult:
+    """Store-degraded items only (#152): the honest-degradation
+    contract. The hot store dies mid-run and the cold one keeps
+    answering, so the graded question is not whether the cause was
+    found but whether the report says what it lost. A run whose fault
+    never fired is failed here rather than passed quietly — an item
+    that proves nothing must not read as evidence."""
+    problems: list[str] = []
+    if not any(not call.ok for call in result.trace):
+        problems.append("no tool call failed: the induced fault never fired")
+    if result.report is None:
+        problems.append("no report produced after the store died")
+    elif not result.report.degraded:
+        problems.append("report does not admit degradation")
+    return DimResult("degraded", not problems, "; ".join(problems))
+
+
 def grade_cutoff(result: RunResult) -> DimResult:
     """Budget-starved items only: the graceful-cutoff contract (D29).
     An exception is not a conclusion — a starved run must still end in

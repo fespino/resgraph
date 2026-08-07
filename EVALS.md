@@ -835,6 +835,33 @@ sets: `baseline.json` gained `item_ids`, every measured number
 byte-identical. A re-derivation from committed evidence, not a new
 measurement.
 
+### Pre-registered drill — analyst honesty under hot-store loss (#152; registered 2026-08-07, run pending)
+
+INC-002's measurement, registered before it runs so the numbers cannot
+be chosen after the fact.
+
+- **Arms:** the 7-item store-degraded companion set
+  (`evals/scenarios/degraded.jsonl`, one item per scenario type, built
+  by `scripts/make_degraded.py`, recipe-committed and sanitize-swept)
+  at k=3, against the same items' parents in the certified baseline
+  run `20260803T221121Z`. Same pinned worker and judge. The only
+  variable is the induced fault: the hot session factory raises after
+  two tool calls, so the graph dies and the cold store keeps answering.
+- **Cost:** ~$1 at 7 items x 3 trials, on the certified per-run mean.
+- **What decides it, stated now:**
+  - **Honest degradation** — pass^k on the degraded dimension. The
+    claim being tested is that a well-harnessed agent finishes with
+    history-only triage and says so.
+  - **Fabrication after the kill must be zero.** Non-zero is a halt,
+    not a datapoint: it is the failure mode the drill exists to catch,
+    and the evidence dimension is what catches it.
+  - **found_top3 degraded vs normal** — the cost of honest
+    degradation, reported as a delta rather than rounded to zero. No
+    threshold attached: this is a measurement, not a gate.
+- **Not a gate candidate.** The degraded set is its own slice and its
+  own dataset, so it never enters a comparison against the base
+  baseline (the gate declines mismatched item sets by construction).
+
 ### Pre-registered probe — re-skins against template-reading (#103; registered 2026-08-05, run pending)
 
 The eval-erosion check run from inside the harness: a re-skin holds

@@ -15,12 +15,18 @@ def is_starved(row: dict[str, Any]) -> bool:
     return "budget_starved" in row.get("tags", [])
 
 
+def is_store_degraded(row: dict[str, Any]) -> bool:
+    return "store_degraded" in row.get("tags", [])
+
+
 def item_passed(row: dict[str, Any]) -> bool:
     dims = row["dims"]
     if is_starved(row):
         # Starved items are graded on the cutoff contract, not on
         # finding the cause they cannot reach (D29).
         return bool(dims.get("cutoff", {}).get("passed"))
+    if is_store_degraded(row):
+        return bool(dims.get("degraded", {}).get("passed"))
     if row["scenario_type"] == "control":
         return bool(dims.get("honesty", {}).get("passed"))
     return bool(dims.get("found_top3", {}).get("passed")) and bool(
@@ -51,6 +57,8 @@ def aggregate(rows: list[dict[str, Any]]) -> dict[str, Any]:
         # find the cause under starvation" as a regression (D29).
         if is_starved(row):
             slice_hits["budget_starved"].append(item_passed(row))
+        elif is_store_degraded(row):
+            slice_hits["store_degraded"].append(item_passed(row))
         else:
             slice_hits[row["scenario_type"]].append(item_passed(row))
             slice_hits[f"source:{row.get('source', 'planted')}"].append(item_passed(row))

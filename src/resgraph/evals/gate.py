@@ -12,7 +12,7 @@ from typing import Any
 OVERALL_DROP = 0.02
 SLICE_DROP = 0.05
 MIN_TRIALS = 3
-PROTECTED_SLICES = ("source:failure_derived", "budget_starved")
+PROTECTED_SLICES = ("source:failure_derived", "budget_starved", "store_degraded")
 
 
 @dataclass(frozen=True)

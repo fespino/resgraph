@@ -14,6 +14,7 @@ thing.
 """
 
 import json
+import re
 from datetime import datetime
 from typing import Any
 
@@ -270,18 +271,25 @@ def test_live_summary_is_built_from_the_graph(journey):
     assert summary.window_end.isoformat() == FIRED
 
 
+def _plain(text: str) -> str:
+    """Typer renders usage errors in a rich box whose wrapping follows
+    terminal width; compare against the words, not the layout."""
+    return re.sub(r"[^\w\s.:=@-]", " ", re.sub(r"\x1b\[[0-9;]*m", "", text))
+
+
 def test_remediation_without_an_approver_is_refused_before_any_io():
     """Argument guards live in the command, and reject before the
     journey — so this needs no stores and no stubs."""
     result = runner.invoke(app, ["triage", VM, "--remediate", "set_attrs:state=drained"])
     assert result.exit_code != 0
-    assert "--approver" in result.output and "--remediate" in result.output
+    plain = _plain(result.output)
+    assert "--approver" in plain and "--remediate" in plain
 
 
 def test_a_naive_fired_at_is_refused_before_any_io():
     result = runner.invoke(app, ["triage", VM, "--fired-at", "2026-01-02T03:04:05"])
     assert result.exit_code != 0
-    assert "offset" in result.output
+    assert "offset" in _plain(result.output)
 
 
 @pytest.mark.parametrize(

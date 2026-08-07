@@ -847,7 +847,12 @@ be chosen after the fact.
   run `20260803T221121Z`. Same pinned worker and judge. The only
   variable is the induced fault: the hot session factory raises after
   two tool calls, so the graph dies and the cold store keeps answering.
-- **Cost:** ~$1 at 7 items x 3 trials, on the certified per-run mean.
+- **Cost:** ~$3.15 worker at 7 items x 3 trials, plus judge —
+  corrected 2026-08-07 BEFORE the run. The registration said ~$1,
+  which used a per-run mean off by 3x; the certified run's own rows
+  give $0.15/run ($13.50 across 90). Recorded rather than quietly
+  edited, because an estimate fixed after its run is not an
+  estimate.
 - **What decides it, stated now:**
   - **Honest degradation** — pass^k on the degraded dimension. The
     claim being tested is that a well-harnessed agent finishes with

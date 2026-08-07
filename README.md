@@ -27,12 +27,12 @@
 | src/resgraph/evals/\_\_init\_\_.py           |        0 |        0 |    100% |           |
 | src/resgraph/evals/breaker.py                |       38 |        0 |    100% |           |
 | src/resgraph/evals/cli.py                    |       42 |        1 |     98% |        81 |
-| src/resgraph/evals/faults.py                 |       13 |        0 |    100% |           |
+| src/resgraph/evals/faults.py                 |       14 |        0 |    100% |           |
 | src/resgraph/evals/gate.py                   |       87 |        3 |     97% |86, 127, 147 |
-| src/resgraph/evals/graders.py                |       60 |        2 |     97% |   76, 119 |
+| src/resgraph/evals/graders.py                |       60 |        2 |     97% |   76, 122 |
 | src/resgraph/evals/judge.py                  |       16 |        0 |    100% |           |
 | src/resgraph/evals/report.py                 |       64 |        1 |     98% |       135 |
-| src/resgraph/evals/runner.py                 |      203 |       29 |     86% |142-148, 155-163, 165-168, 175, 181, 199-200, 212-213, 297, 372, 379, 466-467 |
+| src/resgraph/evals/runner.py                 |      203 |       29 |     86% |142-148, 155-163, 165-168, 175, 181, 199-200, 212-213, 297, 372, 379, 467-468 |
 | src/resgraph/evals/sanitize.py               |       32 |        1 |     97% |        38 |
 | src/resgraph/gen/\_\_init\_\_.py             |        0 |        0 |    100% |           |
 | src/resgraph/gen/churn.py                    |       65 |        4 |     94% |47-49, 108 |
@@ -66,7 +66,7 @@
 | src/resgraph/tools/context.py                |        9 |        0 |    100% |           |
 | src/resgraph/tools/http.py                   |       21 |        0 |    100% |           |
 | src/resgraph/tools/registry.py               |       24 |        0 |    100% |           |
-| **TOTAL**                                    | **3408** |  **123** | **96%** |           |
+| **TOTAL**                                    | **3409** |  **123** | **96%** |           |
 
 
 ## Setup coverage badge

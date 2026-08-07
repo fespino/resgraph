@@ -1494,11 +1494,25 @@ The release-gate half of D29, consuming the certified k=3 baseline.
   slice regression hides inside a flat overall). The regression
   slice (`source:failure_derived`) and the budget-starved slice are
   compared under their own names, not folded into the causal set.
+  A slice the baseline does not carry cannot be compared at all, so
+  it warns rather than blocks — and a *protected* slice in that state
+  says so, because "unguarded until a refresh includes it" is a real
+  gap and should not read like a routine notice.
+- **Comparability precedes verdict.** Every dataset writes into
+  `evals/runs/`, so the newest committed run is not necessarily a run
+  of the baseline's dataset. `aggregate` therefore reports
+  `item_ids`, and the gate declines any run whose item set differs
+  from the baseline's rather than comparing pass^k across different
+  items — which silently scored a 7-item budget-starved run as PASS
+  against the 30-item baseline it never measured.
 - **Flap floor (#137):** the gate declines to verdict a run below
   k=3 — certification measured a 20% single-trial item-flip rate, so
   a k=1 diff on marginal items reads noise. Declined is distinct
   from blocked: an experimental single-trial run is simply not a
-  gate candidate.
+  gate candidate. It is also distinct from a broken gate, which
+  fails closed and is not label-overridable; the command separates
+  all four by exit code (0 passed, 1 blocked, 3 declined, 4 evidence
+  unreadable) so CI never infers a verdict by grepping prose.
 - **The comparison is free; the run is not.** CI runs the offline
   comparison, never the paid suite — a ~$4 run per PR does not scale,
   so a real behavior change ships its own fresh run and the gate
@@ -1506,7 +1520,10 @@ The release-gate half of D29, consuming the certified k=3 baseline.
   `eval-baseline-refresh` label (the CI job's concern, not the gate
   module's) that downgrades a block to a report for a PR committing a
   refreshed baseline; the label signals the gate, it does not bypass
-  review, and fabrications are never overridable.
+  review, and fabrications are never overridable. The workflow listens
+  for `labeled`/`unlabeled` because a re-run replays the original
+  event payload — without a fresh event the new label is invisible and
+  the override cannot be applied at all.
 
 **Rejected:** running the paid suite on every PR (unaffordable and
 needs API secrets in CI — the free comparison gates committed

@@ -12,6 +12,7 @@ from typing import Any
 OVERALL_DROP = 0.02
 SLICE_DROP = 0.05
 MIN_TRIALS = 3
+PROTECTED_SLICES = ("source:failure_derived", "budget_starved")
 
 
 @dataclass(frozen=True)
@@ -19,9 +20,8 @@ class GateVerdict:
     passed: bool
     blocks: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
-    # Below the k>=3 flap floor: declined, not failed — CI treats it
-    # differently from a block.
     undecided: bool = False
+    undecided_reason: str = ""
 
 
 def evaluate(
@@ -34,17 +34,9 @@ def evaluate(
 ) -> GateVerdict:
     """Compare an aggregated run against the baseline. `run` and
     `baseline` are `report.aggregate` outputs."""
-    trials = run.get("trials") or 0
-    if trials < min_trials:
-        return GateVerdict(
-            passed=False,
-            undecided=True,
-            blocks=[
-                f"run has {trials} trial(s); the gate needs k>={min_trials} to verdict "
-                "(certification measured a 20% single-trial flip rate — a k=1 diff on "
-                "marginal items reads noise, #137)"
-            ],
-        )
+    reason = _not_comparable(run, baseline) or _too_few_trials(run, min_trials)
+    if reason:
+        return GateVerdict(passed=False, undecided=True, undecided_reason=reason)
 
     blocks: list[str] = []
     warnings: list[str] = []
@@ -66,7 +58,7 @@ def evaluate(
     base_slices = baseline.get("slices", {})
     for name in sorted(run_slices):
         if name not in base_slices:
-            warnings.append(f"slice {name!r} is new (no baseline to compare)")
+            warnings.append(_new_slice_warning(name))
             continue
         s_drop = _drop(run_slices[name], base_slices[name])
         if s_drop is not None and s_drop > slice_drop:
@@ -83,6 +75,53 @@ def evaluate(
     return GateVerdict(passed=not blocks, blocks=blocks, warnings=warnings)
 
 
+def _not_comparable(run: dict[str, Any], baseline: dict[str, Any]) -> str:
+    run_ids, base_ids = run.get("item_ids"), baseline.get("item_ids")
+    if run_ids is None or base_ids is None:
+        if run.get("items") != baseline.get("items"):
+            return (
+                f"run covers {run.get('items')} item(s), the baseline "
+                f"{baseline.get('items')} — different datasets are not comparable"
+            )
+        return ""
+    missing = sorted(set(base_ids) - set(run_ids))
+    extra = sorted(set(run_ids) - set(base_ids))
+    if not missing and not extra:
+        return ""
+    parts = []
+    if missing:
+        parts.append(f"{len(missing)} baseline item(s) absent from the run ({_sample(missing)})")
+    if extra:
+        parts.append(f"{len(extra)} run item(s) absent from the baseline ({_sample(extra)})")
+    return (
+        "run and baseline measure different item sets — " + "; ".join(parts) + ". "
+        "Gate a run of the baseline's dataset, or refresh the baseline alongside it."
+    )
+
+
+def _too_few_trials(run: dict[str, Any], min_trials: int) -> str:
+    trials = run.get("trials") or 0
+    if trials >= min_trials:
+        return ""
+    return (
+        f"run has {trials} trial(s); the gate needs k>={min_trials} to verdict "
+        "(certification measured a 20% single-trial flip rate — a k=1 diff on "
+        "marginal items reads noise, #137)"
+    )
+
+
+def _new_slice_warning(name: str) -> str:
+    base = f"slice {name!r} is new (no baseline to compare)"
+    if name in PROTECTED_SLICES:
+        return f"{base} — this slice is unguarded until a baseline refresh includes it"
+    return base
+
+
+def _sample(ids: list[str], limit: int = 3) -> str:
+    shown = ", ".join(ids[:limit])
+    return shown if len(ids) <= limit else f"{shown}, ..."
+
+
 def _drop(current: float | None, base: float | None) -> float | None:
     if current is None or base is None:
         return None
@@ -97,6 +136,7 @@ def render_verdict(verdict: GateVerdict) -> str:
     lines = []
     if verdict.undecided:
         lines.append("EVAL GATE: UNDECIDED — run cannot be verdicted")
+        lines.append(f"  ✗ {verdict.undecided_reason}")
     elif verdict.passed:
         lines.append("EVAL GATE: PASS")
     else:

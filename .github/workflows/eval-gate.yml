@@ -5,6 +5,10 @@ name: eval-gate
 # behavior change ships its own fresh run.
 on:
   pull_request:
+    # labeled/unlabeled are here so the eval-baseline-refresh override
+    # takes effect on the label alone: a re-run replays the original
+    # event payload, so without a fresh event the new label is invisible.
+    types: [opened, synchronize, reopened, labeled, unlabeled]
     paths:
       - "src/resgraph/analyst/**"
       - "src/resgraph/tools/**"
@@ -18,7 +22,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
-      pull-requests: write
+      contents: read         # job-level permissions replace the workflow block
+      pull-requests: write   # sticky verdict comment
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
@@ -35,15 +40,17 @@ jobs:
             exit 0
           fi
           echo "gating $run against evals/baseline.json" | tee gate.out
-          if uv run resgraph-evals gate "$run" >> gate.out 2>&1; then
-            if grep -q UNDECIDED gate.out; then
-              echo "verdict=declined" >> "$GITHUB_OUTPUT"
-            else
-              echo "verdict=pass" >> "$GITHUB_OUTPUT"
-            fi
-          else
-            echo "verdict=block" >> "$GITHUB_OUTPUT"
-          fi
+          code=0
+          uv run resgraph-evals gate "$run" >> gate.out 2>&1 || code=$?
+          case "$code" in
+            0) verdict=pass ;;
+            1) verdict=block ;;
+            3) verdict=declined ;;
+            *) verdict=error
+               echo "the gate could not run (exit $code) — this is a broken gate," >> gate.out
+               echo "not an eval regression; the label does not override it." >> gate.out ;;
+          esac
+          echo "verdict=$verdict" >> "$GITHUB_OUTPUT"
           cat gate.out
       - name: Comment gate verdict on PR
         if: always() && github.event_name == 'pull_request'
@@ -61,4 +68,9 @@ jobs:
         run: |
           echo "eval gate blocked — see the PR comment. Override only with a" >&2
           echo "reviewed eval-baseline-refresh label committing a fresh baseline." >&2
+          exit 1
+      - name: Fail on a broken gate
+        if: steps.gate.outputs.verdict == 'error'
+        run: |
+          echo "the eval gate itself failed — see the PR comment." >&2
           exit 1

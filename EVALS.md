@@ -830,6 +830,11 @@ What only k=3 shows, on the record:
 run (was: the original phase-8 baseline). Every future diff reads
 against certified k=3 numbers.
 
+Re-aggregated from the same run when D29b's gate began comparing item
+sets: `baseline.json` gained `item_ids`, every measured number
+byte-identical. A re-derivation from committed evidence, not a new
+measurement.
+
 ### Pre-registered probe — re-skins against template-reading (#103; registered 2026-08-05, run pending)
 
 The eval-erosion check run from inside the harness: a re-skin holds

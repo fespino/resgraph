@@ -1,10 +1,25 @@
 """D29b eval gate: fabrications block unconditionally, overall >2pp or
-any slice >5pp block, the regression slice is named, and a sub-k=3 run
-is declined rather than verdicted (#137)."""
+any slice >5pp block, the regression slice is named, and a run the gate
+cannot verdict — below k=3 (#137), or measuring different items than the
+baseline — is declined rather than compared anyway."""
 
-from resgraph.evals.gate import evaluate
+import json
+from pathlib import Path
+
+from resgraph.evals.gate import evaluate, render_verdict
+from resgraph.evals.report import aggregate
+
+# every key the gate reads out of a report.aggregate summary
+GATE_KEYS = ("trials", "items", "item_ids", "pass_all_trials", "fabrication_count", "slices")
+
+CERTIFIED_RUN = Path("evals/runs/20260803T221121Z.jsonl")
+BASELINE = Path("evals/baseline.json")
+
+IDS = [f"item-{i}" for i in range(30)]
 
 BASE = {
+    "items": len(IDS),
+    "item_ids": IDS,
     "trials": 3,
     "pass_all_trials": 0.667,
     "fabrication_count": 0,
@@ -60,13 +75,20 @@ def test_fabrication_blocks_unconditionally():
 def test_sub_k3_run_is_declined_not_verdicted():
     v = evaluate(run(trials=1), BASE)
     assert not v.passed and v.undecided
-    assert any("k>=3" in b for b in v.blocks)
+    assert "k>=3" in v.undecided_reason
+    assert not v.blocks
 
 
 def test_new_slice_warns_not_blocks():
+    v = evaluate(run(slices={**BASE["slices"], "novel": 0.9}), BASE)
+    assert v.passed
+    assert any("novel" in w and "new" in w for w in v.warnings)
+
+
+def test_new_protected_slice_says_it_is_unguarded():
     v = evaluate(run(slices={**BASE["slices"], "budget_starved": 0.9}), BASE)
     assert v.passed
-    assert any("budget_starved" in w and "new" in w for w in v.warnings)
+    assert any("budget_starved" in w and "unguarded" in w for w in v.warnings)
 
 
 def test_vanished_slice_warns():
@@ -74,3 +96,67 @@ def test_vanished_slice_warns():
     v = evaluate(run(slices=slimmer), BASE)
     assert v.passed
     assert any("control" in w and "absent" in w for w in v.warnings)
+
+
+def test_a_smaller_dataset_is_declined_not_passed():
+    """The fail-open this closes: a 7-item run of another dataset used to
+    score PASS against the 30-item baseline it never measured."""
+    other = run(items=7, item_ids=[f"starved-{i}" for i in range(7)], pass_all_trials=1.0)
+    v = evaluate(other, BASE)
+    assert not v.passed and v.undecided
+    assert "different item sets" in v.undecided_reason
+
+
+def test_a_harder_dataset_is_declined_not_blocked():
+    other = run(items=6, item_ids=[f"regression-{i}" for i in range(6)], pass_all_trials=0.33)
+    v = evaluate(other, BASE)
+    assert v.undecided and not v.blocks
+
+
+def test_one_added_item_is_declined():
+    v = evaluate(run(items=31, item_ids=[*IDS, "item-new"]), BASE)
+    assert v.undecided
+    assert "1 run item(s) absent from the baseline" in v.undecided_reason
+
+
+def test_item_counts_catch_mismatch_when_ids_are_absent():
+    legacy_base = {k: v for k, v in BASE.items() if k != "item_ids"}
+    v = evaluate(run(items=7, item_ids=None), legacy_base)
+    assert v.undecided and "not comparable" in v.undecided_reason
+
+
+def test_comparability_is_checked_before_the_flap_floor():
+    v = evaluate(run(trials=1, items=6, item_ids=["a"]), BASE)
+    assert "different item sets" in v.undecided_reason
+
+
+def test_render_verdict_marks_each_state():
+    assert "PASS" in render_verdict(evaluate(run(), BASE))
+    assert "BLOCKED" in render_verdict(evaluate(run(pass_all_trials=0.1), BASE))
+    declined = render_verdict(evaluate(run(trials=1), BASE))
+    assert "UNDECIDED" in declined and "k>=3" in declined
+
+
+def test_gate_reads_the_keys_aggregate_actually_emits():
+    """The contract test: hand-written fixtures cannot catch a key
+    rename in report.aggregate, which would silently make every
+    comparison None-vs-None and pass everything."""
+    summary = aggregate(
+        [json.loads(ln) for ln in CERTIFIED_RUN.read_text().splitlines() if ln.strip()]
+    )
+    baseline = json.loads(BASELINE.read_text())
+    for key in GATE_KEYS:
+        assert key in summary, f"report.aggregate no longer emits {key!r}; the gate reads it"
+        assert key in baseline, f"evals/baseline.json has no {key!r}; the gate reads it"
+
+
+def test_the_certified_run_passes_its_own_baseline():
+    """End to end over committed evidence: the run the baseline was
+    aggregated from must verdict, and pass."""
+    summary = aggregate(
+        [json.loads(ln) for ln in CERTIFIED_RUN.read_text().splitlines() if ln.strip()]
+    )
+    v = evaluate(summary, json.loads(BASELINE.read_text()))
+    assert not v.undecided, v.undecided_reason
+    assert v.passed, v.blocks
+    assert not v.warnings

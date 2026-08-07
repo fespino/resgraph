@@ -63,6 +63,8 @@ def aggregate(rows: list[dict[str, Any]]) -> dict[str, Any]:
     trials = max((len(v) for v in by_item.values()), default=0)
     return {
         "items": len(by_item),
+        # the gate compares item sets, not just counts
+        "item_ids": sorted(by_item),
         "rows": len(rows),
         "trials": trials,
         "pass_all_trials": _rate(sum(all(v) for v in by_item.values()), len(by_item)),

@@ -88,23 +88,32 @@ def gate(
     baseline: str = "evals/baseline.json",
 ) -> None:
     """Block a merge on an eval regression (D29b). Aggregates the run,
-    compares it to the committed baseline, prints the verdict, and
-    exits nonzero if the gate blocks or cannot verdict the run.
+    compares it to the committed baseline, prints the verdict.
     Fabrications block unconditionally; overall pass^k drop >2pp or any
-    slice drop >5pp block; a run below k=3 is declined (flap floor,
-    #137). The CI job honors the eval-baseline-refresh label; this
-    command does not — it only reports what the numbers say."""
+    slice drop >5pp block; a run below k=3, or one measuring a
+    different item set than the baseline, is declined. The CI job
+    honors the eval-baseline-refresh label; this command does not — it
+    only reports what the numbers say.
+
+    Exit codes: 0 passed, 1 blocked, 3 declined (cannot verdict),
+    4 evidence unreadable."""
     from .gate import evaluate, render_verdict
     from .report import aggregate
 
     baseline_path = Path(baseline)
     if not baseline_path.exists():
         raise typer.BadParameter(f"no baseline at {baseline}; nothing to gate against")
-    rows = [json.loads(line) for line in Path(run_path).read_text().splitlines() if line.strip()]
-    verdict = evaluate(aggregate(rows), json.loads(baseline_path.read_text()))
+    try:
+        rows = [
+            json.loads(line) for line in Path(run_path).read_text().splitlines() if line.strip()
+        ]
+        base = json.loads(baseline_path.read_text())
+    except (OSError, ValueError) as exc:
+        print(f"EVAL GATE: ERROR — cannot read the evidence: {exc}")
+        raise typer.Exit(4) from exc
+    verdict = evaluate(aggregate(rows), base)
     print(render_verdict(verdict))
-    # Undecided (below the k>=3 flap floor) is a decline, not a failure:
-    # an experimental single-trial run is simply not a gate candidate.
-    # Only a real regression on a verdictable run blocks.
-    if not verdict.passed and not verdict.undecided:
+    if verdict.undecided:
+        raise typer.Exit(3)
+    if not verdict.passed:
         raise typer.Exit(1)

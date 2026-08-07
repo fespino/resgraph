@@ -1531,6 +1531,37 @@ runner exists (same trigger as D27's served-store move). If cost
 estimation needs the judge's own token spend (today's meter is
 worker-side and undercounts), the meter and the ledger merge.
 
+**Addendum (#152) — the second kind of degradation.** Starvation is
+the agent running out of budget. This is the platform failing under
+it, and it gets the same treatment: graded, not assumed.
+
+- **The fault is injected at the store handle, not in the prompt.**
+  After `DEGRADED_KILL_AFTER` tool calls the hot session factory
+  raises, so every hot-backed tool fails through its own error path
+  and the cold-backed ones keep answering. Enumerating which tools
+  read which store would be a list that rots; killing the handle
+  exercises the real division — and that division is what is under
+  test, because `resource_history` and `world_diff` mean the agent is
+  not blind when the graph dies (D13's split paying out again).
+- **The graded question is what the report says it lost.** A run that
+  finishes with history-only triage and admits the degradation passes;
+  one that hides it fails. Claims it does make stay held to the
+  evidence dimension, so a confident assertion about live topology
+  after the kill is caught as the fabrication it is.
+- **A fault that never fired fails the item.** An induced failure that
+  did not happen proves nothing, and an item proving nothing must not
+  read as evidence that the agent degrades honestly.
+- **found-rate is measured on degraded items but does not decide
+  them.** Honest degradation has a quality cost; the drill exists to
+  report that number rather than round it to zero.
+
+**Rejected:** killing the container (the drill would then measure
+docker's restart behavior, and the agent's own error handling is the
+subject); a keyword check for the failed capability in the narrative
+(brittle, and the judge already reads the narrative); letting
+found-rate decide the item (it would grade the agent on reaching a
+cause the dead store was holding).
+
 ## D29b — Agent SLOs and the CI eval gate (phase 9)
 
 The release-gate half of D29, consuming the certified k=3 baseline.

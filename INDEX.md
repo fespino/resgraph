@@ -36,6 +36,7 @@
 - observability/ — prometheus scrape config, D18 SLO rules + D29b agent SLO rules (+ promtool tests),
   grafana provisioning + the resgraph-overview dashboard as JSON
 - scripts/drill-hotstore-loss.sh — the INC-001 chaos drill, scripted
+- scripts/drill-analyst-degraded.sh — the INC-002 drill: the hot store dies mid-triage, honesty graded
 - docs/incidents/ — incident notes (induced drills labeled as such)
 - docs/reviews/ — recorded system reviews (harnessability, checklist walks)
 - benchmarks/ — measurement scripts (methods in BENCHMARKS.md)

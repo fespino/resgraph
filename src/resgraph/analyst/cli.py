@@ -13,6 +13,8 @@ no model output is ever interpreted as an instruction to write.
 
 import subprocess  # nosec B404 — one literal-arg call, see _git_ref
 from collections import Counter
+from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Annotated, Any
@@ -180,18 +182,117 @@ def live_summary(session: Any, resource_id: str, fired_at: datetime, window_h: i
     )
 
 
-def _print_report(report: Any) -> None:
+def _print_report(report: Any, echo: Callable[[str], None] = typer.echo) -> None:
     if report is None:
-        typer.echo("no parseable report — the run is on the trail, the verdict is not")
+        echo("no parseable report — the run is on the trail, the verdict is not")
         return
-    typer.echo(f"\n{report.narrative}\n")
+    echo(f"\n{report.narrative}\n")
     if report.no_confident_candidate:
-        typer.echo("no confident candidate — that is an answer, not a failure")
+        echo("no confident candidate — that is an answer, not a failure")
     for i, s in enumerate(report.suspects, 1):
-        typer.echo(
+        echo(
             f"  {i}. {s.resource_id}  seq={s.sequence}  {s.confidence}"
             f"  path={' -> '.join(s.mechanism_path)}"
         )
+
+
+@dataclass(frozen=True)
+class TriageIO:
+    """The journey's collaborators, each one a real boundary: the hot
+    store, the model, the tool surface, the ingest stream, the audit
+    store, the operator's terminal. Injected so the sequence of stages
+    can be tested without reaching into how the command wires them."""
+
+    session: Any
+    client: Any
+    toolset: Any
+    store: AuditStore
+    run: Callable[..., Any]
+    emit: Callable[[list[Any]], None] | None = None
+    ask: Callable[[str], str] = input
+    echo: Callable[[str], None] = typer.echo
+
+
+def triage_journey(
+    *,
+    resource_id: str,
+    symptom: str,
+    fired_at: datetime,
+    remediate: list[str],
+    approver: str,
+    model: str,
+    window_h: int,
+    run_id: str,
+    git_ref: str,
+    io: TriageIO,
+) -> int:
+    """Alert in, report out, and — when the operator asks — plan,
+    approval, execution. Returns a process exit code."""
+    from resgraph.query.executor import QueryContext
+    from resgraph.tools.context import CallerContext
+
+    from .approval import approve_plan
+    from .executor import WRITE_SCOPE, ApplyRemediationIn, apply_remediation, capture_pre_state
+    from .prompts import build_prompt
+    from .remediation import StepStatus, render_plan
+
+    prompt = build_prompt(
+        resource_id=resource_id,
+        symptom=symptom,
+        fired_at=fired_at,
+        summary=live_summary(io.session, resource_id, fired_at, window_h),
+    )
+    io.store.begin_run(
+        run_id,
+        alert={
+            "resource_id": resource_id,
+            "symptom": symptom,
+            "fired_at": fired_at.isoformat(),
+        },
+        model=model,
+        git_ref=git_ref,
+    )
+    io.echo(f"run {run_id}: investigating {symptom} on {resource_id}")
+    result = io.run(prompt, io.toolset, io.client, model=model, on_event=io.store.sink(run_id))
+    io.store.finish_run(run_id, result)
+    _print_report(result.report, io.echo)
+    if not remediate:
+        io.echo(f"\nreport only — no remediation proposed. Trail: resgraph-analyst audit {run_id}")
+        return 0
+    if result.report is None or not result.report.suspects:
+        io.echo("\nno suspect to remediate — refusing to propose a plan against nothing")
+        return 1
+    if io.emit is None:
+        raise RuntimeError("remediation was requested without a write channel to the stream")
+
+    top = result.report.suspects[0].resource_id
+    specs = [parse_remediation(spec, top) for spec in remediate]
+    plan = render_plan(specs, capture_pre_state(io.session))
+    decision = approve_plan(plan, approver=approver, ask=io.ask, echo=io.echo)
+    io.store.record_approval(run_id, decision)
+    if not decision.approved:
+        io.echo("rejected — nothing was applied")
+        return 0
+
+    subplan = [plan[i] for i in decision.applied]
+    out = apply_remediation(
+        ApplyRemediationIn(run_id=run_id, owner=approver, steps=subplan),
+        ctx=CallerContext(
+            caller="operator",
+            scopes=frozenset({WRITE_SCOPE}),
+            query=QueryContext(session=io.session),
+            emit=io.emit,
+        ),
+    )
+    io.store.record_step_events(run_id, out.events, subplan)
+    for index, status in sorted(out.summary.items()):
+        io.echo(f"  {index}: {status}")
+    io.echo(f"\ntrail: resgraph-analyst audit {run_id}")
+    # the summary is per-step final disposition; the event list also
+    # carries the 'started' events, which are not outcomes
+    if any(status != StepStatus.SUCCEEDED for status in out.summary.values()):
+        return 1
+    return 0
 
 
 @app.command("triage")
@@ -220,14 +321,8 @@ def triage_cmd(
     from anthropic import Anthropic
 
     from resgraph.graph.client import get_driver
-    from resgraph.query.executor import QueryContext
-    from resgraph.tools.context import CallerContext
 
-    from .approval import approve_plan
-    from .executor import WRITE_SCOPE, ApplyRemediationIn, apply_remediation, capture_pre_state
     from .harness import run_triage
-    from .prompts import build_prompt
-    from .remediation import StepStatus, render_plan
     from .tools import default_toolset
 
     steps_requested = list(remediate or [])
@@ -241,71 +336,38 @@ def triage_cmd(
     driver.verify_connectivity()
     session = driver.session()
     store = AuditStore(Path(db) if db else DEFAULT_DB)
-    run_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
-    try:
-        prompt = build_prompt(
-            resource_id=resource_id,
-            symptom=symptom,
-            fired_at=fired,
-            summary=live_summary(session, resource_id, fired, window_h),
-        )
-        store.begin_run(
-            run_id,
-            alert={"resource_id": resource_id, "symptom": symptom, "fired_at": fired.isoformat()},
-            model=model,
-            git_ref=_git_ref(),
-        )
-        typer.echo(f"run {run_id}: investigating {symptom} on {resource_id}")
-        result = run_triage(
-            prompt, default_toolset(), Anthropic(), model=model, on_event=store.sink(run_id)
-        )
-        store.finish_run(run_id, result)
-        _print_report(result.report)
-        if not steps_requested:
-            typer.echo(
-                f"\nreport only — no remediation proposed. Trail: resgraph-analyst audit {run_id}"
-            )
-            return
-        if result.report is None or not result.report.suspects:
-            typer.echo("\nno suspect to remediate — refusing to propose a plan against nothing")
-            raise typer.Exit(1)
-
-        top = result.report.suspects[0].resource_id
-        specs = [parse_remediation(spec, top) for spec in steps_requested]
-        plan = render_plan(specs, capture_pre_state(session))
-        decision = approve_plan(plan, approver=approver, ask=input, echo=typer.echo)
-        store.record_approval(run_id, decision)
-        if not decision.approved:
-            typer.echo("rejected — nothing was applied")
-            return
-
+    sink = None
+    if steps_requested:
         from resgraph.gen.sinks import RedisSink
 
         sink = RedisSink(redis_url, stream=stream)
-        subplan = [plan[i] for i in decision.applied]
-        try:
-            out = apply_remediation(
-                ApplyRemediationIn(run_id=run_id, owner=approver, steps=subplan),
-                ctx=CallerContext(
-                    caller="operator",
-                    scopes=frozenset({WRITE_SCOPE}),
-                    query=QueryContext(session=session),
-                    emit=sink.emit_many,
-                ),
-            )
-        finally:
-            sink.close()
-        store.record_step_events(run_id, out.events, subplan)
-        for index, status in sorted(out.summary.items()):
-            typer.echo(f"  {index}: {status}")
-        typer.echo(f"\ntrail: resgraph-analyst audit {run_id}")
-        # the summary is per-step final disposition; the event list also
-        # carries the 'started' events, which are not outcomes
-        if any(status != StepStatus.SUCCEEDED for status in out.summary.values()):
-            raise typer.Exit(1)
+    try:
+        code = triage_journey(
+            resource_id=resource_id,
+            symptom=symptom,
+            fired_at=fired,
+            remediate=steps_requested,
+            approver=approver,
+            model=model,
+            window_h=window_h,
+            run_id=datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ"),
+            git_ref=_git_ref(),
+            io=TriageIO(
+                session=session,
+                client=Anthropic(),
+                toolset=default_toolset(),
+                store=store,
+                run=run_triage,
+                emit=sink.emit_many if sink is not None else None,
+            ),
+        )
     finally:
+        if sink is not None:
+            sink.close()
         session.close()
         store.close()
+    if code:
+        raise typer.Exit(code)
 
 
 def _render_tree(events: list[dict[str, Any]]) -> None:

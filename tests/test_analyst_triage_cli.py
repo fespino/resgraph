@@ -2,21 +2,26 @@
 and — only when an operator asks for it — a rendered plan, a typed
 approval, execution, and every stage on the audit trail.
 
-The agent and the stores are stubbed; what is under test is the wiring
-between the stages, which is the part no unit test of a stage can see.
+The journey takes its collaborators, so this tests the sequence of
+stages rather than how the command wires them. One double, at the
+outermost boundary we do not own: a driver session backed by an
+in-memory graph that answers the Cypher shapes the code actually
+sends, and applies the D2/D3 rules on emit (watermark first, then
+replace-the-whole-statement upsert). Everything between the CLI and
+that session — live_summary, read_node, plan rendering, the approval
+gate, the step machine, the executor, the audit store — is the real
+thing.
 """
 
-import copy
 import json
-import re
-from pathlib import Path
+from datetime import datetime
 from typing import Any
 
 import pytest
 from typer.testing import CliRunner
 
 from resgraph.analyst.audit import AuditStore
-from resgraph.analyst.cli import app, parse_remediation
+from resgraph.analyst.cli import TriageIO, app, live_summary, parse_remediation, triage_journey
 from resgraph.analyst.harness import RunResult, Usage
 from resgraph.analyst.models import EvidenceVerdict, TriageReport, TriageSuspect
 from resgraph.schema import Op
@@ -25,65 +30,98 @@ runner = CliRunner()
 
 VM = "vm-000001"
 HOST = "host-000001"
+FIRED = "2026-01-02T03:04:05+00:00"
 
 
-def _node(resource_id: str, seq: int, attrs: dict[str, Any]):
-    return {
-        "id": resource_id,
-        "applied_seq": seq,
-        "deleted": False,
-        "deleted_seq": None,
-        "phantom": False,
-        "attrs": attrs,
-        "rels": [("RUNS_ON", HOST)] if resource_id == VM else [],
-    }
+class _Rows(list):
+    def single(self):
+        return self[0] if self else None
 
 
-class World:
+class Graph:
+    """The store's property bag and edges, plus the two ingest rules the
+    executor depends on."""
+
     def __init__(self) -> None:
-        self.nodes = {VM: _node(VM, 7, {"role": "web"}), HOST: _node(HOST, 2, {"state": "up"})}
+        self.props: dict[str, dict[str, Any]] = {
+            VM: {"id": VM, "applied_seq": 7, "deleted": False, "phantom": False, "role": "web"},
+            HOST: {"id": HOST, "applied_seq": 2, "deleted": False, "phantom": False, "state": "up"},
+        }
+        self.rels: dict[str, list[tuple[str, str]]] = {VM: [("RUNS_ON", HOST)], HOST: []}
         self.emitted: list[Any] = []
-
-    def read(self, _session: Any, target: str):
-        found = self.nodes.get(target)
-        return copy.deepcopy(found) if found is not None else None
 
     def emit(self, msgs: list[Any]) -> None:
         self.emitted.extend(msgs)
         for m in msgs:
-            if m.sequence <= self.nodes.get(m.resource_id, {}).get("applied_seq", -1):
+            current = self.props.get(m.resource_id, {}).get("applied_seq", -1)
+            if m.sequence <= current:  # D3 watermark: stale or replayed
                 continue
-            node = _node(m.resource_id, m.sequence, dict(m.attrs))
-            node["deleted"] = m.op is Op.DELETE
-            self.nodes[m.resource_id] = node
+            if m.op is Op.DELETE:
+                self.props[m.resource_id] |= {
+                    "applied_seq": m.sequence,
+                    "deleted": True,
+                    "deleted_seq": m.sequence,
+                }
+                continue
+            self.props[m.resource_id] = {
+                "id": m.resource_id,
+                "applied_seq": m.sequence,
+                "deleted": False,
+                "phantom": False,
+                **dict(m.attrs),  # D2 upsert replaces the bag
+            }
+            self.rels[m.resource_id] = sorted(
+                (r.type.upper(), r.target_id) for r in m.relationships
+            )
+
+    def attrs(self, resource_id: str) -> dict[str, Any]:
+        system = {"id", "applied_seq", "deleted", "deleted_seq", "phantom"}
+        return {k: v for k, v in self.props[resource_id].items() if k not in system}
 
 
 class FakeSession:
-    """Answers only the two shapes live_summary asks for."""
+    """Answers the three query shapes the triage path sends."""
 
-    def run(self, query: str, **params: Any):
-        if "RETURN n.id AS id" in str(query):
-            return [{"id": VM}, {"id": HOST}]
-        return []
+    def __init__(self, graph: Graph) -> None:
+        self.graph = graph
+
+    def run(self, query: str, **params: Any) -> _Rows:
+        q = str(query)
+        if "properties(n) AS props" in q:
+            found = self.graph.props.get(params["id"])
+            if found is None:
+                return _Rows()
+            rels = [{"type": t, "target": tid} for t, tid in self.graph.rels[params["id"]]]
+            # OPTIONAL MATCH with no edges collects one null row
+            return _Rows([{"props": dict(found), "rels": rels or [{"type": None, "target": None}]}])
+        if "RETURN n.id AS id" in q:
+            return _Rows(
+                [{"id": rid} for rid, p in self.graph.props.items() if not p.get("deleted")]
+            )
+        if "type(r) AS t" in q:
+            return _Rows(
+                [
+                    {"src": src, "t": t}
+                    for src, edges in self.graph.rels.items()
+                    for t, tid in edges
+                    if tid == params["id"]
+                ]
+            )
+        return _Rows()
 
     def close(self) -> None:
         pass
 
 
-class FakeDriver:
-    def verify_connectivity(self) -> None:
-        pass
+class Script:
+    """Scripted operator answers; runs out loudly rather than hanging."""
 
-    def session(self) -> FakeSession:
-        return FakeSession()
+    def __init__(self, *answers: str) -> None:
+        self.answers = list(answers)
 
-
-class FakeSink:
-    def __init__(self, world: "World") -> None:
-        self.emit_many = world.emit
-
-    def close(self) -> None:
-        pass
+    def __call__(self, _prompt: str) -> str:
+        assert self.answers, "the gate asked more questions than the test scripted"
+        return self.answers.pop(0)
 
 
 def _report(suspects: list[str]) -> TriageReport:
@@ -106,163 +144,144 @@ def _report(suspects: list[str]) -> TriageReport:
     )
 
 
+def _agent(report: TriageReport):
+    def run(prompt, toolset, client, **kw):
+        return RunResult(report=report, degraded=False, tool_calls=3, turns=2, usage=Usage())
+
+    return run
+
+
 @pytest.fixture()
-def wired(monkeypatch, tmp_path):
-    world = World()
-    monkeypatch.setattr("resgraph.graph.client.get_driver", FakeDriver)
-    monkeypatch.setattr("resgraph.graph.ingest.read_node", world.read)
-    monkeypatch.setattr("resgraph.analyst.executor.read_node", world.read)
-    monkeypatch.setattr("anthropic.Anthropic", object)
-    monkeypatch.setattr("resgraph.analyst.tools.default_toolset", object)
-    monkeypatch.setattr("resgraph.gen.sinks.RedisSink", lambda *a, **k: FakeSink(world))
+def journey(tmp_path):
+    """Returns (run_it, graph, store) — run_it drives the real journey."""
+    graph = Graph()
+    store = AuditStore(tmp_path / "audit.db")
+    echoed: list[str] = []
 
-    def fake_run_triage(prompt, toolset, client, **kw):
-        return RunResult(
-            report=_report([HOST]), degraded=False, tool_calls=3, turns=2, usage=Usage()
+    def run_it(*, suspects=(HOST,), remediate=(), answers=(), approver="fran"):
+        code = triage_journey(
+            resource_id=VM,
+            symptom="crash_loop",
+            fired_at=datetime.fromisoformat(FIRED),
+            remediate=list(remediate),
+            approver=approver,
+            model="claude-test",
+            window_h=24,
+            run_id="RUN1",
+            git_ref="abc1234",
+            io=TriageIO(
+                session=FakeSession(graph),
+                client=object(),
+                toolset=object(),
+                store=store,
+                run=_agent(_report(list(suspects))),
+                emit=graph.emit,
+                ask=Script(*answers),
+                echo=echoed.append,
+            ),
         )
+        return code, "\n".join(echoed)
 
-    monkeypatch.setattr("resgraph.analyst.harness.run_triage", fake_run_triage)
-    return world, tmp_path / "audit.db"
-
-
-def _events(db: Path, output: str) -> list[dict[str, Any]]:
-    run_id = re.search(r"^run (\S+):", output, re.MULTILINE).group(1)  # type: ignore[union-attr]
-    store = AuditStore(db)
-    try:
-        return store.timeline(run_id)
-    finally:
-        store.close()
+    yield run_it, graph, store
+    store.close()
 
 
-def test_report_only_run_writes_nothing(wired):
-    world, db = wired
-    result = runner.invoke(app, ["triage", VM, "--symptom", "crash_loop", "--db", str(db)])
-    assert result.exit_code == 0, result.output
-    assert "report only" in result.output
-    assert HOST in result.output
-    assert world.emitted == []
+def test_report_only_run_writes_nothing(journey):
+    run_it, graph, store = journey
+    code, out = run_it()
+    assert code == 0
+    assert "report only" in out and HOST in out
+    assert graph.emitted == []
+    assert [e["kind"] for e in store.timeline("RUN1")] == []
 
 
-def _plain(text: str) -> str:
-    """Typer renders usage errors in a rich box whose wrapping depends on
-    terminal width; compare against the words, not the layout."""
-    return re.sub(r"[^\w\s.:=@-]", " ", re.sub(r"\x1b\[[0-9;]*m", "", text))
-
-
-def test_remediation_without_an_approver_is_refused(wired):
-    _world, db = wired
-    result = runner.invoke(
-        app, ["triage", VM, "--db", str(db), "--remediate", "set_attrs:state=drained"]
-    )
-    assert result.exit_code != 0
-    plain = _plain(result.output)
-    assert "--approver" in plain and "--remediate" in plain
-
-
-def test_approved_plan_applies_to_the_agents_top_suspect(wired):
-    world, db = wired
-    result = runner.invoke(
-        app,
-        [
-            "triage",
-            VM,
-            "--db",
-            str(db),
-            "--approver",
-            "fran",
-            "--remediate",
-            "set_attrs:state=drained",
-        ],
-        input="1\n",
-    )
-    assert result.exit_code == 0, result.output
-    # the step targeted the suspect the agent named, not the alerting resource
-    assert world.nodes[HOST]["attrs"] == {"state": "drained"}
-    assert world.nodes[VM]["attrs"] == {"role": "web"}
-    kinds = [e["kind"] for e in _events(db, result.output)]
+def test_approved_plan_applies_to_the_agents_top_suspect(journey):
+    run_it, graph, store = journey
+    code, _out = run_it(remediate=["set_attrs:state=drained"], answers=["1"])
+    assert code == 0
+    # the step hit the suspect the agent named, not the alerting resource
+    assert graph.attrs(HOST) == {"state": "drained"}
+    assert graph.attrs(VM) == {"role": "web"}
+    kinds = [e["kind"] for e in store.timeline("RUN1")]
     assert "approval" in kinds and "step" in kinds
 
 
-def test_a_rejected_plan_applies_nothing_but_is_still_recorded(wired):
-    world, db = wired
-    result = runner.invoke(
-        app,
-        [
-            "triage",
-            VM,
-            "--db",
-            str(db),
-            "--approver",
-            "fran",
-            "--remediate",
-            "set_attrs:state=drained",
-        ],
-        input="no\n",
-    )
-    assert result.exit_code == 0, result.output
-    assert "rejected" in result.output
-    assert world.emitted == []
-    events = _events(db, result.output)
-    approval = [e for e in events if e["kind"] == "approval"]
+def test_the_upsert_keeps_edges_the_patch_never_mentioned(journey):
+    run_it, graph, _store = journey
+    code, _out = run_it(suspects=(VM,), remediate=["set_attrs:role=drained"], answers=["1"])
+    assert code == 0
+    assert graph.rels[VM] == [("RUNS_ON", HOST)]
+
+
+def test_a_rejected_plan_applies_nothing_but_is_still_recorded(journey):
+    run_it, graph, store = journey
+    code, out = run_it(remediate=["set_attrs:state=drained"], answers=["no"])
+    assert code == 0
+    assert "rejected" in out
+    assert graph.emitted == []
+    approval = [e for e in store.timeline("RUN1") if e["kind"] == "approval"]
     assert approval and approval[0]["payload"]["approved"] is False
 
 
-def test_an_explicit_target_overrides_the_suspect(wired):
-    world, db = wired
-    result = runner.invoke(
-        app,
-        [
-            "triage",
-            VM,
-            "--db",
-            str(db),
-            "--approver",
-            "fran",
-            "--remediate",
-            f"set_attrs@{VM}:role=drained",
-        ],
-        input="1\n",
-    )
-    assert result.exit_code == 0, result.output
-    assert world.nodes[VM]["attrs"] == {"role": "drained"}
+def test_a_mistyped_count_re_asks_rather_than_applying(journey):
+    run_it, graph, _store = journey
+    code, out = run_it(remediate=["set_attrs:state=drained"], answers=["3", "1"])
+    assert code == 0
+    assert "count them and retype" in out
+    assert graph.attrs(HOST) == {"state": "drained"}
 
 
-def test_no_suspect_means_no_plan_is_proposed(wired, monkeypatch):
-    world, db = wired
-    monkeypatch.setattr(
-        "resgraph.analyst.harness.run_triage",
-        lambda *a, **k: RunResult(
-            report=_report([]), degraded=False, tool_calls=1, turns=1, usage=Usage()
-        ),
-    )
-    result = runner.invoke(
-        app,
-        ["triage", VM, "--db", str(db), "--approver", "fran", "--remediate", "set_attrs:state=x"],
-        input="1\n",
-    )
-    assert result.exit_code == 1
-    assert "refusing to propose a plan against nothing" in result.output
-    assert world.emitted == []
+def test_an_explicit_target_overrides_the_suspect(journey):
+    run_it, graph, _store = journey
+    code, _out = run_it(remediate=[f"set_attrs@{VM}:role=drained"], answers=["1"])
+    assert code == 0
+    assert graph.attrs(VM) == {"role": "drained"}
 
 
-def test_the_plan_the_approver_sees_declares_the_rollback_state(wired):
-    _world, db = wired
-    result = runner.invoke(
-        app,
-        [
-            "triage",
-            VM,
-            "--db",
-            str(db),
-            "--approver",
-            "fran",
-            "--remediate",
-            "set_attrs:state=drained",
-        ],
-        input="no\n",
-    )
-    assert "current:" in result.output
-    assert json.dumps({"state": "drained"}, sort_keys=True) in result.output
+def test_no_suspect_means_no_plan_is_proposed(journey):
+    run_it, graph, _store = journey
+    code, out = run_it(suspects=(), remediate=["set_attrs:state=x"])
+    assert code == 1
+    assert "refusing to propose a plan against nothing" in out
+    assert graph.emitted == []
+
+
+def test_the_plan_the_approver_sees_declares_the_rollback_state(journey):
+    run_it, _graph, _store = journey
+    _code, out = run_it(remediate=["set_attrs:state=drained"], answers=["no"])
+    assert "current:" in out
+    assert json.dumps({"state": "drained"}, sort_keys=True) in out
+
+
+def test_a_step_that_cannot_apply_exits_nonzero(journey):
+    run_it, graph, store = journey
+    code, _out = run_it(remediate=["set_attrs@vm-999999:role=x"], answers=["1"])
+    assert code == 1
+    assert graph.emitted == []
+    steps = [e for e in store.timeline("RUN1") if e["kind"] == "step"]
+    assert any(e["payload"]["status"] == "failed" for e in steps)
+
+
+def test_live_summary_is_built_from_the_graph(journey):
+    _run_it, graph, _store = journey
+    summary = live_summary(FakeSession(graph), VM, datetime.fromisoformat(FIRED), 24)
+    assert summary.resource_counts == {"vm": 1, "host": 1}
+    assert f"{VM} runs_on {HOST}" in summary.neighborhood
+    assert summary.window_end.isoformat() == FIRED
+
+
+def test_remediation_without_an_approver_is_refused_before_any_io():
+    """Argument guards live in the command, and reject before the
+    journey — so this needs no stores and no stubs."""
+    result = runner.invoke(app, ["triage", VM, "--remediate", "set_attrs:state=drained"])
+    assert result.exit_code != 0
+    assert "--approver" in result.output and "--remediate" in result.output
+
+
+def test_a_naive_fired_at_is_refused_before_any_io():
+    result = runner.invoke(app, ["triage", VM, "--fired-at", "2026-01-02T03:04:05"])
+    assert result.exit_code != 0
+    assert "offset" in result.output
 
 
 @pytest.mark.parametrize(

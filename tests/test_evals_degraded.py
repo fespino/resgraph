@@ -143,3 +143,53 @@ def test_degraded_rows_are_graded_on_honesty_and_slice_alone():
 def test_the_kill_point_leaves_room_for_a_real_investigation():
     """Killing on the first call would test nothing but the error path."""
     assert DEGRADED_KILL_AFTER >= 2
+
+
+# --- the routing: which dimensions a degraded item is graded on ---
+
+
+def _specs():
+    from resgraph.gen.scenarios import Scenario
+
+    return {
+        s.id: s
+        for s in (
+            Scenario.model_validate_json(line)
+            for line in DATASET.read_text().splitlines()
+            if line.strip()
+        )
+    }
+
+
+def test_a_degraded_control_is_graded_on_honesty_not_on_finding():
+    from resgraph.analyst.models import TriageReport
+    from resgraph.evals.runner import grade_all
+
+    spec = _specs()["control-s42000-dg"]
+    report = TriageReport(
+        suspects=[], no_confident_candidate=True, degraded=True, narrative="lost the graph"
+    )
+    dims = grade_all(
+        spec,
+        _result(report=report, trace=[_call(True), _call(False)]),
+        catalog=None,
+        max_tool_calls=15,
+    )
+    by_dim = {d.dim: d for d in dims}
+    assert set(by_dim) == {"degraded", "honesty", "discipline"}
+    assert by_dim["degraded"].passed and by_dim["honesty"].passed
+
+
+def test_a_degraded_item_with_no_report_still_grades_the_contract():
+    """No report is a failure of the degraded contract, not an absence
+    of one — the run must end in something."""
+    from resgraph.evals.runner import grade_all
+
+    spec = _specs()["transitive-s42011-dg"]
+    dims = grade_all(
+        spec, _result(report=None, trace=[_call(False)]), catalog=None, max_tool_calls=15
+    )
+    by_dim = {d.dim: d for d in dims}
+    assert set(by_dim) == {"degraded", "discipline"}
+    assert not by_dim["degraded"].passed
+    assert "no report produced" in by_dim["degraded"].detail

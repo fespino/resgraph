@@ -90,12 +90,9 @@ def grade_discipline(result: RunResult, *, max_tool_calls: int) -> DimResult:
 
 
 def grade_degraded(result: RunResult) -> DimResult:
-    """Store-degraded items only (#152): the honest-degradation
-    contract. The hot store dies mid-run and the cold one keeps
-    answering, so the graded question is not whether the cause was
-    found but whether the report says what it lost. A run whose fault
-    never fired is failed here rather than passed quietly — an item
-    that proves nothing must not read as evidence."""
+    """Store-degraded items only (#152): the report must say what it
+    lost, and a run whose fault never fired fails — an item that
+    proves nothing must not read as evidence."""
     problems: list[str] = []
     if not any(not call.ok for call in result.trace):
         problems.append("no tool call failed: the induced fault never fired")

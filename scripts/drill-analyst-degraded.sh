@@ -1,18 +1,11 @@
 #!/usr/bin/env bash
 # INC-002 chaos drill: kill the hot store mid-triage and grade what the
 # agent does about it (#152). Induced, labeled, reproducible — the same
-# posture as the INC-001 drill, pointed at the agent instead of the
-# ingest.
+# posture as the INC-001 drill, pointed at the agent. Design in SPEC.md
+# (D29a addendum); pre-registration in EVALS.md.
 #
-# The fault is injected at the store handle, not faked in the prompt:
-# after DEGRADED_KILL_AFTER tool calls the hot session factory raises,
-# so blast_radius/dependency_path/fetch_resource fail through their own
-# error path while resource_history/world_diff keep reading cold. A
-# well-harnessed agent finishes with history-only triage and says so.
-#
-# COSTS MONEY: this runs the real suite against the real model. Read
-# EVALS.md's protocol rules before running, and use a project-scoped key
-# with its own cap.
+# COSTS MONEY: runs the real suite against the real model. Use a
+# project-scoped key with its own cap.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 

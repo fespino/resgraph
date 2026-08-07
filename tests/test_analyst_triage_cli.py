@@ -139,13 +139,20 @@ def test_report_only_run_writes_nothing(wired):
     assert world.emitted == []
 
 
+def _plain(text: str) -> str:
+    """Typer renders usage errors in a rich box whose wrapping depends on
+    terminal width; compare against the words, not the layout."""
+    return re.sub(r"[^\w\s.:=@-]", " ", re.sub(r"\x1b\[[0-9;]*m", "", text))
+
+
 def test_remediation_without_an_approver_is_refused(wired):
     _world, db = wired
     result = runner.invoke(
         app, ["triage", VM, "--db", str(db), "--remediate", "set_attrs:state=drained"]
     )
     assert result.exit_code != 0
-    assert "needs --approver" in result.output
+    plain = _plain(result.output)
+    assert "--approver" in plain and "--remediate" in plain
 
 
 def test_approved_plan_applies_to_the_agents_top_suspect(wired):

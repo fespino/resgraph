@@ -147,16 +147,42 @@ def test_no_anthropic_tool_blocks_outside_the_analyst_toolset():
 
 
 def test_analyst_surface_derives_from_registry():
-    from resgraph.analyst.tools import RegistryToolset
+    from resgraph.analyst.tools import RegistryToolset, agent_entries
 
     toolset = RegistryToolset(lambda: None)  # type: ignore[arg-type, return-value]
     blocks = {b["name"]: b for b in toolset.blocks()}
-    assert set(blocks) == {e.name for e in TOOL_REGISTRY}
-    for entry in TOOL_REGISTRY:
+    assert set(blocks) == {e.name for e in agent_entries()}
+    for entry in agent_entries():
         block = blocks[entry.name]
         assert block["description"] == entry.description
         assert block["input_schema"] == entry.input_model.model_json_schema()
         assert entry.hints.read_only and not entry.privileged
+
+
+def test_the_privileged_tool_is_absent_from_every_agent_and_client_surface():
+    """The proposal boundary as a structural fact: apply_remediation is
+    registered, so the registry stays the single source of truth, but no
+    surface derivation can reach it."""
+    privileged = [e for e in TOOL_REGISTRY if e.privileged]
+    assert privileged, "the registry should carry the privileged capability"
+    for entry in privileged:
+        assert not entry.surfaces, f"{entry.name} is reachable by an external client"
+        assert entry not in _agent_entries(), f"{entry.name} is on the agent's surface"
+
+
+def _agent_entries():
+    from resgraph.analyst.tools import agent_entries
+
+    return agent_entries()
+
+
+def test_the_analyst_package_root_imports_nothing():
+    """The registry registers the analyst's privileged executor, so any
+    import in this package's root closes a cycle. Guarding the property
+    rather than trusting a docstring."""
+    tree = ast.parse((SRC / "analyst" / "__init__.py").read_text())
+    imports = [n for n in ast.walk(tree) if isinstance(n, ast.Import | ast.ImportFrom)]
+    assert not imports, "resgraph/analyst/__init__.py must not import: it would cycle via registry"
 
 
 def test_registry_module_is_the_only_registry():

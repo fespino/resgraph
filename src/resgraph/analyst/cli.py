@@ -1,19 +1,30 @@
-"""resgraph-analyst — the audit query surface (D27).
+"""resgraph-analyst — the operator's two surfaces.
 
-Every question here is answered from the audit store alone, with the
-agent stopped: the run timeline, what the agent read and wrote
-(--touched), the cross-run write history (--tool apply_remediation),
-and the span tree (--trace).
+`audit` answers from the audit store alone, with the agent stopped: the
+run timeline, what the agent read and wrote (--touched), the cross-run
+write history (--tool apply_remediation), and the span tree (--trace).
+
+`triage` is the whole journey in one command — alert in, investigation,
+report, proposed plan, typed approval, execution, every stage on the
+trail. The agent names a cause; it never names a mutation. The
+remediation vocabulary is the operator's, supplied with --remediate, so
+no model output is ever interpreted as an instruction to write.
 """
 
+import subprocess  # nosec B404 — one literal-arg call, see _git_ref
+from collections import Counter
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
 
 import typer
 
 from .audit import DEFAULT_DB, AuditStore, parse_since
 
 app = typer.Typer(help="resgraph analyst CLI.", add_completion=False)
+
+DEFAULT_MODEL = "claude-opus-4-8"
+NEIGHBORHOOD_CAP = 40
 
 
 @app.callback()
@@ -105,6 +116,195 @@ def audit_cmd(
             )
             typer.echo(line.rstrip())
     finally:
+        store.close()
+
+
+def _git_ref() -> str:
+    try:
+        out = subprocess.run(  # nosec B603 B607 — literal args, no user input
+            ["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True, check=True
+        )
+        return out.stdout.strip()
+    except Exception:
+        return "unknown"
+
+
+def _typed(value: str) -> str | int | bool:
+    if value.lower() in {"true", "false"}:
+        return value.lower() == "true"
+    if value.lstrip("-").isdigit():
+        return int(value)
+    return value
+
+
+def parse_remediation(spec: str, default_target: str) -> tuple[str, str, dict[str, Any]]:
+    """`action[@target][:k=v,k=v]` — the operator's vocabulary, parsed
+    here so a malformed step fails before anything is rendered."""
+    head, _, patch_text = spec.partition(":")
+    action, _, target = head.partition("@")
+    if not action:
+        raise typer.BadParameter(f"no action in {spec!r}; expected action[@target][:k=v]")
+    patch: dict[str, Any] = {}
+    for pair in (p for p in patch_text.split(",") if p.strip()):
+        key, sep, value = pair.partition("=")
+        if not sep:
+            raise typer.BadParameter(f"{pair!r} is not k=v in {spec!r}")
+        patch[key.strip()] = _typed(value.strip())
+    return action, target or default_target, patch
+
+
+def live_summary(session: Any, resource_id: str, fired_at: datetime, window_h: int) -> Any:
+    from resgraph.graph.client import lit
+    from resgraph.graph.ingest import read_node
+
+    from .prompts import WorldSummary
+
+    live = session.run(
+        lit(
+            "MATCH (n) WHERE coalesce(n.deleted, false) = false "
+            "AND coalesce(n.phantom, false) = false RETURN n.id AS id"
+        )
+    )
+    counts = Counter(str(r["id"]).split("-", 1)[0] for r in live)
+    state = read_node(session, resource_id)
+    deps = [f"{resource_id} {t.lower()} {tid}" for t, tid in (state or {}).get("rels", [])]
+    inbound = session.run(
+        lit("MATCH (m)-[r]->(n {id: $id}) RETURN m.id AS src, type(r) AS t"), id=resource_id
+    )
+    rdeps = [f"{r['src']} {str(r['t']).lower()} {resource_id}" for r in inbound]
+    return WorldSummary(
+        resource_counts=dict(counts),
+        neighborhood=tuple((sorted(deps) + sorted(rdeps))[:NEIGHBORHOOD_CAP]),
+        window_start=fired_at - timedelta(hours=window_h),
+        window_end=fired_at,
+    )
+
+
+def _print_report(report: Any) -> None:
+    if report is None:
+        typer.echo("no parseable report — the run is on the trail, the verdict is not")
+        return
+    typer.echo(f"\n{report.narrative}\n")
+    if report.no_confident_candidate:
+        typer.echo("no confident candidate — that is an answer, not a failure")
+    for i, s in enumerate(report.suspects, 1):
+        typer.echo(
+            f"  {i}. {s.resource_id}  seq={s.sequence}  {s.confidence}"
+            f"  path={' -> '.join(s.mechanism_path)}"
+        )
+
+
+@app.command("triage")
+def triage_cmd(
+    resource_id: str = typer.Argument(..., help="The alerting resource."),
+    symptom: str = typer.Option("crash_loop", "--symptom", help="What fired."),
+    fired_at: str | None = typer.Option(None, "--fired-at", help="ISO-8601 UTC [now]."),
+    remediate: Annotated[
+        list[str] | None,
+        typer.Option("--remediate", help="Propose a step: action[@target][:k=v]. Repeatable."),
+    ] = None,
+    approver: str = typer.Option("", "--approver", help="Required to propose remediation."),
+    model: str = typer.Option(DEFAULT_MODEL, "--model"),
+    window_h: int = typer.Option(24, "--window-hours", help="Event window handed to the agent."),
+    db: str | None = typer.Option(None, "--db", help="Audit store path."),
+    stream: str = typer.Option("resgraph:updates", "--stream", help="Ingest stream to emit on."),
+    redis_url: str = typer.Option("redis://localhost:6379", "--redis-url"),
+) -> None:
+    """Investigate an alert; with --remediate, propose and gate a plan.
+
+    Without --remediate this is read-only: the agent investigates and
+    reports. Remediation is a separate, deliberate act — it needs an
+    approver, it renders every step with the state a rollback would
+    restore, and it takes a typed count at the gate.
+    """
+    from anthropic import Anthropic
+
+    from resgraph.graph.client import get_driver
+    from resgraph.query.executor import QueryContext
+    from resgraph.tools.context import CallerContext
+
+    from .approval import approve_plan
+    from .executor import WRITE_SCOPE, ApplyRemediationIn, apply_remediation, capture_pre_state
+    from .harness import run_triage
+    from .prompts import build_prompt
+    from .remediation import StepStatus, render_plan
+    from .tools import default_toolset
+
+    steps_requested = list(remediate or [])
+    if steps_requested and not approver:
+        raise typer.BadParameter("--remediate needs --approver: execution is attributable")
+    fired = datetime.fromisoformat(fired_at) if fired_at else datetime.now(UTC)
+    if fired.tzinfo is None:
+        raise typer.BadParameter("--fired-at needs an offset; ambiguous time is not accepted (D2)")
+
+    driver = get_driver()
+    driver.verify_connectivity()
+    session = driver.session()
+    store = AuditStore(Path(db) if db else DEFAULT_DB)
+    run_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    try:
+        prompt = build_prompt(
+            resource_id=resource_id,
+            symptom=symptom,
+            fired_at=fired,
+            summary=live_summary(session, resource_id, fired, window_h),
+        )
+        store.begin_run(
+            run_id,
+            alert={"resource_id": resource_id, "symptom": symptom, "fired_at": fired.isoformat()},
+            model=model,
+            git_ref=_git_ref(),
+        )
+        typer.echo(f"run {run_id}: investigating {symptom} on {resource_id}")
+        result = run_triage(
+            prompt, default_toolset(), Anthropic(), model=model, on_event=store.sink(run_id)
+        )
+        store.finish_run(run_id, result)
+        _print_report(result.report)
+        if not steps_requested:
+            typer.echo(
+                f"\nreport only — no remediation proposed. Trail: resgraph-analyst audit {run_id}"
+            )
+            return
+        if result.report is None or not result.report.suspects:
+            typer.echo("\nno suspect to remediate — refusing to propose a plan against nothing")
+            raise typer.Exit(1)
+
+        top = result.report.suspects[0].resource_id
+        specs = [parse_remediation(spec, top) for spec in steps_requested]
+        plan = render_plan(specs, capture_pre_state(session))
+        decision = approve_plan(plan, approver=approver, ask=input, echo=typer.echo)
+        store.record_approval(run_id, decision)
+        if not decision.approved:
+            typer.echo("rejected — nothing was applied")
+            return
+
+        from resgraph.gen.sinks import RedisSink
+
+        sink = RedisSink(redis_url, stream=stream)
+        subplan = [plan[i] for i in decision.applied]
+        try:
+            out = apply_remediation(
+                ApplyRemediationIn(run_id=run_id, owner=approver, steps=subplan),
+                ctx=CallerContext(
+                    caller="operator",
+                    scopes=frozenset({WRITE_SCOPE}),
+                    query=QueryContext(session=session),
+                    emit=sink.emit_many,
+                ),
+            )
+        finally:
+            sink.close()
+        store.record_step_events(run_id, out.events, subplan)
+        for index, status in sorted(out.summary.items()):
+            typer.echo(f"  {index}: {status}")
+        typer.echo(f"\ntrail: resgraph-analyst audit {run_id}")
+        # the summary is per-step final disposition; the event list also
+        # carries the 'started' events, which are not outcomes
+        if any(status != StepStatus.SUCCEEDED for status in out.summary.values()):
+            raise typer.Exit(1)
+    finally:
+        session.close()
         store.close()
 
 

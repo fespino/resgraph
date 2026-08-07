@@ -1429,6 +1429,63 @@ If plans grow beyond single-owner linear sequences (partial
 remediation toward a least-degraded state becomes a goal), the
 re-plan question reopens inside the machine, not outside it.
 
+**Addendum (#145) — what a step actually does.** The protocol above
+described execution before the capability existed; this is the
+executor that fills it in.
+
+- **Remediation is a stream write, never a store write.** A step
+  becomes a D2 update emitted onto the same ingest stream every other
+  producer uses and applied by the same idempotent path (D3/D10).
+  Nothing in the executor touches a store, so remediation inherits
+  ordering, replay-safety and the audit trail rather than reimplementing
+  them beside the platform.
+- **Emit, then confirm.** The D3 watermark drops a message whose
+  sequence is not ahead of the target's, silently and by design. An
+  executor that emitted and returned would report success for writes
+  that never landed, so each step reads the watermark back and fails
+  the step if its sequence never arrived. A remediation that vanished
+  is a failure, not a success nobody checked.
+- **The patch merges onto live state; the rollback target is the
+  approved snapshot.** A D2 upsert is a full statement — it replaces
+  the attribute bag and the owned edge set — so a step that sent only
+  its patch would strip every attribute and edge it did not mention.
+  Applying merges onto the target's state at apply time (patching the
+  render-time snapshot would silently revert whatever changed in
+  between); rolling back restores the snapshot the approver actually
+  saw, and only while the resource still sits at the sequence this
+  step wrote. Past that, a third party has written and the snapshot
+  restores nothing — the step reports ROLLBACK_IRREVERSIBLE rather
+  than clobbering them.
+- **The agent names a cause; it never names a mutation.** The report
+  schema has no remediation field and gains none. The remediation
+  vocabulary is the operator's, supplied to `resgraph-analyst triage`
+  with `--remediate`, and the plan is assembled outside the model
+  against the suspect the model identified. No model output is ever
+  interpreted as an instruction to write — a stronger property than
+  gating one, and it costs nothing to hold.
+- **The capability is the injected write channel, not a flag.**
+  `apply_remediation` is registered with `privileged=True` and an
+  empty surface set; both transports derive by membership, so "external
+  clients have no bypassing use case" is enforced rather than promised.
+  The agent's toolset is built by *selection* — read-only, unprivileged,
+  closed-world — so a new registration is off the agent's surface until
+  it earns a place, rather than on it until someone remembers to
+  exclude it. Execution additionally requires an operator caller and an
+  emit channel that no read transport supplies.
+
+**Rejected:** writing to the hot store directly (fast, and it would
+desynchronize the stores the platform exists to keep in agreement);
+returning success on emit (the watermark makes that a lie); letting
+the report carry proposed actions (it would make model output an
+instruction, and it would change the graded schema the D24 baseline
+was certified against). **Known hazard:** the executor is a second
+writer, and D3's watermark cannot arbitrate sequence assignment
+between producers — a generator write racing a remediation can make
+either look stale. Confirmation turns that race into a visible step
+failure rather than a silent no-op, which is containment, not a fix;
+the fix is #31's multi-producer sequencing (epochs/fencing), and this
+executor moves to it unchanged when it lands.
+
 ## D29a — Hard budgets with graceful cutoff, and the judge spend breaker (phase 9)
 
 The runtime half of D29 (the SLOs and the CI eval gate are D29b,

@@ -9,6 +9,11 @@ from typing import Any, Literal
 
 from pydantic import BaseModel
 
+from resgraph.analyst.executor import (
+    ApplyRemediationIn,
+    ApplyRemediationOut,
+    apply_remediation,
+)
 from resgraph.tools.canonical.entity import FetchResourceIn, FetchResourceOut, fetch_resource
 from resgraph.tools.canonical.history import (
     ResourceHistoryIn,
@@ -50,6 +55,9 @@ class ToolHints:
 
 
 READ_ONLY = ToolHints(read_only=True, destructive=False, idempotent=True, open_world=False)
+# idempotent because the D3 watermark makes a replayed message a no-op,
+# not because the effect is harmless
+PRIVILEGED_WRITE = ToolHints(read_only=False, destructive=True, idempotent=True, open_world=False)
 
 
 @dataclass(frozen=True)
@@ -71,6 +79,11 @@ class ToolRegistration:
 
 _BOTH: frozenset[Surface] = frozenset({"mcp", "http"})
 _READ: frozenset[str] = frozenset({"resgraph:read"})
+# no surface: both transports derive by membership, so an empty set is
+# how "external clients have no bypassing use case" is enforced rather
+# than promised (D19 admission rule)
+_NO_SURFACE: frozenset[Surface] = frozenset()
+_WRITE: frozenset[str] = frozenset({"resgraph:write"})
 
 TOOL_REGISTRY: tuple[ToolRegistration, ...] = (
     ToolRegistration(
@@ -158,5 +171,22 @@ TOOL_REGISTRY: tuple[ToolRegistration, ...] = (
         privileged=False,
         hints=READ_ONLY,
         timeout_s=5.0,
+    ),
+    ToolRegistration(
+        name="apply_remediation",
+        fn=apply_remediation,
+        input_model=ApplyRemediationIn,
+        output_model=ApplyRemediationOut,
+        description=(
+            "Execute an approved remediation plan: each step becomes a D2 "
+            "update on the ingest stream, confirmed against the watermark, "
+            "with reverse-order rollback on failure. Operator-only, after "
+            "the typed approval gate — never callable from an agent loop."
+        ),
+        surfaces=_NO_SURFACE,
+        scopes=_WRITE,
+        privileged=True,
+        hints=PRIVILEGED_WRITE,
+        timeout_s=120.0,
     ),
 )

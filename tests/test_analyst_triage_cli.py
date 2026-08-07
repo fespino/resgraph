@@ -70,6 +70,22 @@ class FakeSession:
         pass
 
 
+class FakeDriver:
+    def verify_connectivity(self) -> None:
+        pass
+
+    def session(self) -> FakeSession:
+        return FakeSession()
+
+
+class FakeSink:
+    def __init__(self, world: "World") -> None:
+        self.emit_many = world.emit
+
+    def close(self) -> None:
+        pass
+
+
 def _report(suspects: list[str]) -> TriageReport:
     return TriageReport(
         suspects=[
@@ -93,24 +109,12 @@ def _report(suspects: list[str]) -> TriageReport:
 @pytest.fixture()
 def wired(monkeypatch, tmp_path):
     world = World()
-    monkeypatch.setattr(
-        "resgraph.graph.client.get_driver",
-        lambda: type(
-            "D",
-            (),
-            {"verify_connectivity": lambda self: None, "session": lambda self: FakeSession()},
-        )(),
-    )
+    monkeypatch.setattr("resgraph.graph.client.get_driver", FakeDriver)
     monkeypatch.setattr("resgraph.graph.ingest.read_node", world.read)
     monkeypatch.setattr("resgraph.analyst.executor.read_node", world.read)
-    monkeypatch.setattr("anthropic.Anthropic", lambda *a, **k: object())
-    monkeypatch.setattr("resgraph.analyst.tools.default_toolset", lambda: object())
-    monkeypatch.setattr(
-        "resgraph.gen.sinks.RedisSink",
-        lambda *a, **k: type(
-            "S", (), {"emit_many": staticmethod(world.emit), "close": lambda self: None}
-        )(),
-    )
+    monkeypatch.setattr("anthropic.Anthropic", object)
+    monkeypatch.setattr("resgraph.analyst.tools.default_toolset", object)
+    monkeypatch.setattr("resgraph.gen.sinks.RedisSink", lambda *a, **k: FakeSink(world))
 
     def fake_run_triage(prompt, toolset, client, **kw):
         return RunResult(

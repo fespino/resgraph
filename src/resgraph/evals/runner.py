@@ -436,6 +436,7 @@ def run_eval(
                     "degraded": result.degraded,
                     "cutoff_reason": result.cutoff_reason,
                     "tool_calls": result.tool_calls,
+                    "tool_trace": [{"tool": c.name, "ok": c.ok} for c in result.trace],
                     "turns": result.turns,
                     "tokens": tokens,
                     "cache_hit_rate": result.usage.cache_hit_rate,

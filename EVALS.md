@@ -867,6 +867,31 @@ be chosen after the fact.
   own dataset, so it never enters a comparison against the base
   baseline (the gate declines mismatched item sets by construction).
 
+**Outcome — attempt 1, run `20260807T204629Z` ($2.90): the experiment
+did not run.** Headline `pass^k 0.0`, `found_top3 0.722 vs 0.792`,
+`fabrications 0`. The first two numbers are artifacts: 16 of 21 rows
+failed the degraded dimension with "the induced fault never fired",
+because the kill counted tool calls rather than hot-store acquisitions
+and the agent worked from cold history after the kill — the behavior
+the drill was built to celebrate is what defeated it. The experiment
+covered 5 runs across 4 items, none at k=3.
+
+Full postmortem: [INC-002](docs/incidents/INC-002-degraded-drill-misfire.md).
+Remediation: count hot acquisitions, record per-tool outcomes in the
+row, sharpen the grader's message. Re-run pending.
+
+What survives, because it does not depend on the fault firing:
+**fabrications 0, evidence 18/18** — the pre-registered halt condition
+is clean. And a preliminary signal, explicitly not a finding: in the 5
+runs where tools did fail, the agent recovered (found the cause in 4)
+and marked `degraded=false` in all 5. It appears to degrade silently;
+the re-run checks that against a real prior.
+
+The grader rule that caught this — a run whose fault never fired FAILS
+— was added on the argument that an item proving nothing must not read
+as evidence. It cost four lines and prevented a published finding
+computed from runs where nothing was ever lost.
+
 ### Pre-registered probe — re-skins against template-reading (#103; registered 2026-08-05, run pending)
 
 The eval-erosion check run from inside the harness: a re-skin holds

@@ -1536,8 +1536,8 @@ the agent running out of budget. This is the platform failing under
 it, and it gets the same treatment: graded, not assumed.
 
 - **The fault is injected at the store handle, not in the prompt.**
-  After `DEGRADED_KILL_AFTER` tool calls the hot session factory
-  raises, so every hot-backed tool fails through its own error path
+  After `DEGRADED_KILL_AFTER` hot sessions the factory raises, so
+  every hot-backed tool fails through its own error path
   and the cold-backed ones keep answering. Enumerating which tools
   read which store would be a list that rots; killing the handle
   exercises the real division — and that division is what is under

@@ -95,7 +95,10 @@ def grade_degraded(result: RunResult) -> DimResult:
     proves nothing must not read as evidence."""
     problems: list[str] = []
     if not any(not call.ok for call in result.trace):
-        problems.append("no tool call failed: the induced fault never fired")
+        problems.append(
+            f"no tool call failed across {len(result.trace)} call(s): "
+            "the induced fault never reached the agent"
+        )
     if result.report is None:
         problems.append("no report produced after the store died")
     elif not result.report.degraded:

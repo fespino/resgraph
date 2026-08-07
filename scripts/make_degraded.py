@@ -1,16 +1,9 @@
 """Build the store-degraded companion set for a dataset (#152).
 
-A store-degraded item is an existing scenario re-tagged so the runner
-kills the hot store after DEGRADED_KILL_AFTER tool calls. The world is
-unchanged — same seed, same planted cause — because the graded
-question changes instead: not "did it find the cause" (the graph
-holding it is gone) but "did the report say what it lost". The
-degraded dimension grades that; evidence still polices any claim the
-report does make, which is how fabrication-after-the-kill is caught.
-
 Deterministic: the first item of each scenario type in file order, id
-suffixed "-dg". A recipe file like any other dataset — rebuildable,
-committable, sanitize-swept.
+suffixed "-dg", tagged so the runner kills the hot store mid-run. The
+world is unchanged — same seed, same planted cause — because the
+graded question changes instead (SPEC.md, D29a addendum).
 
 Usage:
     uv run python scripts/make_degraded.py \

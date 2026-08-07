@@ -224,3 +224,19 @@ def test_an_operator_without_the_write_scope_cannot_execute():
     )
     with pytest.raises(PermissionError, match="resgraph:write"):
         apply_remediation(args, ctx=_ctx("operator", world, scopes=frozenset({"resgraph:read"})))
+
+
+def test_rollback_of_a_revived_resource_puts_the_tombstone_back():
+    """The step revived something the approver saw as deleted, so the
+    honest restore is the tombstone, not an empty upsert."""
+    world = FakeWorld({VM: node(VM, 7, {"role": "web"}, [])})
+    world.nodes[VM] |= {"deleted": True, "deleted_seq": 7}
+    pre = world.read(VM)
+    r = remediator(world)
+    s = step("set_attrs", VM, {"role": "back"}, pre)
+
+    r.apply_step(s)
+    assert world.nodes[VM]["deleted"] is False
+
+    r.rollback_step(s)
+    assert world.nodes[VM]["deleted"] is True

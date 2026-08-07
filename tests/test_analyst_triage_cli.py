@@ -11,6 +11,11 @@ replace-the-whole-statement upsert). Everything between the CLI and
 that session — live_summary, read_node, plan rendering, the approval
 gate, the step machine, the executor, the audit store — is the real
 thing.
+
+The command's composition root gets its own two tests at the bottom,
+and those DO stub what it constructs — building those collaborators
+and closing them is the whole of its job, so stubbing them tests its
+contract rather than working around it.
 """
 
 import json
@@ -22,7 +27,15 @@ import pytest
 from typer.testing import CliRunner
 
 from resgraph.analyst.audit import AuditStore
-from resgraph.analyst.cli import TriageIO, app, live_summary, parse_remediation, triage_journey
+from resgraph.analyst.cli import (
+    TriageIO,
+    _git_ref,
+    _print_report,
+    app,
+    live_summary,
+    parse_remediation,
+    triage_journey,
+)
 from resgraph.analyst.harness import RunResult, Usage
 from resgraph.analyst.models import EvidenceVerdict, TriageReport, TriageSuspect
 from resgraph.schema import Op
@@ -85,6 +98,7 @@ class FakeSession:
 
     def __init__(self, graph: Graph) -> None:
         self.graph = graph
+        self.closed = False
 
     def run(self, query: str, **params: Any) -> _Rows:
         q = str(query)
@@ -111,7 +125,7 @@ class FakeSession:
         return _Rows()
 
     def close(self) -> None:
-        pass
+        self.closed = True
 
 
 class Script:
@@ -307,3 +321,146 @@ def test_parse_remediation(spec, expected):
 def test_parse_remediation_rejects_a_malformed_patch():
     with pytest.raises(Exception, match="not k=v"):
         parse_remediation("set_attrs:state", "top")
+
+
+def test_parse_remediation_rejects_a_missing_action():
+    with pytest.raises(Exception, match="no action"):
+        parse_remediation(f"@{VM}:role=x", "top")
+
+
+def test_an_unparseable_report_is_said_plainly(journey):
+    run_it, graph, _store = journey
+    printed: list[str] = []
+    _print_report(None, printed.append)
+    assert "no parseable report" in printed[0]
+    assert graph.emitted == []
+
+
+def test_remediation_without_a_write_channel_refuses_rather_than_pretending(tmp_path):
+    """The journey is handed no emit when the command opened no sink;
+    it must not reach the executor and quietly do nothing."""
+    graph = Graph()
+    store = AuditStore(tmp_path / "audit.db")
+    try:
+        with pytest.raises(RuntimeError, match="without a write channel"):
+            triage_journey(
+                resource_id=VM,
+                symptom="crash_loop",
+                fired_at=datetime.fromisoformat(FIRED),
+                remediate=["set_attrs:state=drained"],
+                approver="fran",
+                model="claude-test",
+                window_h=24,
+                run_id="RUN1",
+                git_ref="abc1234",
+                io=TriageIO(
+                    session=FakeSession(graph),
+                    client=object(),
+                    toolset=object(),
+                    store=store,
+                    run=_agent(_report([HOST])),
+                    emit=None,
+                    ask=Script(),
+                    echo=lambda _m: None,
+                ),
+            )
+    finally:
+        store.close()
+    assert graph.emitted == []
+
+
+def test_git_ref_reads_the_repo_and_degrades_to_unknown_outside_one(tmp_path, monkeypatch):
+    assert re.fullmatch(r"[0-9a-f]{7,}", _git_ref())
+    monkeypatch.chdir(tmp_path)
+    assert _git_ref() == "unknown"
+
+
+# --- the composition root: what the command builds, and what it closes ---
+
+
+class WiringDriver:
+    def __init__(self, session: FakeSession) -> None:
+        self._session = session
+
+    def verify_connectivity(self) -> None:
+        pass
+
+    def session(self) -> FakeSession:
+        return self._session
+
+
+class WiringSink:
+    def __init__(self) -> None:
+        self.closed = False
+        self.emitted: list[Any] = []
+
+    def emit_many(self, msgs: list[Any]) -> None:
+        self.emitted.extend(msgs)
+
+    def close(self) -> None:
+        self.closed = True
+
+
+@pytest.fixture()
+def wiring(monkeypatch, tmp_path):
+    session, sink, captured = FakeSession(Graph()), WiringSink(), {}
+
+    def fake_journey(**kw):
+        captured.update(kw)
+        return captured.get("code", 0)
+
+    monkeypatch.setattr("resgraph.analyst.cli.triage_journey", fake_journey)
+    monkeypatch.setattr("resgraph.graph.client.get_driver", lambda: WiringDriver(session))
+    monkeypatch.setattr("anthropic.Anthropic", object)
+    monkeypatch.setattr("resgraph.analyst.tools.default_toolset", object)
+    monkeypatch.setattr("resgraph.gen.sinks.RedisSink", lambda *a, **k: sink)
+    return session, sink, captured, str(tmp_path / "audit.db")
+
+
+def test_the_command_hands_the_journey_what_it_built(wiring):
+    session, sink, captured, db = wiring
+    result = runner.invoke(
+        app,
+        ["triage", VM, "--db", db, "--approver", "fran", "--remediate", "set_attrs:state=x"],
+    )
+    assert result.exit_code == 0, result.output
+    io = captured["io"]
+    assert io.session is session
+    assert io.emit == sink.emit_many
+    assert captured["remediate"] == ["set_attrs:state=x"]
+    assert session.closed and sink.closed
+
+
+def test_a_report_only_run_opens_no_stream_at_all(wiring):
+    session, sink, captured, db = wiring
+    result = runner.invoke(app, ["triage", VM, "--db", db])
+    assert result.exit_code == 0, result.output
+    assert captured["io"].emit is None
+    assert not sink.closed  # never constructed, so nothing to close
+    assert session.closed
+
+
+def test_the_journeys_exit_code_reaches_the_shell_and_nothing_leaks(wiring, monkeypatch):
+    session, sink, _captured, db = wiring
+
+    def failing_journey(**kw):
+        raise RuntimeError("the journey blew up")
+
+    monkeypatch.setattr("resgraph.analyst.cli.triage_journey", failing_journey)
+    result = runner.invoke(
+        app,
+        ["triage", VM, "--db", db, "--approver", "fran", "--remediate", "set_attrs:state=x"],
+    )
+    assert result.exit_code != 0
+    assert session.closed and sink.closed, "an exception must still close the session and the sink"
+
+
+def test_a_nonzero_journey_becomes_a_nonzero_exit(wiring):
+    session, sink, captured, db = wiring
+    captured["code"] = 1
+    result = runner.invoke(
+        app,
+        ["triage", VM, "--db", db, "--approver", "fran", "--remediate", "set_attrs:state=x"],
+    )
+    assert result.exit_code == 1
+    assert session.closed and sink.closed

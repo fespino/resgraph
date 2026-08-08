@@ -136,5 +136,7 @@ The first remediation is retained where it is independently correct and abandone
 - [x] name the distinction in the grader's message
 - [x] audit which store each canonical tool reads, per workload, and write it down (this note)
 - [ ] redesign the drill around the cold store, or both stores — the fault that bites the workload the agent actually runs
-- [ ] pilot any redesigned fault on one item at k=1 before spending on a suite
+- [x] pilot any redesigned fault on one item at k=1 before spending on a suite — gated in the drill script, not left to habit
+- [x] write the runbook and templates these rules should have come from ([docs/drills/](../drills/README.md))
+- [x] write the pre-mortem the first run should have had ([premortem-analyst-degraded.md](../drills/premortem-analyst-degraded.md))
 - [ ] the degraded-honesty question is still unanswered; it gets its own incident note when a drill can actually pose it

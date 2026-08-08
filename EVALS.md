@@ -40,6 +40,19 @@ Three more, added 2026-08-04 from the honest review below:
   not refine** — and the next prediction in a failed class shrinks
   toward the observed effect.
 
+One more, added 2026-08-07 after INC-002:
+
+- **Every drill gets an adversarial pre-mortem too, and its own
+  question.** Iterations ask "how could the model satisfy this
+  change's letter without the intended behavior?" Induced-fault
+  experiments ask **"how could this run complete, produce numbers, and
+  measure nothing?"** Answer it in writing before the first paid run,
+  trace the fault's causal chain to `file:line` for the ACTUAL
+  workload (not in the abstract), and pilot one item at k=1 before
+  spending on a suite. Runbook and templates in `docs/drills/`.
+  INC-002 is the cost of skipping this: $5.88, two void runs, and a
+  diagnosis that was wrong the first time.
+
 Environment pin (all runs unless a row says otherwise): model
 `claude-opus-4-8`, adaptive thinking, judge = same model + pinned
 template, 30-scenario dataset `evals/scenarios/base.jsonl` (seed 42),

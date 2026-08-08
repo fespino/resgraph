@@ -173,13 +173,14 @@ def journey(tmp_path):
     store = AuditStore(tmp_path / "audit.db")
     echoed: list[str] = []
 
-    def run_it(*, suspects=(HOST,), remediate=(), answers=(), approver="fran"):
+    def run_it(*, suspects=(HOST,), remediate=(), answers=(), approver="fran", dry_run=False):
         code = triage_journey(
             resource_id=VM,
             symptom="crash_loop",
             fired_at=datetime.fromisoformat(FIRED),
             remediate=list(remediate),
             approver=approver,
+            dry_run=dry_run,
             model="claude-test",
             window_h=24,
             run_id="RUN1",
@@ -464,3 +465,22 @@ def test_a_nonzero_journey_becomes_a_nonzero_exit(wiring):
     )
     assert result.exit_code == 1
     assert session.closed and sink.closed
+
+
+def test_dry_run_previews_without_approval_or_a_stream(journey):
+    """--dry-run answers "what would this do" without asking anyone to
+    approve it, and without opening a write channel at all."""
+    run_it, graph, store = journey
+    code, out = run_it(remediate=["set_attrs:state=drained"], dry_run=True)
+    assert code == 0
+    assert "dry run" in out
+    assert '"op":"upsert"' in out and '"state":"drained"' in out
+    assert graph.emitted == []
+    assert [e["kind"] for e in store.timeline("RUN1")] == [], "nothing to approve, nothing recorded"
+
+
+def test_an_approval_carries_an_expiry(journey):
+    run_it, _graph, store = journey
+    run_it(remediate=["set_attrs:state=drained"], answers=["1"])
+    approval = [e for e in store.timeline("RUN1") if e["kind"] == "approval"]
+    assert approval, "the approval should be on the trail"

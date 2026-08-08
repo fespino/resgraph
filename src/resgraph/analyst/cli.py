@@ -27,6 +27,7 @@ app = typer.Typer(help="resgraph analyst CLI.", add_completion=False)
 
 DEFAULT_MODEL = "claude-opus-4-8"
 NEIGHBORHOOD_CAP = 40
+GRANT_TTL_S = 900.0
 
 
 @app.callback()
@@ -225,14 +226,22 @@ def triage_journey(
     run_id: str,
     git_ref: str,
     io: TriageIO,
+    dry_run: bool = False,
+    grant_ttl_s: float = GRANT_TTL_S,
 ) -> int:
     """Alert in, report out, and — when the operator asks — plan,
     approval, execution. Returns a process exit code."""
     from resgraph.query.executor import QueryContext
     from resgraph.tools.context import CallerContext
 
-    from .approval import approve_plan
-    from .executor import WRITE_SCOPE, ApplyRemediationIn, apply_remediation, capture_pre_state
+    from .approval import approve_plan, render_plan_text
+    from .executor import (
+        WRITE_SCOPE,
+        ApplyRemediationIn,
+        apply_remediation,
+        capture_pre_state,
+        preview_remediation,
+    )
     from .prompts import build_prompt
     from .remediation import StepStatus, render_plan
 
@@ -268,7 +277,13 @@ def triage_journey(
     top = result.report.suspects[0].resource_id
     specs = [parse_remediation(spec, top) for spec in remediate]
     plan = render_plan(specs, capture_pre_state(io.session))
-    decision = approve_plan(plan, approver=approver, ask=io.ask, echo=io.echo)
+    if dry_run:
+        io.echo(render_plan_text(plan))
+        io.echo("\ndry run — these messages would be emitted, and were not:")
+        for msg in preview_remediation(plan, read=capture_pre_state(io.session)):
+            io.echo(f"  {msg.model_dump_json()}")
+        return 0
+    decision = approve_plan(plan, approver=approver, ask=io.ask, echo=io.echo, ttl_s=grant_ttl_s)
     io.store.record_approval(run_id, decision)
     if not decision.approved:
         io.echo("rejected — nothing was applied")
@@ -276,7 +291,9 @@ def triage_journey(
 
     subplan = [plan[i] for i in decision.applied]
     out = apply_remediation(
-        ApplyRemediationIn(run_id=run_id, owner=approver, steps=subplan),
+        ApplyRemediationIn(
+            run_id=run_id, owner=approver, steps=subplan, expires_at=decision.expires_at
+        ),
         ctx=CallerContext(
             caller="operator",
             scopes=frozenset({WRITE_SCOPE}),
@@ -305,6 +322,12 @@ def triage_cmd(
         typer.Option("--remediate", help="Propose a step: action[@target][:k=v]. Repeatable."),
     ] = None,
     approver: str = typer.Option("", "--approver", help="Required to propose remediation."),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="Render the plan and the messages; write nothing."
+    ),
+    grant_ttl_s: float = typer.Option(
+        GRANT_TTL_S, "--grant-ttl", help="Seconds an approval stays valid."
+    ),
     model: str = typer.Option(DEFAULT_MODEL, "--model"),
     window_h: int = typer.Option(24, "--window-hours", help="Event window handed to the agent."),
     db: str | None = typer.Option(None, "--db", help="Audit store path."),
@@ -326,7 +349,9 @@ def triage_cmd(
     from .tools import default_toolset
 
     steps_requested = list(remediate or [])
-    if steps_requested and not approver:
+    if dry_run and not steps_requested:
+        raise typer.BadParameter("--dry-run needs --remediate: there is nothing to preview")
+    if steps_requested and not approver and not dry_run:
         raise typer.BadParameter("--remediate needs --approver: execution is attributable")
     fired = datetime.fromisoformat(fired_at) if fired_at else datetime.now(UTC)
     if fired.tzinfo is None:
@@ -337,7 +362,7 @@ def triage_cmd(
     session = driver.session()
     store = AuditStore(Path(db) if db else DEFAULT_DB)
     sink = None
-    if steps_requested:
+    if steps_requested and not dry_run:
         from resgraph.gen.sinks import RedisSink
 
         sink = RedisSink(redis_url, stream=stream)
@@ -350,6 +375,8 @@ def triage_cmd(
             approver=approver,
             model=model,
             window_h=window_h,
+            dry_run=dry_run,
+            grant_ttl_s=grant_ttl_s,
             run_id=datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ"),
             git_ref=_git_ref(),
             io=TriageIO(

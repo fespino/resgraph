@@ -18,7 +18,7 @@ import hashlib
 import json
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from .remediation import PlannedStep
 
@@ -58,6 +58,7 @@ class ApprovalDecision:
     skipped: tuple[int, ...]
     presented_at: datetime
     decided_at: datetime
+    expires_at: datetime | None = None
 
     @property
     def time_to_decision_ms(self) -> int:
@@ -71,6 +72,7 @@ def approve_plan(
     ask: Callable[[str], str],
     echo: Callable[[str], None] = print,
     now: Callable[[], datetime] = lambda: datetime.now(UTC),
+    ttl_s: float | None = None,
 ) -> ApprovalDecision:
     """Interactive gate. `ask`/`echo`/`now` are injected so the gate's
     invariants are unit-testable; the CLI passes input/print."""
@@ -80,6 +82,7 @@ def approve_plan(
 
     def decide(approved: bool) -> ApprovalDecision:
         applied = tuple(i for i in range(len(plan)) if i not in skipped) if approved else ()
+        decided = now()
         return ApprovalDecision(
             approver=approver,
             approved=approved,
@@ -87,7 +90,8 @@ def approve_plan(
             applied=applied,
             skipped=tuple(sorted(skipped)),
             presented_at=presented,
-            decided_at=now(),
+            decided_at=decided,
+            expires_at=(decided + timedelta(seconds=ttl_s)) if ttl_s else None,
         )
 
     echo(render_plan_text(plan))

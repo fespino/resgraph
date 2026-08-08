@@ -19,13 +19,15 @@ Two properties fall out of D2 and matter more than they look:
   rather than clobbering a third party's write.
 """
 
+import signal
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Generator
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 
 from resgraph.graph.ingest import read_node
 from resgraph.schema import Op, Relationship, ResourceType, UpdateMessage
@@ -46,6 +48,9 @@ class ApplyRemediationIn(BaseModel):
     run_id: str = Field(min_length=1)
     owner: str = Field(min_length=1)
     steps: list[PlannedStep] = Field(min_length=1)
+    # the authority contract's missing field (#152): an approval is a
+    # grant, and a grant without a lifetime never expires
+    expires_at: AwareDatetime | None = None
 
 
 class ApplyRemediationOut(BaseModel):
@@ -125,7 +130,9 @@ class Remediator:
             relationships=_rel_models(rels or []),
         )
 
-    def apply_step(self, step: PlannedStep) -> str:
+    def plan_message(self, step: PlannedStep) -> UpdateMessage:
+        """The exact message this step would emit. Dry-run shows this;
+        apply sends it — one code path, so the preview cannot drift."""
         if step.action not in ACTIONS:
             raise ValueError(
                 f"unknown remediation action {step.action!r}; expected one of {ACTIONS}"
@@ -135,18 +142,19 @@ class Remediator:
             raise RuntimeError(f"{step.target}: not in the graph; nothing to remediate")
         sequence = (live.get("applied_seq") or -1) + 1
         if step.action == DELETE:
-            msg = self._message(target=step.target, sequence=sequence, op=Op.DELETE)
-        else:
-            # upsert replaces the bag: merge onto live state, not onto
-            # the render-time snapshot
-            msg = self._message(
-                target=step.target,
-                sequence=sequence,
-                op=Op.UPSERT,
-                attrs={**live["attrs"], **step.patch},
-                rels=live["rels"],
-            )
-        written = self._emit_and_confirm(msg)
+            return self._message(target=step.target, sequence=sequence, op=Op.DELETE)
+        # upsert replaces the bag: merge onto live state, not onto the
+        # render-time snapshot
+        return self._message(
+            target=step.target,
+            sequence=sequence,
+            op=Op.UPSERT,
+            attrs={**live["attrs"], **step.patch},
+            rels=live["rels"],
+        )
+
+    def apply_step(self, step: PlannedStep) -> str:
+        written = self._emit_and_confirm(self.plan_message(step))
         self._written[id(step)] = written
         return f"{step.target}@{written}"
 
@@ -172,10 +180,48 @@ class Remediator:
         return f"{step.target}@{written + 1}"
 
 
+@contextmanager
+def _revocable(machine: StepMachine, owner: str) -> Generator[None]:
+    """SIGINT revokes the grant mid-trajectory. D28's cancel is
+    cooperative and checked between steps, so the interrupt cannot land
+    mid-commit; executed steps unwind and the summary says which."""
+
+    def revoke(_signum: int, _frame: object) -> None:
+        machine.cancel(owner)
+
+    try:
+        previous = signal.signal(signal.SIGINT, revoke)
+    except ValueError:  # not the main thread; nothing to install
+        yield
+        return
+    try:
+        yield
+    finally:
+        signal.signal(signal.SIGINT, previous)
+
+
+def preview_remediation(
+    steps: list[PlannedStep], *, read: Callable[[str], dict[str, Any] | None]
+) -> list[UpdateMessage]:
+    """--dry-run: the messages the plan would emit, computed by the
+    same code that would send them, written nowhere."""
+
+    def refuse(_msgs: list[UpdateMessage]) -> None:
+        raise RuntimeError("dry-run must not emit")
+
+    remediator = Remediator(read=read, emit=refuse)
+    return [remediator.plan_message(step) for step in steps]
+
+
 def apply_remediation(args: ApplyRemediationIn, *, ctx: CallerContext) -> ApplyRemediationOut:
     """Execute an approved plan. Called by the operator path only; the
     agent's toolset refuses this registration by construction (D26)."""
     emit = _authorize(ctx)
+    if args.expires_at is not None and datetime.now(UTC) > args.expires_at:
+        raise PermissionError(
+            f"the approval expired at {args.expires_at.isoformat()}; "
+            "re-approve rather than executing a stale grant"
+        )
     remediator = Remediator(read=capture_pre_state(ctx.query.require("hot")), emit=emit)
     machine = StepMachine(
         args.steps,
@@ -184,7 +230,8 @@ def apply_remediation(args: ApplyRemediationIn, *, ctx: CallerContext) -> ApplyR
         apply=remediator.apply_step,
         rollback=remediator.rollback_step,
     )
-    events = machine.execute()
+    with _revocable(machine, args.owner):
+        events = machine.execute()
     return ApplyRemediationOut(run_id=args.run_id, events=events, summary=machine.summary())
 
 

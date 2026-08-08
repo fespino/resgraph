@@ -91,7 +91,8 @@ def approve_plan(
             skipped=tuple(sorted(skipped)),
             presented_at=presented,
             decided_at=decided,
-            expires_at=(decided + timedelta(seconds=ttl_s)) if ttl_s else None,
+            # ttl 0 means expired on arrival, not "no expiry"
+            expires_at=(decided + timedelta(seconds=ttl_s)) if ttl_s is not None else None,
         )
 
     echo(render_plan_text(plan))

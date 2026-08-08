@@ -24,6 +24,9 @@ class GateVerdict:
     undecided_reason: str = ""
     run: dict[str, Any] = field(default_factory=dict)
     baseline: dict[str, Any] = field(default_factory=dict)
+    # judged against these bars; rendering reads them so it cannot differ
+    overall_drop: float = OVERALL_DROP
+    slice_drop: float = SLICE_DROP
 
 
 def evaluate(
@@ -39,7 +42,13 @@ def evaluate(
     reason = _not_comparable(run, baseline) or _too_few_trials(run, min_trials)
     if reason:
         return GateVerdict(
-            passed=False, undecided=True, undecided_reason=reason, run=run, baseline=baseline
+            passed=False,
+            undecided=True,
+            undecided_reason=reason,
+            run=run,
+            baseline=baseline,
+            overall_drop=overall_drop,
+            slice_drop=slice_drop,
         )
 
     blocks: list[str] = []
@@ -77,7 +86,13 @@ def evaluate(
             warnings.append(f"slice {name!r} present in baseline but absent from the run")
 
     return GateVerdict(
-        passed=not blocks, blocks=blocks, warnings=warnings, run=run, baseline=baseline
+        passed=not blocks,
+        blocks=blocks,
+        warnings=warnings,
+        run=run,
+        baseline=baseline,
+        overall_drop=overall_drop,
+        slice_drop=slice_drop,
     )
 
 
@@ -183,12 +198,7 @@ def _failing(run: dict[str, Any], limit: int = 5) -> list[str]:
     return lines
 
 
-def render_verdict(
-    verdict: GateVerdict,
-    *,
-    overall_drop: float = OVERALL_DROP,
-    slice_drop: float = SLICE_DROP,
-) -> str:
+def render_verdict(verdict: GateVerdict) -> str:
     """The comment a reviewer acts on without leaving the PR (#152):
     the headline with its delta, every slice marked OK/BREACH, and the
     items that failed with the dimension that failed them."""
@@ -206,7 +216,7 @@ def render_verdict(
     for w in verdict.warnings:
         lines.append(f"  ! {w}")
     if verdict.run and verdict.baseline and not verdict.undecided:
-        lines += _headline(verdict.run, verdict.baseline, overall_drop)
-        lines += _slice_table(verdict.run, verdict.baseline, slice_drop)
+        lines += _headline(verdict.run, verdict.baseline, verdict.overall_drop)
+        lines += _slice_table(verdict.run, verdict.baseline, verdict.slice_drop)
         lines += _failing(verdict.run)
     return "\n".join(lines)

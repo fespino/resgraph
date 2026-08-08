@@ -304,3 +304,85 @@ def test_a_live_grant_executes(monkeypatch):
     out = apply_remediation(args, ctx=_ctx("operator", world, scopes=frozenset({"resgraph:write"})))
     assert out.summary == {"step_0": "succeeded"}
     assert world.nodes[VM]["attrs"] == {"role": "drained"}
+
+
+def test_sigint_revokes_the_grant_between_steps_and_unwinds():
+    """SIGINT cancels between steps; executed steps unwind (#152)."""
+    import os
+    import signal as _signal
+
+    from resgraph.analyst.executor import _revocable
+
+    world = FakeWorld(
+        {VM: node(VM, 7, {"role": "web"}, []), HOST: node(HOST, 3, {"state": "up"}, [])}
+    )
+    r = remediator(world)
+    fired = {"n": 0}
+
+    def apply(s: PlannedStep) -> str:
+        ref = r.apply_step(s)
+        if fired["n"] == 0:
+            fired["n"] += 1
+            os.kill(os.getpid(), _signal.SIGINT)
+        return ref
+
+    plan = [
+        step("set_attrs", VM, {"role": "drained"}, world.read(VM)),
+        step("set_attrs", HOST, {"state": "down"}, world.read(HOST)),
+    ]
+    machine = StepMachine(plan, run_id="r1", owner="ops", apply=apply, rollback=r.rollback_step)
+    with _revocable(machine, "ops"):
+        machine.execute()
+
+    assert machine.summary() == {
+        "step_0": StepStatus.ROLLED_BACK,
+        "step_1": StepStatus.CANCELLED,
+    }
+    assert world.nodes[VM]["attrs"] == {"role": "web"}, "the executed step unwound"
+    assert world.nodes[HOST]["attrs"] == {"state": "up"}, "the cancelled step never ran"
+
+
+def test_revocable_restores_the_previous_handler_even_on_error():
+    import signal as _signal
+
+    from resgraph.analyst.executor import _revocable
+
+    world = FakeWorld({VM: node(VM, 7, {}, [])})
+    machine = StepMachine(
+        [step("set_attrs", VM, {"a": "b"}, None)],
+        run_id="r1",
+        owner="ops",
+        apply=remediator(world).apply_step,
+        rollback=remediator(world).rollback_step,
+    )
+    previous = _signal.getsignal(_signal.SIGINT)
+    with pytest.raises(RuntimeError, match="boom"), _revocable(machine, "ops"):
+        assert _signal.getsignal(_signal.SIGINT) is not previous
+        raise RuntimeError("boom")
+    assert _signal.getsignal(_signal.SIGINT) is previous
+
+
+def test_revocable_in_a_worker_thread_degrades_to_no_handler():
+    """Off the main thread the context still runs the body."""
+    import threading
+
+    from resgraph.analyst.executor import _revocable
+
+    world = FakeWorld({VM: node(VM, 7, {}, [])})
+    machine = StepMachine(
+        [step("set_attrs", VM, {"a": "b"}, None)],
+        run_id="r1",
+        owner="ops",
+        apply=remediator(world).apply_step,
+        rollback=remediator(world).rollback_step,
+    )
+    ran = {}
+
+    def body() -> None:
+        with _revocable(machine, "ops"):
+            ran["ok"] = True
+
+    t = threading.Thread(target=body)
+    t.start()
+    t.join()
+    assert ran.get("ok") is True

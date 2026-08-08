@@ -49,6 +49,7 @@ def aggregate(rows: list[dict[str, Any]]) -> dict[str, Any]:
     by_item: dict[str, list[bool]] = defaultdict(list)
     dim_hits: dict[str, list[bool]] = defaultdict(list)
     slice_hits: dict[str, list[bool]] = defaultdict(list)
+    failed_dims: dict[str, set[str]] = defaultdict(set)
     fabrications: list[str] = []
     for row in rows:
         by_item[row["scenario_id"]].append(item_passed(row))
@@ -64,6 +65,8 @@ def aggregate(rows: list[dict[str, Any]]) -> dict[str, Any]:
             slice_hits[f"source:{row.get('source', 'planted')}"].append(item_passed(row))
         for dim, res in row["dims"].items():
             dim_hits[dim].append(bool(res.get("passed")))
+            if not res.get("passed"):
+                failed_dims[row["scenario_id"]].add(dim)
             if dim == "evidence" and not res.get("passed"):
                 fabrications.append(f"{row['scenario_id']}: {res.get('detail', '')}")
     latencies = [row["latency_s"] for row in rows if row.get("latency_s") is not None]
@@ -79,6 +82,12 @@ def aggregate(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "pass_any_trial": _rate(sum(any(v) for v in by_item.values()), len(by_item)),
         "dims": {d: _rate(sum(hits), len(hits)) for d, hits in sorted(dim_hits.items())},
         "slices": {s: _rate(sum(hits), len(hits)) for s, hits in sorted(slice_hits.items())},
+        # what a reviewer needs to act without leaving the PR (#152)
+        "failing_items": [
+            {"id": i, "dims": sorted(failed_dims[i])}
+            for i in sorted(by_item)
+            if not all(by_item[i])
+        ],
         "fabrication_count": len(fabrications),
         "fabrications": fabrications,
         "degraded_rows": sum(bool(r.get("degraded")) for r in rows),

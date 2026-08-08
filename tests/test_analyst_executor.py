@@ -192,7 +192,7 @@ def _ctx(caller: str, world: FakeWorld, *, scopes: frozenset[str], emit: bool = 
     return CallerContext(
         caller=caller,  # type: ignore[arg-type]
         scopes=scopes,
-        query=QueryContext(),
+        query=QueryContext(session=object()),
         emit=world.emit if emit else None,
     )
 
@@ -240,3 +240,67 @@ def test_rollback_of_a_revived_resource_puts_the_tombstone_back():
 
     r.rollback_step(s)
     assert world.nodes[VM]["deleted"] is True
+
+
+def test_dry_run_shows_the_message_it_would_send_and_sends_nothing():
+    world = FakeWorld({VM: node(VM, 7, {"role": "web", "az": "a"}, [("RUNS_ON", HOST)])})
+    from resgraph.analyst.executor import preview_remediation
+
+    msgs = preview_remediation(
+        [step("set_attrs", VM, {"role": "drained"}, world.read(VM))], read=world.read
+    )
+
+    assert world.emitted == [], "a preview that writes is not a preview"
+    assert len(msgs) == 1
+    # the same merge-onto-live rule the real path uses
+    assert dict(msgs[0].attrs) == {"role": "drained", "az": "a"}
+    assert msgs[0].sequence == 8
+    assert [(r.type, r.target_id) for r in msgs[0].relationships] == [("runs_on", HOST)]
+
+
+def test_the_preview_and_the_apply_agree_by_construction():
+    """One code path: if these could differ, the dry-run would be a
+    second implementation quietly drifting from the first."""
+    from resgraph.analyst.executor import preview_remediation
+
+    world = FakeWorld({VM: node(VM, 7, {"role": "web"}, [])})
+    s = step("set_attrs", VM, {"role": "drained"}, world.read(VM))
+    previewed = preview_remediation([s], read=world.read)[0]
+
+    remediator(world).apply_step(s)
+    sent = world.emitted[0]
+    assert sent.model_dump(exclude={"event_time"}) == previewed.model_dump(exclude={"event_time"})
+
+
+def test_an_expired_grant_is_refused():
+    from datetime import UTC, datetime, timedelta
+
+    world = FakeWorld({VM: node(VM, 7, {}, [])})
+    args = ApplyRemediationIn(
+        run_id="r1",
+        owner="ops",
+        steps=[step("set_attrs", VM, {"a": "b"}, world.read(VM))],
+        expires_at=datetime.now(UTC) - timedelta(seconds=1),
+    )
+    with pytest.raises(PermissionError, match="expired"):
+        apply_remediation(args, ctx=_ctx("operator", world, scopes=frozenset({"resgraph:write"})))
+    assert world.emitted == []
+
+
+def test_a_live_grant_executes(monkeypatch):
+    from datetime import UTC, datetime, timedelta
+
+    world = FakeWorld({VM: node(VM, 7, {"role": "web"}, [])})
+    # the store boundary, not the wiring: capture_pre_state reads through this
+    monkeypatch.setattr(
+        "resgraph.analyst.executor.read_node", lambda _s, target: world.read(target)
+    )
+    args = ApplyRemediationIn(
+        run_id="r1",
+        owner="ops",
+        steps=[step("set_attrs", VM, {"role": "drained"}, world.read(VM))],
+        expires_at=datetime.now(UTC) + timedelta(minutes=15),
+    )
+    out = apply_remediation(args, ctx=_ctx("operator", world, scopes=frozenset({"resgraph:write"})))
+    assert out.summary == {"step_0": "succeeded"}
+    assert world.nodes[VM]["attrs"] == {"role": "drained"}

@@ -771,6 +771,17 @@ advance. So telemetry gets the D12 shape, one level up:
   argument applied to telemetry: the standard API is the durable
   skill, the backend a detail. Metric names stay ours where OTel
   semantic conventions would fight dashboard clarity.
+- **OTel GenAI conventions: adopted for concepts, not for names**
+  (amended #152). The
+  [`gen_ai.*` span attributes](https://opentelemetry.io/docs/specs/semconv/gen-ai/)
+  postdate D17's metric names and cover the shape this platform already
+  records — model, token counts, operation. The names stay ours
+  (`analyst_run_seconds`, `analyst_run_cost_usd`) because the dashboard
+  and the SLO rules are keyed to them and a rename is a silent-dead-panel
+  risk for no measurement gain. Recorded rather than left silent, per
+  this decision's own rule. **Reversal condition:** an OTel-native
+  backend or a collector that routes on `gen_ai.*` makes the convention
+  load-bearing rather than cosmetic.
 - **Stack as code:** Prometheus + Grafana under the compose `obs`
   profile (opt-in — the observer must not distort the benchmarks it
   observes), images digest-pinned, scrape config + datasource +
@@ -1307,7 +1318,28 @@ human gate with a specific shape:
   [Tool Annotations as Risk Vocabulary](https://blog.modelcontextprotocol.io/posts/2026-03-16-tool-annotations/)),
   refused with the rule named, not just the tool.
 
-**Rejected:** y/n confirmation (reflex-compatible, see above);
+**Amended (#152) — a grant has a lifetime and a revocation.** The
+approval carries `expires_at` (default 15 min) and execution refuses a
+stale grant rather than acting on an hour-old decision as if it were
+fresh. Revocation is D28's cooperative cancel, reached by SIGINT during
+execution: checked between steps, never mid-commit, executed steps
+unwind and the summary says which. Completes the authority contract's
+seven fields — identity, operation+target, scope, lifetime+revocation,
+approval, audit+postcondition, rollback — of which six were already
+present.
+
+**Amended (#152) — the write tool has a dry run.** `--dry-run` renders
+the plan and the exact D2 messages it would emit, computed by the same
+`plan_message` the apply path calls, and writes nothing. One code path,
+so a preview cannot drift from what execution sends. With the
+watermark confirmation (postcondition) and `target@sequence` receipts
+already in place, the write tool now carries all three legibility
+affordances.
+
+**Rejected:** auto-apply for "low-risk" steps — risk-tiering the steps
+means the agent chooses its own supervision level, and the tier
+boundary is the tool, not the payload; y/n confirmation
+(reflex-compatible, see above);
 renumbering after a skip (makes the post-hoc conversation ambiguous:
 "step 2" would mean different steps before and after the skip);
 per-tool risk assessment as the only gate (a session of three
@@ -1473,6 +1505,19 @@ executor that fills it in.
   exclude it. Execution additionally requires an operator caller and an
   emit channel that no read transport supplies.
 
+**Amended (#152) — two rules named rather than merely applied.**
+*Ephemeral events, durable state:* StepEvents are progress surfaces and
+carry no arguments; the audit store owns payloads. The machine has
+always worked this way and the principle was never stated, so nothing
+stopped the next surface from copying the shape without the rule.
+*Config-surface scanning* is adopted as a control category: the
+harness's own configuration is part of the attacked surface. Today that
+is covered by the drift guard (the tool surface cannot grow outside the
+registry), TruffleHog (secrets), and the eval gate's path filter (a
+prompt input cannot change ungated, #152). No third-party config
+scanner is adopted — its scope is agent-client configuration this repo
+does not ship.
+
 **Rejected:** writing to the hot store directly (fast, and it would
 desynchronize the stores the platform exists to keep in agreement);
 returning success on emit (the watermark makes that a lie); letting
@@ -1485,6 +1530,19 @@ either look stale. Confirmation turns that race into a visible step
 failure rather than a silent no-op, which is containment, not a fix;
 the fix is #31's multi-producer sequencing (epochs/fencing), and this
 executor moves to it unchanged when it lands.
+
+**Vocabulary check (#152).** The agent SLOs were named before
+consulting
+[Towards a Science of AI Agent Reliability](https://arxiv.org/abs/2602.16666)
+(twelve metrics across consistency, robustness, predictability,
+safety), the way the SRE Workbook shaped D18. Checked after the fact:
+latency, cost/run and degraded-rate map to predictability and
+robustness; **consistency** is measured but as an eval property
+(pass^k across trials) rather than a scraped series, and **safety** is
+carried by the gate's unconditional fabrication block rather than by an
+SLO. No metric is added — the gap the paper names for us is that
+consistency and safety live in the eval thread, which is where they
+can be graded, not on a dashboard where they would be decoration.
 
 ## D29a — Hard budgets with graceful cutoff, and the judge spend breaker (phase 9)
 
@@ -1621,6 +1679,24 @@ The release-gate half of D29, consuming the certified k=3 baseline.
   for `labeled`/`unlabeled` because a re-run replays the original
   event payload — without a fresh event the new label is invisible and
   the override cannot be applied at all.
+
+**Amended (#152) — three gaps closed or recorded.** The breach comment
+is a review artifact: headline with its delta, every slice marked
+OK/BREACH, and the failing items with the dimension that failed them,
+so the regression is read in the PR rather than found later on a
+dashboard. Dataset growth **declines** rather than auto-extending
+per-item baselines: the shipped gate refuses to verdict a run whose
+item set differs from the baseline's, which is the safer primitive and
+a deliberate divergence from the auto-extend design — a new item that
+would have blocked as a curation defect instead forces a labeled
+refresh, where a human sees it. And the gate has **no rollout half**:
+soak periods and gradual rollout are rejected at this scale, because a
+single-user laptop project has no traffic to roll out across and no
+population to soak against; the pre-merge gate plus a labeled refresh
+is the whole control. **Reversal condition:** the day the analyst runs
+as a scraped service with real traffic (#145's SLOs going live), a
+prompt or default change gains a post-merge signal and the rollout half
+becomes buildable.
 
 **Rejected:** running the paid suite on every PR (unaffordable and
 needs API secrets in CI — the free comparison gates committed

@@ -22,6 +22,8 @@ class GateVerdict:
     warnings: list[str] = field(default_factory=list)
     undecided: bool = False
     undecided_reason: str = ""
+    run: dict[str, Any] = field(default_factory=dict)
+    baseline: dict[str, Any] = field(default_factory=dict)
 
 
 def evaluate(
@@ -36,7 +38,9 @@ def evaluate(
     `baseline` are `report.aggregate` outputs."""
     reason = _not_comparable(run, baseline) or _too_few_trials(run, min_trials)
     if reason:
-        return GateVerdict(passed=False, undecided=True, undecided_reason=reason)
+        return GateVerdict(
+            passed=False, undecided=True, undecided_reason=reason, run=run, baseline=baseline
+        )
 
     blocks: list[str] = []
     warnings: list[str] = []
@@ -72,7 +76,9 @@ def evaluate(
         if name not in run_slices:
             warnings.append(f"slice {name!r} present in baseline but absent from the run")
 
-    return GateVerdict(passed=not blocks, blocks=blocks, warnings=warnings)
+    return GateVerdict(
+        passed=not blocks, blocks=blocks, warnings=warnings, run=run, baseline=baseline
+    )
 
 
 def _not_comparable(run: dict[str, Any], baseline: dict[str, Any]) -> str:
@@ -132,17 +138,75 @@ def _fmt(value: float | None) -> str:
     return "—" if value is None else f"{value:.3f}"
 
 
-def render_verdict(verdict: GateVerdict) -> str:
-    lines = []
+def _slice_table(run: dict[str, Any], baseline: dict[str, Any], bar: float) -> list[str]:
+    run_slices, base_slices = run.get("slices", {}), baseline.get("slices", {})
+    names = sorted(set(run_slices) | set(base_slices))
+    if not names:
+        return []
+    lines = ["", f"  {'slice':<26}{'baseline':>10}{'new':>9}{'delta':>9}   verdict"]
+    for name in names:
+        base, new = base_slices.get(name), run_slices.get(name)
+        if base is None:
+            lines.append(f"  {name:<26}{'—':>10}{new:>9.2f}{'—':>9}   NEW")
+        elif new is None:
+            lines.append(f"  {name:<26}{base:>10.2f}{'—':>9}{'—':>9}   ABSENT")
+        else:
+            drop = base - new
+            mark = "BREACH" if drop > bar else "OK"
+            lines.append(f"  {name:<26}{base:>10.2f}{new:>9.2f}{new - base:>+9.2f}   {mark}")
+    return lines
+
+
+def _headline(run: dict[str, Any], baseline: dict[str, Any], bar: float) -> list[str]:
+    new, base = run.get("pass_all_trials"), baseline.get("pass_all_trials")
+    if new is None or base is None:
+        return []
+    drop = base - new
+    mark = "BREACH" if drop > bar else "OK"
+    return [
+        "",
+        f"  overall pass^k  {base:.3f} -> {new:.3f}  ({new - base:+.3f})   {mark} (bar {bar:.2f})",
+        f"  items {run.get('items', '?')}  trials {run.get('trials', '?')}  "
+        f"fabrications {run.get('fabrication_count', 0)}",
+    ]
+
+
+def _failing(run: dict[str, Any], limit: int = 5) -> list[str]:
+    items = run.get("failing_items") or []
+    if not items:
+        return []
+    lines = ["", f"  failing items ({len(items)}):"]
+    for item in items[:limit]:
+        lines.append(f"    {item['id']:<28} {', '.join(item['dims']) or 'pass^k only'}")
+    if len(items) > limit:
+        lines.append(f"    ... and {len(items) - limit} more")
+    return lines
+
+
+def render_verdict(
+    verdict: GateVerdict,
+    *,
+    overall_drop: float = OVERALL_DROP,
+    slice_drop: float = SLICE_DROP,
+) -> str:
+    """The comment a reviewer acts on without leaving the PR (#152):
+    the headline with its delta, every slice marked OK/BREACH, and the
+    items that failed with the dimension that failed them."""
     if verdict.undecided:
-        lines.append("EVAL GATE: UNDECIDED — run cannot be verdicted")
-        lines.append(f"  ✗ {verdict.undecided_reason}")
+        lines = [
+            "EVAL GATE: UNDECIDED — run cannot be verdicted",
+            f"  ✗ {verdict.undecided_reason}",
+        ]
     elif verdict.passed:
-        lines.append("EVAL GATE: PASS")
+        lines = ["EVAL GATE: PASS"]
     else:
-        lines.append("EVAL GATE: BLOCKED")
+        lines = ["EVAL GATE: BLOCKED"]
     for b in verdict.blocks:
         lines.append(f"  ✗ {b}")
     for w in verdict.warnings:
         lines.append(f"  ! {w}")
+    if verdict.run and verdict.baseline and not verdict.undecided:
+        lines += _headline(verdict.run, verdict.baseline, overall_drop)
+        lines += _slice_table(verdict.run, verdict.baseline, slice_drop)
+        lines += _failing(verdict.run)
     return "\n".join(lines)

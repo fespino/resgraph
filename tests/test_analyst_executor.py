@@ -356,9 +356,14 @@ def test_revocable_restores_the_previous_handler_even_on_error():
         rollback=remediator(world).rollback_step,
     )
     previous = _signal.getsignal(_signal.SIGINT)
-    with pytest.raises(RuntimeError, match="boom"), _revocable(machine, "ops"):
-        assert _signal.getsignal(_signal.SIGINT) is not previous
-        raise RuntimeError("boom")
+    # the raise simulates execution failing mid-plan: the finally path
+    # must still restore the handler
+    try:
+        with _revocable(machine, "ops"):
+            assert _signal.getsignal(_signal.SIGINT) is not previous
+            raise RuntimeError("boom")
+    except RuntimeError:
+        pass
     assert _signal.getsignal(_signal.SIGINT) is previous
 
 

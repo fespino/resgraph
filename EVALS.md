@@ -53,6 +53,23 @@ One more, added 2026-08-07 after INC-002:
   INC-002 is the cost of skipping this: $5.88, two void runs, and a
   diagnosis that was wrong the first time.
 
+One more, added 2026-08-08, closing #137:
+
+- **An iteration verdict is provisional until its flipped items are
+  re-trialed.** Certification measured a 20% single-trial item-flip
+  rate, and #115's verdict then moved entirely on items the
+  certification had flagged as marginal — the verdict held, but only
+  because its clauses were registered in k=1 terms; the mechanistic
+  claims underneath were one-sample reads on known-flaky items.
+  The rule: before an iteration verdict becomes final, re-trial
+  exactly the items whose pass/fail flipped between the comparison
+  run and the iteration run (k=2-or-3 for the deciding items —
+  ~$0.30/item, not ~$12 for a full k=3), and read each clause
+  against the majority outcome. Pre-registrations for self-proposal
+  experiments (the #115 class, #132 next) must require this in their
+  decision rules, and their safety arguments must cover confidence
+  *redistribution*, not only rank-gaming — #115's second lesson.
+
 Environment pin (all runs unless a row says otherwise): model
 `claude-opus-4-8`, adaptive thinking, judge = same model + pinned
 template, 30-scenario dataset `evals/scenarios/base.jsonl` (seed 42),

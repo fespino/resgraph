@@ -4,6 +4,7 @@ cannot verdict — below k=3 (#137), or measuring different items than the
 baseline — is declined rather than compared anyway."""
 
 import json
+import re
 from pathlib import Path
 
 from resgraph.evals.gate import evaluate, render_verdict
@@ -160,3 +161,46 @@ def test_the_certified_run_passes_its_own_baseline():
     assert not v.undecided, v.undecided_reason
     assert v.passed, v.blocks
     assert not v.warnings
+
+
+def test_render_marks_each_slice_and_names_the_failing_items():
+    """OK/BREACH per slice, deltas, failing items, truncation."""
+    regressed = run(
+        pass_all_trials=0.60,
+        slices={**BASE["slices"], "decoy": 0.30},
+        failing_items=[{"id": f"item-{i:02d}", "dims": ["evidence"]} for i in range(7)],
+    )
+    text = render_verdict(evaluate(regressed, BASE))
+    assert "overall pass^k  0.667 -> 0.600  (-0.067)   BREACH (bar 0.02)" in text
+    assert re.search(r"decoy\s+0\.50\s+0\.30\s+-0\.20\s+BREACH", text)
+    assert re.search(r"control\s+0\.78\s+0\.78\s+\+0\.00\s+OK", text)
+    assert "failing items (7):" in text
+    assert "item-00" in text and "evidence" in text
+    assert "... and 2 more" in text
+
+
+def test_render_shows_new_and_absent_slices_as_rows():
+    moved = run(slices={k: v for k, v in BASE["slices"].items() if k != "control"} | {"novel": 0.9})
+    text = render_verdict(evaluate(moved, BASE))
+    assert re.search(r"novel\s+—\s+0\.90\s+—\s+NEW", text)
+    assert re.search(r"control\s+0\.78\s+—\s+—\s+ABSENT", text)
+
+
+def test_a_pass_still_renders_the_table():
+    text = render_verdict(evaluate(run(), BASE))
+    assert text.startswith("EVAL GATE: PASS")
+    assert "overall pass^k" in text and "OK" in text
+
+
+def test_custom_bars_ride_the_verdict_into_the_rendering():
+    """evaluate's bars reach the rendering (#159 review drift)."""
+    lenient = evaluate(run(pass_all_trials=0.62), BASE, overall_drop=0.10)
+    assert lenient.passed
+    text = render_verdict(lenient)
+    assert "(bar 0.10)" in text and "OK" in text
+
+
+def test_an_undecided_verdict_renders_no_misleading_table():
+    text = render_verdict(evaluate(run(trials=1), BASE))
+    assert "UNDECIDED" in text
+    assert "BREACH" not in text and "failing items" not in text

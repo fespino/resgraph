@@ -173,7 +173,9 @@ def journey(tmp_path):
     store = AuditStore(tmp_path / "audit.db")
     echoed: list[str] = []
 
-    def run_it(*, suspects=(HOST,), remediate=(), answers=(), approver="fran", dry_run=False):
+    def run_it(
+        *, suspects=(HOST,), remediate=(), answers=(), approver="fran", dry_run=False, wired=True
+    ):
         code = triage_journey(
             resource_id=VM,
             symptom="crash_loop",
@@ -191,7 +193,7 @@ def journey(tmp_path):
                 toolset=object(),
                 store=store,
                 run=_agent(_report(list(suspects))),
-                emit=graph.emit,
+                emit=graph.emit if wired else None,
                 ask=Script(*answers),
                 echo=echoed.append,
             ),
@@ -468,10 +470,10 @@ def test_a_nonzero_journey_becomes_a_nonzero_exit(wiring):
 
 
 def test_dry_run_previews_without_approval_or_a_stream(journey):
-    """--dry-run answers "what would this do" without asking anyone to
-    approve it, and without opening a write channel at all."""
+    """emit=None is what the command passes on --dry-run; the guard
+    must not fire first (#159 review: the original ordering crashed)."""
     run_it, graph, store = journey
-    code, out = run_it(remediate=["set_attrs:state=drained"], dry_run=True)
+    code, out = run_it(remediate=["set_attrs:state=drained"], dry_run=True, wired=False)
     assert code == 0
     assert "dry run" in out
     assert '"op":"upsert"' in out and '"state":"drained"' in out
@@ -479,8 +481,26 @@ def test_dry_run_previews_without_approval_or_a_stream(journey):
     assert [e["kind"] for e in store.timeline("RUN1")] == [], "nothing to approve, nothing recorded"
 
 
-def test_an_approval_carries_an_expiry(journey):
+def test_the_grants_expiry_is_on_the_audit_trail(journey):
+    """The lifetime is part of the decision, so it is on the trail."""
     run_it, _graph, store = journey
     run_it(remediate=["set_attrs:state=drained"], answers=["1"])
     approval = [e for e in store.timeline("RUN1") if e["kind"] == "approval"]
     assert approval, "the approval should be on the trail"
+    expires = approval[0]["payload"]["expires_at"]
+    parsed = datetime.fromisoformat(expires)
+    assert parsed.tzinfo is not None, "an aware deadline, per D2's posture"
+    assert parsed > datetime.fromisoformat(approval[0]["ts"].replace("Z", "+00:00"))
+
+
+def test_dry_run_wiring_builds_no_sink_and_passes_no_emit(wiring):
+    """The flag changes what the composition root constructs (#159)."""
+    session, sink, captured, db = wiring
+    result = runner.invoke(
+        app, ["triage", VM, "--db", db, "--dry-run", "--remediate", "set_attrs:state=x"]
+    )
+    assert result.exit_code == 0, result.output
+    assert captured["dry_run"] is True
+    assert captured["io"].emit is None
+    assert not sink.closed, "no sink is ever constructed for a preview"
+    assert session.closed

@@ -271,18 +271,19 @@ def triage_journey(
     if result.report is None or not result.report.suspects:
         io.echo("\nno suspect to remediate — refusing to propose a plan against nothing")
         return 1
-    if io.emit is None:
-        raise RuntimeError("remediation was requested without a write channel to the stream")
 
     top = result.report.suspects[0].resource_id
     specs = [parse_remediation(spec, top) for spec in remediate]
     plan = render_plan(specs, capture_pre_state(io.session))
     if dry_run:
+        # must precede the emit guard: a preview has no write channel
         io.echo(render_plan_text(plan))
         io.echo("\ndry run — these messages would be emitted, and were not:")
         for msg in preview_remediation(plan, read=capture_pre_state(io.session)):
             io.echo(f"  {msg.model_dump_json()}")
         return 0
+    if io.emit is None:
+        raise RuntimeError("remediation was requested without a write channel to the stream")
     decision = approve_plan(plan, approver=approver, ask=io.ask, echo=io.echo, ttl_s=grant_ttl_s)
     io.store.record_approval(run_id, decision)
     if not decision.approved:
@@ -323,7 +324,9 @@ def triage_cmd(
     ] = None,
     approver: str = typer.Option("", "--approver", help="Required to propose remediation."),
     dry_run: bool = typer.Option(
-        False, "--dry-run", help="Render the plan and the messages; write nothing."
+        False,
+        "--dry-run",
+        help="Render the plan and its messages; runs the paid investigation, writes nothing.",
     ),
     grant_ttl_s: float = typer.Option(
         GRANT_TTL_S, "--grant-ttl", help="Seconds an approval stays valid."

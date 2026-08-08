@@ -93,3 +93,29 @@ def test_out_of_range_skip_reasks():
     decision, echoed = gate(plan(), "skip 9", "3")
     assert decision.approved and decision.skipped == ()
     assert any("No step" in line for line in echoed)
+
+
+def _decide_with_ttl(ttl_s):
+    return approve_plan(
+        plan(2),
+        approver="fran",
+        ask=asker("2"),
+        echo=lambda _m: None,
+        now=ticking(0, 1),
+        ttl_s=ttl_s,
+    )
+
+
+def test_ttl_zero_means_expired_on_arrival_not_eternal():
+    """`if ttl_s` made 0 the eternal grant (#159 review footgun)."""
+    decision = _decide_with_ttl(0)
+    assert decision.expires_at == decision.decided_at
+
+
+def test_no_ttl_means_no_expiry_explicitly():
+    assert _decide_with_ttl(None).expires_at is None
+
+
+def test_a_ttl_sets_the_deadline_from_the_decision():
+    decision = _decide_with_ttl(900)
+    assert (decision.expires_at - decision.decided_at).total_seconds() == 900

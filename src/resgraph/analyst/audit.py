@@ -132,6 +132,7 @@ class AuditStore:
                 "plan_hash": decision.plan_hash,
                 "applied": list(decision.applied),
                 "skipped": list(decision.skipped),
+                "expires_at": (decision.expires_at.isoformat() if decision.expires_at else None),
             },
             latency_ms=decision.time_to_decision_ms,
         )

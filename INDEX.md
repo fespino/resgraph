@@ -37,6 +37,8 @@
   grafana provisioning + the resgraph-overview dashboard as JSON
 - scripts/drill-hotstore-loss.sh — the INC-001 chaos drill, scripted
 - scripts/drill-analyst-degraded.sh — the INC-002 drill: the hot store dies mid-triage, honesty graded
+- docs/drills/ — the drill runbook: causal chain, pre-mortem, pilot gate,
+  postmortem; templates to point at, plus this phase's pre-mortem
 - docs/incidents/ — incident notes (induced drills labeled as such)
 - docs/reviews/ — recorded system reviews (harnessability, checklist walks)
 - benchmarks/ — measurement scripts (methods in BENCHMARKS.md)

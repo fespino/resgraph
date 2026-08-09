@@ -39,7 +39,7 @@ from resgraph.graph.schema import init_schema, node_count, wipe
 from resgraph.query.executor import QueryContext
 
 from .breaker import JudgeSpendBreaker
-from .faults import hot_store_dies_after
+from .faults import cold_store_dies_after, hot_store_dies_after
 from .graders import (
     DimResult,
     grade_cutoff,
@@ -119,6 +119,19 @@ def evidence_inputs(catalog: Any, at: datetime) -> tuple[set[tuple[str, str]], s
     edges = {(row["resource_id"], rel["target_id"]) for row in rows for rel in row["relationships"]}
     scan = catalog.load_table(cold_store.EVENTS).scan(selected_fields=("sequence",)).to_arrow()
     return edges, set(scan.column("sequence").to_pylist())
+
+
+def fault_for(spec: Scenario):
+    """Which store the induced fault targets — named per item, refused
+    when absent. INC-002 was a drill aimed at a store the workload
+    barely used; an implicit target is how that recurs (#158)."""
+    if "fault:cold" in spec.tags:
+        return cold_store_dies_after
+    if "fault:hot" in spec.tags:
+        return hot_store_dies_after
+    raise SystemExit(
+        f"{spec.id}: store_degraded without a fault target tag (fault:hot or fault:cold)"
+    )
 
 
 def grade_all(
@@ -381,7 +394,7 @@ def run_eval(
                         )
 
                     toolset = RegistryToolset(
-                        hot_store_dies_after(
+                        fault_for(spec)(
                             DEGRADED_KILL_AFTER,
                             session_factory=driver.session,
                             catalog_factory=lambda c=catalog: c,

@@ -1620,6 +1620,30 @@ subject); a keyword check for the failed capability in the narrative
 found-rate decide the item (it would grade the agent on reaching a
 cause the dead store was holding).
 
+**Addendum amendment (2026-08-09, #158) — the fault target is a named
+choice, and it moved.** Two runs of the hot-store fault measured
+nothing (INC-002): `fetch_resource` and `blast_radius` read the hot
+store only when `at is None`, and triage of a past alert always passes
+`at`, so the workload is cold-backed and the drill was killing a store
+it barely used. Three consequences, all in code:
+
+- **The fault now targets the cold store** (`cold_store_dies_after`),
+  because that is what a time-travel triage actually depends on — the
+  same D13/D16 split that insulated the agent from the hot kill is
+  what makes the cold kill bite.
+- **The target is explicit per item** (`fault:hot` / `fault:cold`
+  tags) and the runner refuses a degraded item that names neither. An
+  implicit target is how a drill aimed at the wrong store recurs.
+- **The pilot is a gate, not advice**: the drill script refuses the
+  suite unless a one-item run shows a failed tool call.
+
+**Rejected:** a both-stores fault, for now — if hot-only triage of a
+past alert proves impossible, the cold kill already poses the
+total-blindness question, and a second fault adds spend without a new
+graded question. Reversal condition: if the cold drill shows partial
+hot-only answers are possible, total blindness becomes the untested
+case and a both-stores item gets added.
+
 ## D29b — Agent SLOs and the CI eval gate (phase 9)
 
 The release-gate half of D29, consuming the certified k=3 baseline.

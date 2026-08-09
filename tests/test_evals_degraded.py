@@ -9,12 +9,18 @@ import json
 from pathlib import Path
 
 from resgraph.analyst.harness import RunResult, ToolCall, Usage
-from resgraph.evals.faults import HOT_STORE_DEAD, hot_store_dies_after
+from resgraph.evals.faults import (
+    COLD_STORE_DEAD,
+    HOT_STORE_DEAD,
+    cold_store_dies_after,
+    hot_store_dies_after,
+)
 from resgraph.evals.graders import grade_degraded
 from resgraph.evals.report import aggregate, is_store_degraded
 from resgraph.evals.runner import DEGRADED_KILL_AFTER
 
 DATASET = Path("evals/scenarios/degraded.jsonl")
+COLD_DATASET = Path("evals/scenarios/degraded-cold.jsonl")
 
 
 def _result(*, report=None, trace=(), degraded=False):
@@ -81,6 +87,78 @@ def test_the_cold_store_survives_the_kill():
     assert ctx.require("cold") == "cold"
 
 
+def test_the_cold_store_dies_on_the_next_call_that_reaches_for_it():
+    factory = cold_store_dies_after(
+        2, session_factory=lambda: "live", catalog_factory=lambda: "cold"
+    )
+    assert factory().require("cold") == "cold"
+    assert factory().require("cold") == "cold"
+    try:
+        factory().require("cold")
+    except RuntimeError as e:
+        assert COLD_STORE_DEAD in str(e)
+    else:
+        raise AssertionError("the cold store should be dead by the third cold call")
+
+
+def test_hot_only_calls_do_not_consume_the_cold_kill_budget():
+    factory = cold_store_dies_after(
+        1, session_factory=lambda: "live", catalog_factory=lambda: "cold"
+    )
+    for _ in range(5):
+        assert factory().require("hot") == "live"
+    assert factory().require("cold") == "cold", "hot work must not spend the cold budget"
+    try:
+        factory().require("cold")
+    except RuntimeError as e:
+        assert COLD_STORE_DEAD in str(e)
+    else:
+        raise AssertionError("the second cold call should fail")
+
+
+def test_the_hot_store_survives_the_cold_kill():
+    """Whether live-only triage of a past alert is even possible is what
+    the drill measures; the fault must leave the agent the chance."""
+    factory = cold_store_dies_after(
+        0, session_factory=lambda: "live", catalog_factory=lambda: "cold"
+    )
+    ctx = factory()
+    assert ctx.require("hot") == "live"
+
+
+# --- fault selection: what the runner constructs from the tags ---
+
+
+def test_the_fault_target_tag_selects_the_fault():
+    from resgraph.evals.runner import fault_for
+    from resgraph.gen.scenarios import Scenario
+
+    specs = {
+        json.loads(line)["id"]: line
+        for line in [*DATASET.read_text().splitlines(), *COLD_DATASET.read_text().splitlines()]
+        if line.strip()
+    }
+    hot = Scenario.model_validate_json(specs["direct-s42009-dg"])
+    cold = Scenario.model_validate_json(specs["direct-s42009-dgc"])
+    assert fault_for(hot) is hot_store_dies_after
+    assert fault_for(cold) is cold_store_dies_after
+
+
+def test_a_degraded_item_without_a_named_target_is_refused():
+    """INC-002: a fault whose target nobody named is a fault nobody
+    checked against the workload."""
+    import pytest
+
+    from resgraph.evals.runner import fault_for
+    from resgraph.gen.scenarios import Scenario
+
+    line = next(line for line in DATASET.read_text().splitlines() if line.strip())
+    spec = Scenario.model_validate_json(line)
+    spec = spec.model_copy(update={"tags": [t for t in spec.tags if not t.startswith("fault:")]})
+    with pytest.raises(SystemExit, match="fault target"):
+        fault_for(spec)
+
+
 # --- the grader ---
 
 
@@ -112,13 +190,18 @@ def test_a_fault_that_never_fired_fails_rather_than_passing_quietly():
 # --- the dataset and its slice ---
 
 
-def test_the_dataset_is_one_item_per_scenario_type_tagged_for_the_fault():
-    items = [json.loads(line) for line in DATASET.read_text().splitlines() if line.strip()]
-    assert items, "the degraded companion set should be committed"
-    assert all("store_degraded" in i["tags"] for i in items)
-    assert all(i["id"].endswith("-dg") for i in items)
-    types = [i["scenario_type"] for i in items]
-    assert len(types) == len(set(types)), "one item per scenario type"
+def test_each_dataset_is_one_item_per_scenario_type_with_a_named_fault():
+    for path, suffix, target in (
+        (DATASET, "-dg", "fault:hot"),
+        (COLD_DATASET, "-dgc", "fault:cold"),
+    ):
+        items = [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
+        assert items, f"{path} should be committed"
+        assert all("store_degraded" in i["tags"] for i in items)
+        assert all(target in i["tags"] for i in items)
+        assert all(i["id"].endswith(suffix) for i in items)
+        types = [i["scenario_type"] for i in items]
+        assert len(types) == len(set(types)), "one item per scenario type"
 
 
 def test_the_world_is_unchanged_so_only_the_runtime_differs():
@@ -128,11 +211,12 @@ def test_the_world_is_unchanged_so_only_the_runtime_differs():
         for line in Path("evals/scenarios/base.jsonl").read_text().splitlines()
         if line.strip()
     }
-    for line in DATASET.read_text().splitlines():
-        item = json.loads(line)
-        parent = base[item["id"].removesuffix("-dg")]
-        assert item["seed"] == parent["seed"]
-        assert item["ground_truth"] == parent["ground_truth"]
+    for path, suffix in ((DATASET, "-dg"), (COLD_DATASET, "-dgc")):
+        for line in path.read_text().splitlines():
+            item = json.loads(line)
+            parent = base[item["id"].removesuffix(suffix)]
+            assert item["seed"] == parent["seed"]
+            assert item["ground_truth"] == parent["ground_truth"]
 
 
 def test_degraded_rows_are_graded_on_honesty_and_slice_alone():

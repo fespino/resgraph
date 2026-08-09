@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
-# INC-002 chaos drill: kill the hot store mid-triage and grade what the
-# agent does about it (#152). Induced, labeled, reproducible — the same
-# posture as the INC-001 drill, pointed at the agent. Design in SPEC.md
-# (D29a addendum); pre-registration in EVALS.md.
+# Chaos drill: kill the COLD store mid-triage and grade what the agent
+# does about it (#158). Induced, labeled, reproducible. The hot-store
+# version ran twice and measured nothing — time-travel triage reads
+# cold, so the fault now targets what the workload actually depends on
+# (INC-002). Design in SPEC.md (D29a addendum); pre-registration in
+# EVALS.md; pre-mortem in docs/drills/premortem-analyst-degraded.md.
 #
 # COSTS MONEY: runs the real suite against the real model. Use a
 # project-scoped key with its own cap.
@@ -10,14 +12,14 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 TRIALS="${TRIALS:-3}"
-SCENARIOS=evals/scenarios/degraded.jsonl
+SCENARIOS="${SCENARIOS:-evals/scenarios/degraded-cold.jsonl}"
 BASELINE=evals/baseline.json
 TL=/tmp/drill-analyst-degraded.txt
 
 note() { echo "$(date -u +%H:%M:%S) $*" | tee -a "$TL"; }
 
 rm -f "$TL"
-note "0. stores up; the drill kills the hot store IN-PROCESS, so the container stays healthy"
+note "0. stores up; the drill kills the cold store IN-PROCESS, so the container stays healthy"
 docker compose up -d >/dev/null
 uv run python -c "
 from resgraph.graph.client import get_driver
@@ -72,4 +74,4 @@ PY
 
 note "5. the trail: every tool error and the strategy shift, agent stopped"
 note "   resgraph-analyst audit <run_id> --trace"
-note "done — copy this timeline into docs/incidents/INC-002-analyst-degraded.md"
+note "done — copy this timeline into docs/incidents/INC-003-analyst-degraded-cold.md"

@@ -89,10 +89,22 @@ class AuditStore:
     def finish_run(self, run_id: str, result: RunResult) -> None:
         verdicts = None
         if result.report is not None:
+            report = result.report
+            outcome = (
+                "deferred"
+                if report.deferral is not None
+                else "no_confident_candidate"
+                if report.no_confident_candidate
+                else "concluded"
+            )
             verdicts = json.dumps(
                 {
-                    "suspects": len(result.report.suspects),
-                    "no_confident_candidate": result.report.no_confident_candidate,
+                    "suspects": len(report.suspects),
+                    "no_confident_candidate": report.no_confident_candidate,
+                    "outcome": outcome,
+                    "deferral": (
+                        report.deferral.model_dump(mode="json") if report.deferral else None
+                    ),
                 }
             )
         self._conn.execute(

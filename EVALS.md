@@ -1014,6 +1014,34 @@ INC-002's inversion this closes the loop: hot kill ≈ no effect, cold
 kill = attribution to zero. Full note:
 [INC-003](docs/incidents/INC-003-analyst-degraded-cold.md).
 
+### Pre-registered refresh — the deferral schema change re-certifies the baseline (#153; registered 2026-08-11, run pending)
+
+The report schema gained `deferral` (D29a addendum — the third honest
+terminal), and the schema rides the prompt's output contract: new
+prompt, new cache fingerprint, every future run non-comparable to the
+certified baseline `20260803T221121Z`. The #158 ordering constraint is
+satisfied — INC-003 landed on the old fingerprint before this change.
+
+- **Arms:** the 30-item base set at k=3 under the certification
+  protocol — same pinned worker and judge, run atomically with the
+  schema change under the `eval-baseline-refresh` label (D29b), so the
+  new baseline and the contract it certifies merge together.
+- **Cost:** ~$13.50 worker (the certified run's own $0.15/run across
+  90 rows) plus judge. The phase intake said ~$10; corrected here,
+  before the run, from the committed rows.
+- **What decides it:** this is a re-certification, not an experiment.
+  Fabrications must be 0 for the new baseline to be adopted; every
+  other number is recorded whatever it is. Deltas against the old
+  baseline are reported as context only — the fingerprint changed, so
+  they are not gate verdicts.
+- **Deferral-specific check, stated now:** deferral_rate on the
+  healthy base set is expected ≈ 0. A rate materially above zero is
+  the proportionality failure — deferring instead of investigating —
+  and blocks adoption of the new baseline until the prompt rule is
+  revised. Deferral quality has no dedicated items yet; the evidence
+  dimension polices fabricated gaps wherever they appear.
+- **Flip re-trial** applies per the protocol rule above.
+
 ### Pre-registered probe — re-skins against template-reading (#103; registered 2026-08-05, run pending)
 
 The eval-erosion check run from inside the harness: a re-skin holds

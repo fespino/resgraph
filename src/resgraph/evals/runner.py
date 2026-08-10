@@ -41,8 +41,10 @@ from resgraph.query.executor import QueryContext
 from .breaker import JudgeSpendBreaker
 from .faults import cold_store_dies_after, hot_store_dies_after
 from .graders import (
+    DeferralWorld,
     DimResult,
     grade_cutoff,
+    grade_deferral_claim,
     grade_degraded,
     grade_discipline,
     grade_evidence,
@@ -121,6 +123,19 @@ def evidence_inputs(catalog: Any, at: datetime) -> tuple[set[tuple[str, str]], s
     return edges, set(scan.column("sequence").to_pylist())
 
 
+def _deferral_claim(result: RunResult, catalog: Any) -> DimResult | None:
+    if result.report is None or result.report.deferral is None:
+        return None
+    d = result.report.deferral
+    scan = catalog.load_table(cold_store.EVENTS).scan(selected_fields=("event_time",)).to_arrow()
+    covered = any(d.window_start <= t < d.window_end for t in scan.column("event_time").to_pylist())
+    world = DeferralWorld(
+        any_call_failed=any(not c.ok for c in result.trace),
+        events_in_window=covered,
+    )
+    return grade_deferral_claim(d, world)
+
+
 def fault_for(spec: Scenario):
     """Which store the induced fault targets — named per item, refused
     when absent. INC-002 was a drill aimed at a store the workload
@@ -159,6 +174,9 @@ def grade_all(
                 dims.extend(grade_found(result.report, truth))
                 edges, log_sequences = evidence_inputs(catalog, spec.alert.fired_at)
                 dims.append(grade_evidence(result.report, edges, log_sequences))
+            claim = _deferral_claim(result, catalog)
+            if claim is not None:
+                dims.append(claim)
         dims.append(grade_discipline(result, max_tool_calls=max_tool_calls))
         return dims
     if starved:
@@ -172,6 +190,9 @@ def grade_all(
             else:
                 edges, log_sequences = evidence_inputs(catalog, spec.alert.fired_at)
                 dims.append(grade_evidence(result.report, edges, log_sequences))
+            claim = _deferral_claim(result, catalog)
+            if claim is not None:
+                dims.append(claim)
         dims.append(grade_discipline(result, max_tool_calls=max_tool_calls))
         return dims
     if result.report is None:
@@ -189,6 +210,9 @@ def grade_all(
         dims.extend(grade_found(result.report, truth))
         edges, log_sequences = evidence_inputs(catalog, spec.alert.fired_at)
         dims.append(grade_evidence(result.report, edges, log_sequences))
+    claim = _deferral_claim(result, catalog)
+    if claim is not None:
+        dims.append(claim)
     dims.append(grade_discipline(result, max_tool_calls=max_tool_calls))
     if judge_client is not None and judge_model:
         dims.append(
@@ -447,6 +471,7 @@ def run_eval(
                     "trial": trial,
                     "dims": {d.dim: {"passed": d.passed, "detail": d.detail} for d in dims},
                     "degraded": result.degraded,
+                    "deferred": bool(result.report and result.report.deferral),
                     "cutoff_reason": result.cutoff_reason,
                     "tool_calls": result.tool_calls,
                     "tool_trace": [{"tool": c.name, "ok": c.ok} for c in result.trace],

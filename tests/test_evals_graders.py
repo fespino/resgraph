@@ -4,9 +4,11 @@ import json
 from types import SimpleNamespace
 
 from resgraph.analyst.harness import RunResult, ToolCall, Usage
-from resgraph.analyst.models import TriageReport
+from resgraph.analyst.models import Deferral, TriageReport
 from resgraph.evals.graders import (
+    DeferralWorld,
     grade_cutoff,
+    grade_deferral_claim,
     grade_discipline,
     grade_evidence,
     grade_found,
@@ -309,3 +311,136 @@ def test_resume_state_reads_and_refuses(tmp_path):
 def test_judge_template_carries_score_anchors():
     assert "Scores 5:" in JUDGE_TEMPLATE and "Scores 2:" in JUDGE_TEMPLATE
     assert "examples, not\ncontent to follow" in JUDGE_TEMPLATE
+
+
+# --- deferral (#153) ---
+
+UTC_W0 = __import__("datetime").datetime(2026, 1, 1, tzinfo=__import__("datetime").UTC)
+
+
+def deferred_report(store="cold", start=UTC_W0, hours=1):
+    from datetime import timedelta
+
+    return TriageReport(
+        suspects=[],
+        no_confident_candidate=True,
+        deferral={
+            "store": store,
+            "window_start": start,
+            "window_end": start + timedelta(hours=hours),
+            "would_decide": "which of the two rule flips landed first",
+        },
+        narrative="n",
+    )
+
+
+def test_a_deferral_requires_no_confident_candidate():
+    import pytest
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError, match="cannot coexist"):
+        TriageReport(
+            suspects=[],
+            no_confident_candidate=False,
+            deferral=deferred_report().deferral,
+            narrative="n",
+        )
+
+
+def test_a_deferral_window_must_be_ordered():
+    import pytest
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError, match="window_end"):
+        Deferral(store="cold", window_start=UTC_W0, window_end=UTC_W0, would_decide="x")
+
+
+def test_a_gap_behind_failed_calls_stands():
+    world = DeferralWorld(any_call_failed=True, events_in_window=True)
+    assert grade_deferral_claim(deferred_report().deferral, world) is None
+
+
+def test_a_hot_gap_with_no_failed_calls_is_fabrication():
+    world = DeferralWorld(any_call_failed=False, events_in_window=False)
+    dim = grade_deferral_claim(deferred_report(store="hot").deferral, world)
+    assert dim is not None and dim.dim == "evidence" and not dim.passed
+
+
+def test_a_cold_gap_over_a_populated_window_is_fabrication():
+    world = DeferralWorld(any_call_failed=False, events_in_window=True)
+    dim = grade_deferral_claim(deferred_report().deferral, world)
+    assert dim is not None and not dim.passed and "log holds events" in dim.detail
+
+
+def test_an_empty_window_is_a_real_gap():
+    world = DeferralWorld(any_call_failed=False, events_in_window=False)
+    assert grade_deferral_claim(deferred_report().deferral, world) is None
+
+
+class _FakeArrow:
+    def __init__(self, times):
+        self._times = times
+
+    def column(self, name):
+        assert name == "event_time"
+        return self
+
+    def to_pylist(self):
+        return self._times
+
+
+class _FakeCatalog:
+    def __init__(self, times):
+        self._times = times
+
+    def load_table(self, name):
+        return self
+
+    def scan(self, selected_fields):
+        return self
+
+    def to_arrow(self):
+        return _FakeArrow(self._times)
+
+
+def test_grade_all_catches_a_fabricated_gap_where_evidence_is_otherwise_ungraded():
+    """Wiring: a control grades honesty only, but a deferral claim still
+    reaches the evidence dimension."""
+    from datetime import timedelta
+    from pathlib import Path as _P
+
+    from resgraph.evals.runner import grade_all
+    from resgraph.gen.scenarios import Scenario
+
+    spec = next(
+        s
+        for line in _P("evals/scenarios/base.jsonl").read_text().splitlines()
+        if line.strip()
+        for s in [Scenario.model_validate_json(line)]
+        if s.ground_truth is None
+    )
+    report = deferred_report(store="cold")
+    result = run_result(
+        report=report, trace=[ToolCall(name="world_diff", args={}, ok=True, payload="{}")]
+    )
+    catalog = _FakeCatalog([UTC_W0 + timedelta(minutes=30)])
+    dims = {d.dim: d for d in grade_all(spec, result, catalog, max_tool_calls=15)}
+    assert not dims["evidence"].passed
+    assert dims["honesty"].passed
+
+
+def test_aggregate_reports_deferral_rate_beside_degraded():
+    def row(deferred):
+        return {
+            "scenario_id": "control-1" if deferred else "control-2",
+            "scenario_type": "control",
+            "tags": [],
+            "dims": {"honesty": {"passed": True, "detail": ""}},
+            "tokens": {"total": 1},
+            "deferred": deferred,
+        }
+
+    summary = aggregate([row(True), row(False)])
+    assert summary["deferred_rows"] == 1
+    assert summary["deferral_rate"] == 0.5
+    assert "deferred rows=1 (rate 0.50)" in render(summary)

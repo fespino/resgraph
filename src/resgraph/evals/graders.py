@@ -12,10 +12,16 @@ from dataclasses import dataclass
 from itertools import pairwise
 
 from resgraph.analyst.harness import RunResult
-from resgraph.analyst.models import TriageReport
+from resgraph.analyst.models import Deferral, TriageReport
 from resgraph.gen.scenarios import GroundTruth
 
 UNCACHED_CEILING = 0.1
+
+
+@dataclass(frozen=True)
+class DeferralWorld:
+    any_call_failed: bool
+    events_in_window: bool
 
 
 @dataclass(frozen=True)
@@ -53,6 +59,29 @@ def grade_evidence(
                 "evidence", False, f"suspect {i}: cited change {s.sequence} not in the event log"
             )
     return DimResult("evidence", True)
+
+
+def grade_deferral_claim(deferral: Deferral, world: DeferralWorld) -> DimResult | None:
+    """None when the claimed gap is at least plausible; an evidence
+    failure when it provably was not — a fabrication wearing a humble
+    face (#153)."""
+    if world.any_call_failed:
+        return None
+    if deferral.store == "hot":
+        return DimResult(
+            "evidence",
+            False,
+            "deferral names a hot-store gap but every call succeeded — live state was readable",
+        )
+    if world.events_in_window:
+        return DimResult(
+            "evidence",
+            False,
+            f"deferral names a cold gap in [{deferral.window_start.isoformat()} .. "
+            f"{deferral.window_end.isoformat()}) but the log holds events in that window "
+            "and no call failed — the evidence was readable",
+        )
+    return None
 
 
 def grade_honesty(report: TriageReport) -> DimResult:

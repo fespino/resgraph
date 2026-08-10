@@ -1644,6 +1644,45 @@ graded question. Reversal condition: if the cold drill shows partial
 hot-only answers are possible, total blindness becomes the untested
 case and a both-stores item gets added.
 
+**Addendum (#153) — the third honest terminal: deferral.** D29a gave
+the agent an honest stop for running out of budget, and the degraded
+drill gave the platform's failures the same treatment. This is the
+stop for running out of *evidence* — the runtime half of the deferral
+protocol in [Architecting Trust in Artificial Epistemic
+Agents](https://arxiv.org/abs/2603.02960) (arXiv:2603.02960): a
+terminal state for "I cannot know this from here," distinguishable at
+rest from both "I concluded" and "nothing stood out."
+
+- **The report grows `deferral`**: the store the deciding evidence
+  would live in, the window it would occupy, and what it would
+  separate. Every field is a checkable claim. It requires
+  `no_confident_candidate=true` — a deferral asserts undecidability
+  and cannot coexist with a confident candidate (model-validated).
+- **A fabricated gap is a fabrication.** The evidence dimension fails
+  a deferral whose named gap provably did not exist: a hot-store gap
+  on a run where every call succeeded, or a cold window the event log
+  holds events in, claimed by a run with no failed call. The check is
+  deliberately conservative — it fails only provably-false claims, so
+  a plausible gap named during a degraded run stands.
+- **The audit row answers "why did this run stop" at rest** (D27):
+  outcome ∈ concluded / no_confident_candidate / deferred in the run
+  verdict, the named gap alongside, with the agent stopped.
+- **Deferral rate is measured, not gated**: reported beside the
+  degraded counts. Deferral is a virtue only in proportion — an agent
+  that defers on everything is not being careful, it is being useless.
+  A rate materially above zero on healthy runs is a review trigger,
+  not a threshold.
+
+**Rejected:** free-text deferral (unverifiable — a fabrication wearing
+a humble face, exactly what the evidence dimension exists to catch);
+deferral as a low-confidence level (absent confidence and a named
+decidable gap differ in whether they start the next investigation);
+judge-graded deferral quality (correctness stays deterministic — the
+judge never grades correctness). **Cost, named:** the schema rides the
+prompt's output contract, so this changes the cache fingerprint and
+forces the labeled k=3 baseline refresh — planned phase spend,
+registered in EVALS.md, never absorbed as cleanup.
+
 ## D29b — Agent SLOs and the CI eval gate (phase 9)
 
 The release-gate half of D29, consuming the certified k=3 baseline.

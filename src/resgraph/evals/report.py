@@ -91,6 +91,8 @@ def aggregate(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "fabrication_count": len(fabrications),
         "fabrications": fabrications,
         "degraded_rows": sum(bool(r.get("degraded")) for r in rows),
+        "deferred_rows": sum(bool(r.get("deferred")) for r in rows),
+        "deferral_rate": _rate(sum(bool(r.get("deferred")) for r in rows), len(rows)),
         "latency_p50_s": _percentile(latencies, 0.5),
         "latency_p95_s": _percentile(latencies, 0.95),
         "cache_hit_mean": (sum(cache_rates) / len(cache_rates)) if cache_rates else None,
@@ -123,7 +125,9 @@ def render(summary: dict[str, Any], baseline: dict[str, Any] | None = None) -> s
         + (
             "  <-- HALT: iteration stops until this is zero" if summary["fabrication_count"] else ""
         ),
-        f"degraded rows={summary['degraded_rows']}",
+        f"degraded rows={summary['degraded_rows']}"
+        f"  deferred rows={summary.get('deferred_rows', 0)}"
+        f" (rate {_fmt(summary.get('deferral_rate'))})",
         f"latency p50={_fmt(summary['latency_p50_s'])}s p95={_fmt(summary['latency_p95_s'])}s"
         f"  cache={_fmt(summary['cache_hit_mean'])}",
         "",

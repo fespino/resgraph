@@ -118,3 +118,9 @@ def test_worked_examples_include_a_labeled_negative():
     assert "do not copy" in text
     assert "sequence 0 is the initial snapshot" in text
     assert "derived arithmetic" in " ".join(text.split())
+
+
+def test_contract_carries_the_deferral_rule():
+    text = prefix_text()
+    assert "deferral is for running out of EVIDENCE" in text
+    assert '"deferral"' in text

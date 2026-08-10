@@ -1647,11 +1647,19 @@ case and a both-stores item gets added.
 **Addendum (#153) — the third honest terminal: deferral.** D29a gave
 the agent an honest stop for running out of budget, and the degraded
 drill gave the platform's failures the same treatment. This is the
-stop for running out of *evidence* — the runtime half of the deferral
-protocol in [Architecting Trust in Artificial Epistemic
-Agents](https://arxiv.org/abs/2603.02960) (arXiv:2603.02960): a
-terminal state for "I cannot know this from here," distinguishable at
-rest from both "I concluded" and "nothing stood out."
+stop for running out of *evidence*: a terminal state for "I cannot
+know this from here," distinguishable at rest from both "I concluded"
+and "nothing stood out."
+
+Attribution, stated precisely: [Architecting Trust in Artificial
+Epistemic Agents](https://arxiv.org/abs/2603.02960) (arXiv:2603.02960)
+supplies the *norms* — epistemic competence, calibration, robust
+falsifiability — and the framing that abstention should also say what
+would disambiguate. It is a normative paper; it specifies no runtime
+protocol. The mechanism below is this repo's construction, and its one
+design idea is the paper's falsifiability virtue applied to the
+deferral itself: a deferral here is a falsifiable claim, checkable
+against the platform's own event log, not a humble sentence.
 
 - **The report grows `deferral`**: the store the deciding evidence
   would live in, the window it would occupy, and what it would

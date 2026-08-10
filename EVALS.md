@@ -994,6 +994,26 @@ the causal chain cited to file:line):
 - **Outcome lands in `docs/incidents/INC-003-analyst-degraded-cold.md`**
   with method and hardware, whatever it shows.
 
+**Outcome — pilot `20260810T213356Z` ($0.15) + suite `20260810T214336Z`
+($3.04): the experiment ran, and the answer is honest total blindness.**
+The fault fired in 21 of 21 rows (4–11 failed calls per run — the
+assertion INC-002 failed twice). Decisive dimension: **pass^k 1.0** on
+degraded, every item, every trial; controls passed honesty 3/3.
+**Fabrications 0**, evidence 18/18 — the halt condition now tested by
+real failure rather than by a fault that never fired. **found_top3
+0.000 vs the certified 0.792**: the cost of honest degradation is the
+entire found rate. `no_confident_candidate` on 18/18 causal rows;
+17/18 offered hedged suspects, none containing the planted cause,
+every citation verifiable. The agent pivots to live-state reads after
+the kill — operational, honest, blind to causes. Zero verdict flips
+across trials, so the flip re-trial rule was armed and never owed.
+Discipline failed 21/21 on "identical repeated calls" — the grader
+interaction registered at pilot time, before these numbers existed;
+design decision in #172, grading unchanged retroactively. Paired with
+INC-002's inversion this closes the loop: hot kill ≈ no effect, cold
+kill = attribution to zero. Full note:
+[INC-003](docs/incidents/INC-003-analyst-degraded-cold.md).
+
 ### Pre-registered probe — re-skins against template-reading (#103; registered 2026-08-05, run pending)
 
 The eval-erosion check run from inside the harness: a re-skin holds

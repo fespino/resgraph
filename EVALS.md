@@ -1040,6 +1040,14 @@ satisfied — INC-003 landed on the old fingerprint before this change.
   and blocks adoption of the new baseline until the prompt rule is
   revised. Deferral quality has no dedicated items yet; the evidence
   dimension polices fabricated gaps wherever they appear.
+- **Pilot precondition (#180, added 2026-08-11):** one coverage-gap
+  item (`evals/scenarios/gap-pilot.jsonl`, k=1, ~$0.15, gated in
+  `scripts/pilot-deferral-gap.sh`) runs BEFORE this refresh. The
+  refresh exercises the new field on no row — it proves the schema
+  breaks nothing, not that it works — and a schema fix discovered
+  after certification costs a second refresh. The pilot must show a
+  valid deferral naming the planted gap, or the schema is revised
+  first.
 - **Flip re-trial** applies per the protocol rule above.
 
 ### Pre-registered probe — re-skins against template-reading (#103; registered 2026-08-05, run pending)

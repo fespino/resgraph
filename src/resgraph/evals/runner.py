@@ -102,6 +102,15 @@ def world_summary(gen: GeneratedScenario) -> WorldSummary:
     )
 
 
+def withheld_events(messages: list[Any], gap_before: str | None) -> list[Any]:
+    """Coverage truncation (#180): the readable log starts at the cut;
+    the initial snapshot survives, pre-cut churn does not."""
+    if gap_before is None:
+        return messages
+    cut = datetime.fromisoformat(gap_before)
+    return [m for m in messages if m.sequence == 0 or m.event_time >= cut]
+
+
 def load_stores(driver: Any, gen: GeneratedScenario, cold_dir: Path) -> Any:
     snapshot = [m for m in gen.messages if m.sequence == 0]
     churned = [m for m in gen.messages if m.sequence > 0]
@@ -112,7 +121,8 @@ def load_stores(driver: Any, gen: GeneratedScenario, cold_dir: Path) -> Any:
         apply_batch(session, churned)
     catalog = cold_store.get_catalog(cold_dir)
     cold_store.ensure_tables(catalog)
-    cold_store.append_events(catalog, gen.messages)
+    gap = gen.spec.provenance.get("gap_before")
+    cold_store.append_events(catalog, withheld_events(gen.messages, str(gap) if gap else None))
     return catalog
 
 
@@ -127,8 +137,21 @@ def _deferral_claim(result: RunResult, catalog: Any) -> DimResult | None:
     if result.report is None or result.report.deferral is None:
         return None
     d = result.report.deferral
-    scan = catalog.load_table(cold_store.EVENTS).scan(selected_fields=("event_time",)).to_arrow()
-    covered = any(d.window_start <= t < d.window_end for t in scan.column("event_time").to_pylist())
+    scan = (
+        catalog.load_table(cold_store.EVENTS)
+        .scan(selected_fields=("sequence", "event_time"))
+        .to_arrow()
+    )
+    # sequence 0 is the initial snapshot, never a change event: a
+    # window holding only snapshot rows is uncovered, not readable
+    covered = any(
+        seq > 0 and d.window_start <= ts < d.window_end
+        for seq, ts in zip(
+            scan.column("sequence").to_pylist(),
+            scan.column("event_time").to_pylist(),
+            strict=True,
+        )
+    )
     world = DeferralWorld(
         any_call_failed=any(not c.ok for c in result.trace),
         events_in_window=covered,

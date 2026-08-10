@@ -378,20 +378,16 @@ def test_an_empty_window_is_a_real_gap():
 
 
 class _FakeArrow:
-    def __init__(self, times):
-        self._times = times
+    def __init__(self, cols):
+        self._cols = cols
 
     def column(self, name):
-        assert name == "event_time"
-        return self
-
-    def to_pylist(self):
-        return self._times
+        return SimpleNamespace(to_pylist=lambda: self._cols[name])
 
 
 class _FakeCatalog:
-    def __init__(self, times):
-        self._times = times
+    def __init__(self, times, seqs=None):
+        self._cols = {"event_time": times, "sequence": seqs or list(range(1, len(times) + 1))}
 
     def load_table(self, name):
         return self
@@ -400,7 +396,7 @@ class _FakeCatalog:
         return self
 
     def to_arrow(self):
-        return _FakeArrow(self._times)
+        return _FakeArrow(self._cols)
 
 
 def test_grade_all_catches_a_fabricated_gap_where_evidence_is_otherwise_ungraded():
@@ -444,3 +440,22 @@ def test_aggregate_reports_deferral_rate_beside_degraded():
     assert summary["deferred_rows"] == 1
     assert summary["deferral_rate"] == 0.5
     assert "deferred rows=1 (rate 0.50)" in render(summary)
+
+
+def test_snapshot_rows_are_not_coverage():
+    """Sequence 0 is the initial snapshot, never a change event: a
+    window holding only snapshot rows is a real gap, not readable
+    evidence (#180)."""
+    from datetime import timedelta
+
+    from resgraph.evals.runner import _deferral_claim
+
+    report = deferred_report(store="cold")
+    result = run_result(
+        report=report, trace=[ToolCall(name="world_diff", args={}, ok=True, payload="{}")]
+    )
+    snapshot_only = _FakeCatalog([UTC_W0 + timedelta(minutes=30)], seqs=[0])
+    assert _deferral_claim(result, snapshot_only) is None
+    real_event = _FakeCatalog([UTC_W0 + timedelta(minutes=30)], seqs=[7])
+    dim = _deferral_claim(result, real_event)
+    assert dim is not None and not dim.passed

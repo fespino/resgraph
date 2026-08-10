@@ -44,6 +44,10 @@ Anything in the right-hand column reading "nothing" is a reason not to run yet.
 - **Halt conditions** (a result that stops everything): <e.g. fabrications > 0>
 - **Measured, not decisive:** <numbers reported without a threshold>
 - **Not a gate candidate:** <why this run does or does not enter the eval gate>
+- **Grader walk:** read every graded dimension against the behavior the
+  fault induces, and register expected interactions here, before the run.
+  INC-003: retry-after-kill trips the discipline check on every degraded
+  row — predictable at design time, registered only at pilot time.
 
 ## Assumptions
 

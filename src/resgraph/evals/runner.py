@@ -504,7 +504,7 @@ def run_eval(
                     "cache_fingerprint": fingerprint,
                     "latency_s": round(latency, 3),
                     "validation_failures": result.validation_failures,
-                    "report": result.report.model_dump() if result.report else None,
+                    "report": result.report.model_dump(mode="json") if result.report else None,
                 }
                 row_json = json.dumps(row)
                 assert_row_clean(row_json)

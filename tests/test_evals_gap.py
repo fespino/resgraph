@@ -52,3 +52,27 @@ def test_the_pilot_item_world_is_unchanged_from_its_parent():
     parent = base[item["id"].removesuffix("-gap")]
     assert item["seed"] == parent["seed"]
     assert item["ground_truth"] == parent["ground_truth"]
+
+
+def test_a_deferred_report_serializes_into_a_run_row():
+    """A deferral carries datetimes; python-mode model_dump would crash
+    json.dumps AFTER the paid call. Caught by the pre-run verification
+    pass, pinned here."""
+    from datetime import timedelta
+
+    from resgraph.analyst.models import TriageReport
+
+    report = TriageReport(
+        suspects=[],
+        no_confident_candidate=True,
+        deferral={
+            "store": "cold",
+            "window_start": datetime(2026, 1, 1, tzinfo=UTC),
+            "window_end": datetime(2026, 1, 1, tzinfo=UTC) + timedelta(hours=1),
+            "would_decide": "x",
+        },
+        narrative="n",
+    )
+    json.dumps({"report": report.model_dump(mode="json")})
+    runner_src = Path("src/resgraph/evals/runner.py").read_text()
+    assert '"report": result.report.model_dump(mode="json")' in runner_src

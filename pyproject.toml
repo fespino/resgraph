@@ -23,8 +23,8 @@ dependencies = [
     "pyiceberg[pyiceberg-core,sql-sqlite]>=0.11.1",
     "pyyaml>=6.0.3",
     "redis>=8.0.1",
-    "typer>=0.27.0",
-    "uvicorn>=0.52.0",
+    "typer>=0.27.1",
+    "uvicorn>=0.52.1",
 ]
 
 [project.scripts]
@@ -35,7 +35,7 @@ resgraph-gen = "resgraph.gen.cli:app"
 resgraph-mcp = "resgraph.mcp.server:main"
 
 [build-system]
-requires = ["uv_build>=0.12.1,<0.13.0"]
+requires = ["uv_build>=0.12.3,<0.13.0"]
 build-backend = "uv_build"
 
 [tool.ruff]
@@ -64,13 +64,13 @@ markers = ["integration: requires docker compose stores (memgraph)"]
 dev = [
     "bandit[toml]>=1.9.4",
     "httpx>=0.28.1",
-    "hypothesis>=6.163.0",
+    "hypothesis>=6.165.2",
     "psycopg[binary]>=3.3.4",
     "pyarrow-stubs>=20.0.0.20260625",
     "pyright[nodejs]>=1.1.411",
     "pytest>=9.1.1",
     "pytest-cov>=7.1.0",
-    "ruff>=0.16.0",
+    "ruff>=0.16.2",
 ]
 
 [tool.pyright]

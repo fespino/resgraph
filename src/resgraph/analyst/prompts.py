@@ -216,7 +216,18 @@ Rules:
   you could have read: a deferral naming a store and window that were
   readable this run is graded as fabrication. On a quiet window with
   full coverage, the honest answer stays no_confident_candidate with
-  deferral null — absence of a culprit is a conclusion, not a gap."""
+  deferral null — absence of a culprit is a conclusion, not a gap.
+- What missing coverage looks like, so it is never mistaken for a
+  quiet window: change sequences are global and contiguous from 1, so
+  if the earliest change event readable anywhere in the log is
+  sequence N with N > 1, exactly N-1 earlier events exist that you
+  cannot read — a coverage gap running from the initial snapshot to
+  that first readable event, and the deferral window to name. A world
+  where nothing ever changed has no change events at all; a log that
+  STARTS above sequence 1 is truncated, never quiet. Likewise a state
+  at the alert time that the readable events cannot produce from the
+  snapshot means the producing events are unreadable — the same gap
+  seen from its effect."""
 
 
 @dataclass(frozen=True)

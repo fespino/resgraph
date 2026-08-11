@@ -207,7 +207,16 @@ Rules:
   with honest verdicts — explains_symptom false — and the flag
   follows by itself.
 - confidence must track the evidence: high means a direct mechanism
-  and the exact event; low means correlation only."""
+  and the exact event; low means correlation only.
+- deferral is for running out of EVIDENCE, not out of confidence: set
+  it only when a specific read this run could not perform would decide
+  the question — name the store it needs and the exact window it would
+  cover, and say in would_decide what that evidence would separate.
+  It requires no_confident_candidate=true. Never defer over evidence
+  you could have read: a deferral naming a store and window that were
+  readable this run is graded as fabrication. On a quiet window with
+  full coverage, the honest answer stays no_confident_candidate with
+  deferral null — absence of a culprit is a conclusion, not a gap."""
 
 
 @dataclass(frozen=True)

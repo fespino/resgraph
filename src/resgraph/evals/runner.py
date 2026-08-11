@@ -41,8 +41,10 @@ from resgraph.query.executor import QueryContext
 from .breaker import JudgeSpendBreaker
 from .faults import cold_store_dies_after, hot_store_dies_after
 from .graders import (
+    DeferralWorld,
     DimResult,
     grade_cutoff,
+    grade_deferral_claim,
     grade_degraded,
     grade_discipline,
     grade_evidence,
@@ -100,6 +102,15 @@ def world_summary(gen: GeneratedScenario) -> WorldSummary:
     )
 
 
+def withheld_events(messages: list[Any], gap_before: str | None) -> list[Any]:
+    """Coverage truncation (#180): the readable log starts at the cut;
+    the initial snapshot survives, pre-cut churn does not."""
+    if gap_before is None:
+        return messages
+    cut = datetime.fromisoformat(gap_before)
+    return [m for m in messages if m.sequence == 0 or m.event_time >= cut]
+
+
 def load_stores(driver: Any, gen: GeneratedScenario, cold_dir: Path) -> Any:
     snapshot = [m for m in gen.messages if m.sequence == 0]
     churned = [m for m in gen.messages if m.sequence > 0]
@@ -110,7 +121,8 @@ def load_stores(driver: Any, gen: GeneratedScenario, cold_dir: Path) -> Any:
         apply_batch(session, churned)
     catalog = cold_store.get_catalog(cold_dir)
     cold_store.ensure_tables(catalog)
-    cold_store.append_events(catalog, gen.messages)
+    gap = gen.spec.provenance.get("gap_before")
+    cold_store.append_events(catalog, withheld_events(gen.messages, str(gap) if gap else None))
     return catalog
 
 
@@ -119,6 +131,32 @@ def evidence_inputs(catalog: Any, at: datetime) -> tuple[set[tuple[str, str]], s
     edges = {(row["resource_id"], rel["target_id"]) for row in rows for rel in row["relationships"]}
     scan = catalog.load_table(cold_store.EVENTS).scan(selected_fields=("sequence",)).to_arrow()
     return edges, set(scan.column("sequence").to_pylist())
+
+
+def _deferral_claim(result: RunResult, catalog: Any) -> DimResult | None:
+    if result.report is None or result.report.deferral is None:
+        return None
+    d = result.report.deferral
+    scan = (
+        catalog.load_table(cold_store.EVENTS)
+        .scan(selected_fields=("sequence", "event_time"))
+        .to_arrow()
+    )
+    # sequence 0 is the initial snapshot, never a change event: a
+    # window holding only snapshot rows is uncovered, not readable
+    covered = any(
+        seq > 0 and d.window_start <= ts < d.window_end
+        for seq, ts in zip(
+            scan.column("sequence").to_pylist(),
+            scan.column("event_time").to_pylist(),
+            strict=True,
+        )
+    )
+    world = DeferralWorld(
+        any_call_failed=any(not c.ok for c in result.trace),
+        events_in_window=covered,
+    )
+    return grade_deferral_claim(d, world)
 
 
 def fault_for(spec: Scenario):
@@ -159,6 +197,9 @@ def grade_all(
                 dims.extend(grade_found(result.report, truth))
                 edges, log_sequences = evidence_inputs(catalog, spec.alert.fired_at)
                 dims.append(grade_evidence(result.report, edges, log_sequences))
+            claim = _deferral_claim(result, catalog)
+            if claim is not None:
+                dims.append(claim)
         dims.append(grade_discipline(result, max_tool_calls=max_tool_calls))
         return dims
     if starved:
@@ -172,6 +213,9 @@ def grade_all(
             else:
                 edges, log_sequences = evidence_inputs(catalog, spec.alert.fired_at)
                 dims.append(grade_evidence(result.report, edges, log_sequences))
+            claim = _deferral_claim(result, catalog)
+            if claim is not None:
+                dims.append(claim)
         dims.append(grade_discipline(result, max_tool_calls=max_tool_calls))
         return dims
     if result.report is None:
@@ -189,6 +233,9 @@ def grade_all(
         dims.extend(grade_found(result.report, truth))
         edges, log_sequences = evidence_inputs(catalog, spec.alert.fired_at)
         dims.append(grade_evidence(result.report, edges, log_sequences))
+    claim = _deferral_claim(result, catalog)
+    if claim is not None:
+        dims.append(claim)
     dims.append(grade_discipline(result, max_tool_calls=max_tool_calls))
     if judge_client is not None and judge_model:
         dims.append(
@@ -447,6 +494,7 @@ def run_eval(
                     "trial": trial,
                     "dims": {d.dim: {"passed": d.passed, "detail": d.detail} for d in dims},
                     "degraded": result.degraded,
+                    "deferred": bool(result.report and result.report.deferral),
                     "cutoff_reason": result.cutoff_reason,
                     "tool_calls": result.tool_calls,
                     "tool_trace": [{"tool": c.name, "ok": c.ok} for c in result.trace],
@@ -456,7 +504,7 @@ def run_eval(
                     "cache_fingerprint": fingerprint,
                     "latency_s": round(latency, 3),
                     "validation_failures": result.validation_failures,
-                    "report": result.report.model_dump() if result.report else None,
+                    "report": result.report.model_dump(mode="json") if result.report else None,
                 }
                 row_json = json.dumps(row)
                 assert_row_clean(row_json)

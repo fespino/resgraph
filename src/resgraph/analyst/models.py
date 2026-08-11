@@ -4,11 +4,30 @@ Strict on purpose: a report that fails to parse first try is a graded
 discipline failure, so the schema gives the model nothing to negotiate.
 """
 
-from typing import Literal
+from typing import Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
 
 Confidence = Literal["high", "medium", "low"]
+
+
+class Deferral(BaseModel):
+    """Running out of evidence, not confidence (D29a addendum, #153).
+    Every field is a checkable claim: a named gap that was actually
+    readable this run is graded as fabrication."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    store: Literal["hot", "cold"]
+    window_start: AwareDatetime
+    window_end: AwareDatetime
+    would_decide: str = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def _window_ordered(self) -> Self:
+        if self.window_end <= self.window_start:
+            raise ValueError("deferral window_end must be after window_start")
+        return self
 
 
 class EvidenceVerdict(BaseModel):
@@ -44,4 +63,14 @@ class TriageReport(BaseModel):
     suspects: list[TriageSuspect]
     no_confident_candidate: bool
     degraded: bool = False
+    deferral: Deferral | None = None
     narrative: str
+
+    @model_validator(mode="after")
+    def _deferral_defers(self) -> Self:
+        if self.deferral is not None and not self.no_confident_candidate:
+            raise ValueError(
+                "a deferral asserts the question is undecidable from here; "
+                "it cannot coexist with a confident candidate"
+            )
+        return self

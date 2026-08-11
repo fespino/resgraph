@@ -201,3 +201,39 @@ def test_parse_since():
     assert parse_since("30m") == timedelta(minutes=30)
     with pytest.raises(ValueError, match="--since"):
         parse_since("7 days")
+
+
+def test_finish_run_distinguishes_deferred_at_rest(store):
+    import json
+    from datetime import UTC, datetime, timedelta
+
+    from resgraph.analyst.harness import RunResult, Usage
+    from resgraph.analyst.models import TriageReport
+
+    w0 = datetime(2026, 1, 1, tzinfo=UTC)
+    cases = {
+        "deferred": TriageReport(
+            suspects=[],
+            no_confident_candidate=True,
+            deferral={
+                "store": "cold",
+                "window_start": w0,
+                "window_end": w0 + timedelta(hours=1),
+                "would_decide": "x",
+            },
+            narrative="n",
+        ),
+        "no_confident_candidate": TriageReport(
+            suspects=[], no_confident_candidate=True, narrative="n"
+        ),
+    }
+    for expected, report in cases.items():
+        run_id = f"r-{expected}"
+        store.begin_run(run_id, alert={}, model=MODEL, git_ref="abc")
+        result = RunResult(
+            report=report, degraded=False, tool_calls=0, turns=1, usage=Usage(), trace=[]
+        )
+        store.finish_run(run_id, result)
+        verdict = json.loads(store.run_row(run_id)["verdict"])
+        assert verdict["outcome"] == expected
+    assert json.loads(store.run_row("r-deferred")["verdict"])["deferral"]["store"] == "cold"

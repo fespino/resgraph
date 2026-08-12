@@ -256,44 +256,22 @@ def test_extra_args_merge_into_the_payload():
     assert payload["tool_choice"] == "required"
 
 
-def test_build_client_endpoint_pins_full_identity():
-    setup = {
-        "name": "qwen-remote",
-        "provider": "ollama",
-        "model": "qwen2.5:7b",
-        "base_url": "http://a-remote-gpu:8000/v1",
-        "seed": 7,
-        "quant": "Q4_K_M",
-        "temperature": 0,
-    }
-    client, meta = build_client(setup)
-    assert isinstance(client, ChatCompletionsClient)
-    assert meta == {
-        "provider": "ollama",
-        "setup": "qwen-remote",
-        "base_url": "http://a-remote-gpu:8000/v1",
-        "temperature": 0,
-        "seed": 7,
-        "quant": "Q4_K_M",
-    }
+def test_build_client_endpoint_uses_the_chat_completions_client():
+    setup = {"provider": "ollama", "model": "qwen2.5:7b", "base_url": "http://a-remote-gpu:8000/v1"}
+    assert isinstance(build_client(setup), ChatCompletionsClient)
 
 
-def test_build_client_anthropic_records_provider_and_setup(monkeypatch):
+def test_build_client_anthropic_provider_uses_the_sdk(monkeypatch):
     import anthropic
 
     sentinel = object()
     monkeypatch.setattr(anthropic, "Anthropic", lambda: sentinel)
-    client, meta = build_client(
-        {"name": "opus", "provider": "anthropic", "model": "claude-opus-4-8"}
-    )
-    assert client is sentinel
-    assert meta == {"provider": "anthropic", "setup": "opus"}
+    assert build_client({"provider": "anthropic", "model": "claude-opus-4-8"}) is sentinel
 
 
 def test_unknown_provider_falls_back_to_chat_completions():
-    client, meta = build_client({"provider": "together", "model": "x", "base_url": "http://x/v1"})
+    client = build_client({"provider": "together", "model": "x", "base_url": "http://x/v1"})
     assert isinstance(client, ChatCompletionsClient)
-    assert meta["provider"] == "together"
 
 
 def test_chat_provider_without_a_base_url_is_rejected():

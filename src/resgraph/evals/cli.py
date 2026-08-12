@@ -60,8 +60,8 @@ def run(
         load_setup(worker, cfg) if worker else {"provider": "anthropic", "model": model}
     )
     worker_model: str = worker_setup["model"]
-    worker_client, worker_meta = build_client(worker_setup)
-    provenance = {f"worker_{k}": v for k, v in worker_meta.items()}
+    worker_client = build_client(worker_setup)
+    provenance: dict[str, Any] = {"worker": worker_setup}
 
     judge_client = None
     judge_model_resolved: str | None = None
@@ -70,8 +70,8 @@ def run(
             load_setup(judge, cfg) if judge else {"provider": "anthropic", "model": judge_model}
         )
         judge_model_resolved = judge_setup["model"]
-        judge_client, judge_meta = build_client(judge_setup)
-        provenance |= {f"judge_{k}": v for k, v in judge_meta.items()}
+        judge_client = build_client(judge_setup)
+        provenance["judge"] = judge_setup
 
     driver = get_driver()
     driver.verify_connectivity()

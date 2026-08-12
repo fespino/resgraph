@@ -293,26 +293,16 @@ def _build_chat_completions(setup: dict[str, Any]) -> Any:
 CLIENTS: dict[str, Callable[[dict[str, Any]], Any]] = {"anthropic": _build_anthropic}
 
 
-def build_client(setup: dict[str, Any]) -> tuple[Any, dict[str, Any]]:
-    """Resolve a client and its provenance from a setup, picking by ``provider``
-    and falling back to chat-completions for anything without its own builder.
-    Role-neutral — worker or judge resolve the same way, so the judge is not tied
-    to a provider (the caller keeps it constant across arms)."""
+def build_client(setup: dict[str, Any]) -> Any:
+    """Resolve a client from a setup, picking by ``provider`` and falling back to
+    chat-completions for anything without its own builder. Role-neutral — worker
+    or judge resolve the same way, so the judge is not tied to a provider. The
+    setup itself is the provenance the caller records; a secret is never inline
+    (``api_key_env`` names the environment variable)."""
     if "api_key" in setup:
         raise SystemExit(
             "setup carries an inline api_key; keep the secret in the environment "
             "and name it with api_key_env instead"
         )
     provider = setup.get("provider", "default")
-    client = CLIENTS.get(provider, _build_chat_completions)(setup)
-    meta: dict[str, Any] = {"provider": provider}
-    if setup.get("name"):
-        meta["setup"] = setup["name"]
-    if setup.get("base_url"):
-        meta |= {
-            "base_url": setup["base_url"],
-            "temperature": setup.get("temperature", 0.0),
-            "seed": setup.get("seed"),
-            "quant": setup.get("quant"),
-        }
-    return client, meta
+    return CLIENTS.get(provider, _build_chat_completions)(setup)

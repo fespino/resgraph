@@ -359,9 +359,19 @@ def run_eval(
     max_item_seconds: float | None = None,
     judge_daily_cap: float = JUDGE_DAILY_CAP_USD,
     with_skill: bool = True,
+    judge_client: Any = None,
+    provenance: dict[str, Any] | None = None,
+    price_worker: bool = True,
 ) -> Path:
-    if max_cost is not None or max_item_cost is not None:
+    if price_worker and (max_cost is not None or max_item_cost is not None):
         estimate_cost({"input": 0, "output": 0, "cache_read": 0, "cache_creation": 0}, model)
+    # The judge resolves independently of the worker (D29c): a local worker
+    # never drags the judge off Anthropic. A local worker's tokens are unpriced
+    # (electricity, not API spend), so its per-item cost cutoff reads zero.
+    judge = judge_client if judge_client is not None else client
+    worker_cost_fn = (
+        (lambda u: estimate_cost(_usage_tokens(u), model)) if price_worker else (lambda u: 0.0)
+    )
     judge_breaker = (
         JudgeSpendBreaker(
             cap_usd=judge_daily_cap, model=judge_model, prices_per_mtok=PRICES_PER_MTOK
@@ -391,6 +401,8 @@ def run_eval(
         "stores": _store_images(),
         "host": _host(),
     }
+    if provenance:
+        envpin = envpin | provenance
     with out.open("a" if resume_path is not None else "w") as f:
         for spec in scenarios:
             gen = rebuild(spec)
@@ -439,11 +451,7 @@ def run_eval(
                         max_tool_calls=item_max_calls,
                         thinking=thinking,
                         max_cost_usd=max_item_cost,
-                        cost_fn=(
-                            (lambda u: estimate_cost(_usage_tokens(u), model))
-                            if max_item_cost is not None
-                            else None
-                        ),
+                        cost_fn=worker_cost_fn if max_item_cost is not None else None,
                         max_wall_s=max_item_seconds,
                     )
                     latency = time.monotonic() - started
@@ -452,7 +460,7 @@ def run_eval(
                         result,
                         catalog,
                         max_tool_calls=item_max_calls,
-                        judge_client=client if judge_model else None,
+                        judge_client=judge if judge_model else None,
                         judge_model=judge_model,
                         judge_breaker=judge_breaker,
                     )

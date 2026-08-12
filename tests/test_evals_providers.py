@@ -7,6 +7,7 @@ from resgraph.evals.providers import (
     OpenAICompatClient,
     TextBlock,
     ToolUseBlock,
+    build_worker,
     from_openai_response,
     to_openai_messages,
     to_openai_tools,
@@ -223,3 +224,58 @@ def test_client_omits_tools_and_seed_when_unset():
     assert "tools" not in payload
     assert "seed" not in payload
     assert payload["messages"] == [{"role": "user", "content": "hi"}]
+
+
+def test_extra_args_merge_into_the_payload():
+    captured: dict[str, object] = {}
+
+    def fake_transport(url, payload, headers):
+        captured["payload"] = payload
+        return {
+            "choices": [{"message": {"content": "ok"}, "finish_reason": "stop"}],
+            "usage": {"prompt_tokens": 1, "completion_tokens": 1},
+        }
+
+    client = OpenAICompatClient(
+        base_url="http://x/v1",
+        extra_args={"guided_json": {"type": "object"}, "tool_choice": "required"},
+        transport=fake_transport,
+    )
+    client.messages.create(
+        model="m",
+        max_tokens=8,
+        messages=[{"role": "user", "content": "hi"}],
+        tools=[{"name": "t", "description": "d", "input_schema": {}}],
+    )
+    payload = captured["payload"]
+    assert payload["guided_json"] == {"type": "object"}
+    # extra_args is merged last, so a provider-specific value wins over the default.
+    assert payload["tool_choice"] == "required"
+
+
+def test_build_worker_local_pins_full_identity():
+    client, prov = build_worker(
+        "qwen2.5:7b",
+        base_url="http://localhost:11434/v1",
+        seed=7,
+        quant="Q4_K_M",
+        temperature=0.0,
+    )
+    assert isinstance(client, OpenAICompatClient)
+    assert prov == {
+        "worker_provider": "local",
+        "worker_base_url": "http://localhost:11434/v1",
+        "worker_temperature": 0.0,
+        "worker_seed": 7,
+        "worker_quant": "Q4_K_M",
+    }
+
+
+def test_build_worker_default_is_anthropic(monkeypatch):
+    import anthropic
+
+    sentinel = object()
+    monkeypatch.setattr(anthropic, "Anthropic", lambda: sentinel)
+    client, prov = build_worker("claude-opus-4-8")
+    assert client is sentinel
+    assert prov == {"worker_provider": "anthropic"}

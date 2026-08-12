@@ -13,7 +13,7 @@ from resgraph.evals.cli import app
 runner = CliRunner()
 
 
-def _row(scenario_id, scenario_type, dims):
+def _row(scenario_id, scenario_type, dims, model=None):
     return {
         "scenario_id": scenario_id,
         "scenario_type": scenario_type,
@@ -24,6 +24,7 @@ def _row(scenario_id, scenario_type, dims):
         "tokens": {"total": 1000},
         "cache_fingerprint": "abc",
         "degraded": False,
+        "model": model,
     }
 
 
@@ -110,9 +111,9 @@ def test_run_defaults_mean_no_cost_cap_and_preflight_on(monkeypatch, tmp_path):
     assert captured["judge_model"] is not None
 
 
-def _run_file(tmp_path, name, *, items=4, trials=3, passed=True):
+def _run_file(tmp_path, name, *, items=4, trials=3, passed=True, model=None):
     rows = [
-        _row(f"s{i}", "direct", {"found_top3": passed, "evidence": True})
+        _row(f"s{i}", "direct", {"found_top3": passed, "evidence": True}, model=model)
         for i in range(items)
         for _ in range(trials)
     ]
@@ -167,6 +168,18 @@ def test_gate_rejects_a_missing_baseline_as_a_usage_error(tmp_path):
     run_path = _run_file(tmp_path, "run.jsonl")
     result = runner.invoke(app, ["gate", str(run_path), "--baseline", str(tmp_path / "no.json")])
     assert result.exit_code == 2
+
+
+def test_gate_directory_skips_a_run_of_a_different_worker(tmp_path):
+    runs = tmp_path / "runs"
+    runs.mkdir()
+    opus = _run_file(runs, "20260101T000000Z.jsonl", model="claude-opus-4-8")
+    _run_file(runs, "20260201T000000Z.jsonl", model="qwen2.5:7b", passed=False)  # newer local arm
+    base = _baseline_file(tmp_path, opus)  # baseline carries model=claude-opus-4-8
+    result = runner.invoke(app, ["gate", str(runs), "--baseline", str(base)])
+    assert result.exit_code == 0
+    assert "worker qwen2.5:7b != baseline claude-opus-4-8" in result.output
+    assert "gating `20260101T000000Z.jsonl`" in result.output
 
 
 def _arm_file(tmp_path, name, model, passes):

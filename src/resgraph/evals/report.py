@@ -80,8 +80,12 @@ def aggregate(rows: list[dict[str, Any]]) -> dict[str, Any]:
     latencies = [row["latency_s"] for row in rows if row.get("latency_s") is not None]
     cache_rates = [row["cache_hit_rate"] for row in rows if row.get("cache_hit_rate") is not None]
     trials = max((len(v) for v in by_item.values()), default=0)
+    models = {r.get("model") for r in rows if r.get("model")}
     return {
         "items": len(by_item),
+        # the worker that produced the run; the gate compares it, so a run of a
+        # different worker is not a candidate against this baseline
+        "model": next(iter(models)) if len(models) == 1 else None,
         # the gate compares item sets, not just counts
         "item_ids": sorted(by_item),
         "rows": len(rows),

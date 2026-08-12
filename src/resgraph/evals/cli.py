@@ -117,3 +117,29 @@ def gate(
         raise typer.Exit(3)
     if not verdict.passed:
         raise typer.Exit(1)
+
+
+@app.command()
+def arms(
+    specs: list[str],
+    baseline: str = "opus",
+) -> None:
+    """Compare labeled arms of the same suite. Each SPEC is
+    label=run_file; the table shows pass^k, worker cost, and cost per
+    passed triage, with deltas against the --baseline arm.
+
+    Exit code 3 if the arms measure different item sets — a cost
+    comparison across different work is declined, not faked."""
+    from .arms import arm_summary, compare, render
+
+    summaries = []
+    for spec in specs:
+        if "=" not in spec:
+            raise typer.BadParameter(f"expected label=run_file, got {spec!r}")
+        label, path = spec.split("=", 1)
+        rows = [json.loads(line) for line in Path(path).read_text().splitlines() if line.strip()]
+        summaries.append(arm_summary(label, rows))
+    comparison = compare(summaries, baseline)
+    print(render(summaries, comparison))
+    if not comparison["comparable"]:
+        raise typer.Exit(3)

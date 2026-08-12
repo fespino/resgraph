@@ -858,6 +858,20 @@ judgment:
   new worker epoch: its failures get fresh attribution, never
   back-ported assumptions.
 
+**Operationalized 2026-08-12, run pending.** The runner already varies
+the worker model independently of the pinned judge; the missing piece
+was the comparison. `resgraph-evals arms label=run …` renders the
+cost-per-passed-triage table (worker cost ÷ items passing at k) with
+pass^k deltas against the Opus arm, and it DECLINES — the gate's
+comparability rule — if the arms do not cover the same item set, so a
+cost comparison across different work cannot be faked. Driver:
+`scripts/run-model-arms.sh`, which pilots one item per arm at k=1
+first (a wrong model id or a pricing gap is a $0 discovery, not a $3
+one). Cost ~$8.50 across the three arms; the pinned judge is a
+constant across arms and is excluded from the worker-cost comparison.
+Batches with the skill arm (same analysis, skill on/off is another
+arm) and the injection set (resistance by tier reuses these runs).
+
 ## Phase 9 — certification completion and probes
 
 ### k=3 certification — completed 2026-08-05, run `20260803T221121Z` (resumed 71 rows, ≈$10.63 worker estimate)

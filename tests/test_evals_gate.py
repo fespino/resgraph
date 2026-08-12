@@ -233,3 +233,15 @@ def test_render_verdict_md_has_a_titled_status_and_folds_details():
 
     undecided = render_verdict_md(GateVerdict(passed=False, undecided=True, undecided_reason="k=1"))
     assert undecided.startswith("## ⚠️ Eval gate — UNDECIDED")
+
+
+def test_gate_skip_reason_flags_an_empty_run():
+    from resgraph.evals.gate import gate_skip_reason
+
+    assert gate_skip_reason([]) == "empty"
+
+
+def test_render_skip_md_is_titled():
+    from resgraph.evals.gate import render_skip_md
+
+    assert render_skip_md("nothing here").startswith("## ⏭️ Eval gate — skipped")

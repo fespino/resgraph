@@ -303,8 +303,8 @@ def build_client(setup: dict[str, Any]) -> tuple[Any, dict[str, Any]]:
             "setup carries an inline api_key; keep the secret in the environment "
             "and name it with api_key_env instead"
         )
-    provider = setup.get("provider")
-    client = CLIENTS.get(provider or "", _build_chat_completions)(setup)
+    provider = setup.get("provider", "default")
+    client = CLIENTS.get(provider, _build_chat_completions)(setup)
     meta: dict[str, Any] = {"provider": provider}
     if setup.get("name"):
         meta["setup"] = setup["name"]

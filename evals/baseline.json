@@ -1,5 +1,6 @@
 {
   "items": 30,
+  "model": "claude-opus-4-8",
   "item_ids": [
     "ambiguous-s42006",
     "ambiguous-s42012",

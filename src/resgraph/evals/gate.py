@@ -32,10 +32,17 @@ def _run_trials(rows: list[dict[str, Any]]) -> int:
     return max(counts.values(), default=0)
 
 
-def gate_skip_reason(rows: list[dict[str, Any]]) -> str:
+def _row_model(rows: list[dict[str, Any]]) -> str | None:
+    models = {r.get("model") for r in rows if r.get("model")}
+    return next(iter(models)) if len(models) == 1 else None
+
+
+def gate_skip_reason(rows: list[dict[str, Any]], baseline_model: str | None = None) -> str:
     """Empty when this run is a gate candidate; otherwise why it is not.
-    Both companion sets and sub-k runs are "not a gate candidate" (D29b),
-    so selection skips past both to find the newest run it can verdict."""
+    Companion sets, sub-k runs, and runs of a different worker than the
+    baseline are all "not a gate candidate" (D29b/D29c), so selection skips
+    past them to find the newest run it can verdict — a weaker local worker is
+    an `arms` comparison, not a regression against the certified baseline."""
     if not rows:
         return "empty"
     if is_companion_only(rows):
@@ -43,6 +50,9 @@ def gate_skip_reason(rows: list[dict[str, Any]]) -> str:
     trials = _run_trials(rows)
     if trials < MIN_TRIALS:
         return f"k={trials}<{MIN_TRIALS}"
+    run_model = _row_model(rows)
+    if baseline_model and run_model and run_model != baseline_model:
+        return f"worker {run_model} != baseline {baseline_model}"
     return ""
 
 
@@ -70,7 +80,11 @@ def evaluate(
 ) -> GateVerdict:
     """Compare an aggregated run against the baseline. `run` and
     `baseline` are `report.aggregate` outputs."""
-    reason = _not_comparable(run, baseline) or _too_few_trials(run, min_trials)
+    reason = (
+        _not_comparable(run, baseline)
+        or _too_few_trials(run, min_trials)
+        or _worker_mismatch(run, baseline)
+    )
     if reason:
         return GateVerdict(
             passed=False,
@@ -160,6 +174,16 @@ def _too_few_trials(run: dict[str, Any], min_trials: int) -> str:
         "(certification measured a 20% single-trial flip rate — a k=1 diff on "
         "marginal items reads noise, #137)"
     )
+
+
+def _worker_mismatch(run: dict[str, Any], baseline: dict[str, Any]) -> str:
+    run_model, base_model = run.get("model"), baseline.get("model")
+    if run_model and base_model and run_model != base_model:
+        return (
+            f"run worker {run_model!r} differs from the baseline's {base_model!r} — "
+            "compare a different worker with `arms`, not against this baseline"
+        )
+    return ""
 
 
 def _new_slice_warning(name: str) -> str:

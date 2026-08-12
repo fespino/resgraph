@@ -241,6 +241,21 @@ def test_gate_skip_reason_flags_an_empty_run():
     assert gate_skip_reason([]) == "empty"
 
 
+def test_gate_skip_reason_flags_a_run_of_a_different_worker():
+    from resgraph.evals.gate import gate_skip_reason
+
+    rows = [{"scenario_id": "s0", "tags": [], "model": "qwen2.5:7b"} for _ in range(3)]
+    assert gate_skip_reason(rows, "claude-opus-4-8").startswith("worker qwen2.5:7b")
+    assert gate_skip_reason(rows, "qwen2.5:7b") == ""  # matching worker gates normally
+    assert gate_skip_reason(rows) == ""  # no baseline worker known -> not checked
+
+
+def test_evaluate_declines_a_run_of_a_different_worker():
+    verdict = evaluate(run(model="qwen2.5:7b"), run(model="claude-opus-4-8"))
+    assert verdict.undecided
+    assert "qwen2.5:7b" in verdict.undecided_reason and "arms" in verdict.undecided_reason
+
+
 def test_render_skip_md_is_titled():
     from resgraph.evals.gate import render_skip_md
 

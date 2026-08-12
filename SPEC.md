@@ -1720,6 +1720,17 @@ The release-gate half of D29, consuming the certified k=3 baseline.
   exists to catch must not be skipped past. With no gateable run
   committed, the gate reports "nothing to gate" rather than declining
   on an old run nobody touched.
+- **A different worker is not a regression (D29c).** Once the worker is
+  pluggable, a local arm run of the base dataset has the same item set
+  and slices as the certified run, so the gate would read its lower
+  pass^k as a regression and block. It is not one — a weaker cheaper
+  worker is an `arms` comparison, not a baseline breach. `aggregate`
+  therefore records the run's worker `model`, the baseline records the
+  worker it was certified on, and selection skips a run whose worker
+  differs (naming it, like a companion set); a direct file gated against
+  a foreign-worker baseline declines rather than blocks, pointing at
+  `arms`. The gate defends whatever worker the baseline was certified on;
+  everything else compares through `arms`.
 - **Flap floor (#137):** the gate declines to verdict a run below
   k=3 — certification measured a 20% single-trial item-flip rate, so
   a k=1 diff on marginal items reads noise. Declined is distinct

@@ -114,10 +114,13 @@ def report(
     print(render(aggregate(rows), base))
 
 
-def _newest_gateable(run_dir: Path) -> tuple[Path | None, list[str]]:
+def _newest_gateable(
+    run_dir: Path, baseline_model: str | None = None
+) -> tuple[Path | None, list[str]]:
     """Newest run the gate can actually verdict, and the runs skipped to
-    reach it (each with why — companion set or too few trials). Filenames
-    are timestamps, so reverse-sorted is newest-first."""
+    reach it (each with why — companion set, too few trials, or a different
+    worker than the baseline). Filenames are timestamps, so reverse-sorted is
+    newest-first."""
     from .gate import gate_skip_reason
 
     skipped: list[str] = []
@@ -126,7 +129,7 @@ def _newest_gateable(run_dir: Path) -> tuple[Path | None, list[str]]:
             rows = [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
         except (OSError, ValueError):
             continue
-        reason = gate_skip_reason(rows)
+        reason = gate_skip_reason(rows, baseline_model)
         if reason:
             skipped.append(f"{path.name} ({reason})")
             continue
@@ -150,9 +153,11 @@ def gate(
 
     RUN_PATH may be a run file or a directory of runs; a directory
     selects the newest GATEABLE run — companion-set runs (their own
-    dataset and slice) are skipped, and the skipped list is named in the
-    output. A base run whose dataset drifted is not companion-only, so
-    it is still selected and declines loudly.
+    dataset and slice) and runs of a different worker than the baseline
+    (a local arm is an `arms` comparison, not a regression) are skipped,
+    and the skipped list is named in the output. A base run whose dataset
+    drifted is not companion-only, so it is still selected and declines
+    loudly.
 
     Exit codes: 0 passed (or nothing gateable), 1 blocked, 3 declined
     (cannot verdict), 4 evidence unreadable."""
@@ -162,10 +167,16 @@ def gate(
     baseline_path = Path(baseline)
     if not baseline_path.exists():
         raise typer.BadParameter(f"no baseline at {baseline}; nothing to gate against")
+    try:
+        base = json.loads(baseline_path.read_text())
+    except (OSError, ValueError) as exc:
+        detail = f"cannot read the baseline: {exc}"
+        print(render_skip_md(f"**ERROR** — {detail}") if md else f"EVAL GATE: ERROR — {detail}")
+        raise typer.Exit(4) from exc
     target = Path(run_path)
     note = ""
     if target.is_dir():
-        selected, skipped = _newest_gateable(target)
+        selected, skipped = _newest_gateable(target, base.get("model"))
         if selected is None:
             msg = (
                 "No gateable run committed — companion sets and sub-k runs are not gate "
@@ -182,7 +193,6 @@ def gate(
         target = selected
     try:
         rows = [json.loads(line) for line in target.read_text().splitlines() if line.strip()]
-        base = json.loads(baseline_path.read_text())
     except (OSError, ValueError) as exc:
         detail = f"cannot read the evidence: {exc}"
         print(render_skip_md(f"**ERROR** — {detail}") if md else f"EVAL GATE: ERROR — {detail}")

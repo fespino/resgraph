@@ -267,7 +267,15 @@ def render_verdict_md(verdict: GateVerdict, *, note: str = "") -> str:
     parts = [f"## {emoji} Eval gate — {label}", ""]
     if note:
         parts += [note, ""]
-    parts += ["<details><summary>details</summary>", "", "```", render_verdict(verdict), "```", "", "</details>"]
+    parts += [
+        "<details><summary>details</summary>",
+        "",
+        "```",
+        render_verdict(verdict),
+        "```",
+        "",
+        "</details>",
+    ]
     return "\n".join(parts)
 
 

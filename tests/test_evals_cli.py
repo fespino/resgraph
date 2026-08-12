@@ -270,7 +270,7 @@ def test_gate_directory_skips_companion_runs_and_gates_the_base(tmp_path):
     result = runner.invoke(app, ["gate", str(runs), "--baseline", str(baseline)])
     assert result.exit_code == 0
     assert "skipped 1 non-gateable run" in result.output and "companion-set" in result.output
-    assert "gating 20260101T000000Z.jsonl" in result.output
+    assert "gating `20260101T000000Z.jsonl`" in result.output
 
 
 def test_gate_directory_declines_a_drifted_base_run_it_must_not_skip(tmp_path):
@@ -292,7 +292,7 @@ def test_gate_directory_with_only_companion_runs_skips(tmp_path):
     baseline = _baseline_file(tmp_path, _base_run(tmp_path, "seed.jsonl"))
     result = runner.invoke(app, ["gate", str(runs), "--baseline", str(baseline)])
     assert result.exit_code == 0
-    assert "no gateable run" in result.output
+    assert "No gateable run" in result.output
 
 
 def test_gate_directory_skips_a_sub_k_base_run_to_find_a_verdictable_one(tmp_path):
@@ -303,4 +303,4 @@ def test_gate_directory_skips_a_sub_k_base_run_to_find_a_verdictable_one(tmp_pat
     baseline = _baseline_file(tmp_path, base)
     result = runner.invoke(app, ["gate", str(runs), "--baseline", str(baseline)])
     assert result.exit_code == 0
-    assert "k=1<3" in result.output and "gating 20260101T000000Z.jsonl" in result.output
+    assert "k=1<3" in result.output and "gating `20260101T000000Z.jsonl`" in result.output

@@ -185,6 +185,7 @@ class _Messages:
         temperature: float,
         seed: int | None,
         tool_choice: str,
+        extra_args: dict[str, Any],
         transport: Transport,
     ) -> None:
         self._url = url
@@ -192,6 +193,7 @@ class _Messages:
         self._temperature = temperature
         self._seed = seed
         self._tool_choice = tool_choice
+        self._extra_args = extra_args
         self._transport = transport
 
     def create(
@@ -204,8 +206,11 @@ class _Messages:
         tools: list[dict[str, Any]] | None = None,
         **_ignored: Any,
     ) -> Response:
-        # _ignored absorbs Anthropic-only kwargs (e.g. thinking) the harness
-        # passes; a local model neither accepts nor needs them.
+        # Provider-specific FORWARD args (e.g. constrained/grammar decoding for
+        # tool calls) travel through extra_args, merged last so they can set or
+        # override request fields. _ignored drops Anthropic-only kwargs (e.g.
+        # thinking) the shared harness may still pass, which this backend has no
+        # equivalent for.
         payload: dict[str, Any] = {
             "model": model,
             "max_tokens": max_tokens,
@@ -217,6 +222,7 @@ class _Messages:
         if tools:
             payload["tools"] = to_openai_tools(tools)
             payload["tool_choice"] = self._tool_choice
+        payload.update(self._extra_args)
         headers = {"Authorization": f"Bearer {self._api_key}"} if self._api_key else {}
         return from_openai_response(self._transport(self._url, payload, headers))
 
@@ -232,6 +238,7 @@ class OpenAICompatClient:
         temperature: float = 0.0,
         seed: int | None = None,
         tool_choice: str = "auto",
+        extra_args: dict[str, Any] | None = None,
         transport: Transport | None = None,
     ) -> None:
         self.messages = _Messages(
@@ -240,5 +247,46 @@ class OpenAICompatClient:
             temperature=temperature,
             seed=seed,
             tool_choice=tool_choice,
+            extra_args=extra_args or {},
             transport=transport or _httpx_transport,
         )
+
+
+def build_worker(
+    model: str,
+    *,
+    base_url: str = "",
+    api_key: str | None = None,
+    temperature: float = 0.0,
+    seed: int | None = None,
+    quant: str = "",
+    tool_choice: str = "auto",
+    extra_args: dict[str, Any] | None = None,
+) -> tuple[Any, dict[str, Any]]:
+    """Resolve the worker client and its provenance. An empty ``base_url`` means
+    the Anthropic SDK — today's default worker. A ``base_url`` points the worker
+    at a local OpenAI-compatible endpoint and pins its full identity into the
+    provenance the runner records per row, so the local daily baseline cannot
+    drift underneath the periodic Anthropic reference. The judge is resolved
+    separately by the caller and never follows the worker through here.
+    """
+    if not base_url:
+        from anthropic import Anthropic
+
+        return Anthropic(), {"worker_provider": "anthropic"}
+    client = OpenAICompatClient(
+        base_url=base_url,
+        api_key=api_key,
+        temperature=temperature,
+        seed=seed,
+        tool_choice=tool_choice,
+        extra_args=extra_args,
+    )
+    provenance = {
+        "worker_provider": "local",
+        "worker_base_url": base_url,
+        "worker_temperature": temperature,
+        "worker_seed": seed,
+        "worker_quant": quant or None,
+    }
+    return client, provenance

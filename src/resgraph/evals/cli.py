@@ -28,6 +28,10 @@ def run(
     max_item_seconds: float = 0.0,
     judge_daily_cap: float = 10.0,
     no_skill: bool = False,
+    worker_base_url: str = "",
+    worker_seed: int = 0,
+    worker_quant: str = "",
+    worker_tool_choice: str = "auto",
 ) -> None:
     """Run every scenario x trials against docker stores + the API;
     one JSONL row per (item, trial) lands in out_dir. --resume PATH
@@ -41,25 +45,39 @@ def run(
     playbook from the prefix (a labeled fingerprint change, the skill
     arm). Run with a project-scoped API key that carries its own spend
     cap — the key is read from the environment and never written
-    anywhere."""
+    anywhere. --worker-base-url points the worker at a local
+    OpenAI-compatible endpoint (the judge stays on Anthropic); the
+    worker is then unpriced and its identity — seed, quant, temperature
+    — is pinned into every row (D29c). A local worker never sends
+    thinking, which that backend has no equivalent for."""
     from anthropic import Anthropic
 
     from resgraph.graph.client import get_driver
 
+    from .providers import build_worker
     from .runner import load_scenarios, run_eval
 
+    local = bool(worker_base_url)
+    worker_client, provenance = build_worker(
+        model,
+        base_url=worker_base_url,
+        seed=worker_seed or None,
+        quant=worker_quant,
+        tool_choice=worker_tool_choice,
+    )
+    judge_client = None if no_judge else Anthropic()
     driver = get_driver()
     driver.verify_connectivity()
     out = run_eval(
         load_scenarios(Path(scenarios)),
-        Anthropic(),
+        worker_client,
         driver,
         model=model,
         judge_model=None if no_judge else judge_model,
         trials=trials,
         out_dir=Path(out_dir),
         max_tool_calls=max_tool_calls,
-        thinking={"type": "adaptive"} if thinking == "adaptive" else None,
+        thinking=None if local else ({"type": "adaptive"} if thinking == "adaptive" else None),
         resume_path=Path(resume) if resume else None,
         max_cost=max_cost or None,
         skip_preflight=skip_preflight,
@@ -67,6 +85,9 @@ def run(
         max_item_seconds=max_item_seconds or None,
         judge_daily_cap=judge_daily_cap,
         with_skill=not no_skill,
+        judge_client=judge_client,
+        provenance=provenance,
+        price_worker=not local,
     )
     print(out)
 

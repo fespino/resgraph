@@ -1,30 +1,34 @@
-# Named worker setups for the eval harness (--worker NAME).
+# Named client setups for the eval harness (--worker NAME, --judge NAME).
 #
-# The setup name is the arm label and the provenance recorded on every row.
-# Secrets never live here: API keys come from the environment
-# (ANTHROPIC_API_KEY, or RESGRAPH_LOCAL_API_KEY for an endpoint that needs one).
-# A setup with no base_url runs on the Anthropic SDK; one with a base_url runs
-# against a chat-completions endpoint, wherever it lives (localhost or remote).
+# `provider` picks the client. Anthropic has its own (native prompt caching and
+# thinking, which the harness relies on); every other provider speaks the OpenAI
+# chat-completions API and shares one client, so adding one is a config entry —
+# base_url + which env var holds its key — not code. The setup name is the arm
+# label and the provenance recorded per row.
+#
+# Secrets never live here: keys come from the environment. `api_key_env` names
+# the variable; never paste the value. Local endpoints usually need no key.
 
 opus:
+  provider: anthropic
   model: claude-opus-4-8
 
 sonnet:
+  provider: anthropic
   model: claude-sonnet-4-6
 
 # A hosted chat-completions provider — OpenAI, OpenRouter, a cloud endpoint.
-# Same adapter as a local model: only base_url and which env var holds the key
-# change. Adding a provider is a config entry, not code. The key lives in the
-# environment; api_key_env names it — never paste the value here.
 openai:
+  provider: openai
   model: gpt-4o
   base_url: https://api.openai.com/v1
   api_key_env: OPENAI_API_KEY
 
-# A self-hosted model, on localhost or a remote GPU — same setup, only the URL
+# A self-hosted model, on localhost or a remote GPU — same client, only the URL
 # changes. tool_choice: required forces a tool call (the constrained-decoding
 # lever); add extra_args (e.g. guided_json) if the model emits malformed calls.
 qwen-local:
+  provider: ollama
   model: qwen2.5:7b
   base_url: http://localhost:11434/v1
   temperature: 0

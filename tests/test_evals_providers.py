@@ -9,9 +9,9 @@ from resgraph.evals.providers import (
     ChatCompletionsClient,
     TextBlock,
     ToolUseBlock,
-    build_worker,
+    build_client,
     from_chat_response,
-    load_worker,
+    load_setup,
     to_chat_messages,
     to_chat_tools,
 )
@@ -256,64 +256,70 @@ def test_extra_args_merge_into_the_payload():
     assert payload["tool_choice"] == "required"
 
 
-def test_build_worker_endpoint_pins_full_identity():
-    # A chat-completions endpoint, whether on localhost or a remote GPU.
+def test_build_client_endpoint_pins_full_identity():
     setup = {
         "name": "qwen-remote",
+        "provider": "ollama",
         "model": "qwen2.5:7b",
         "base_url": "http://a-remote-gpu:8000/v1",
         "seed": 7,
         "quant": "Q4_K_M",
         "temperature": 0,
     }
-    client, prov = build_worker(setup)
+    client, meta = build_client(setup)
     assert isinstance(client, ChatCompletionsClient)
-    assert prov == {
-        "worker_setup": "qwen-remote",
-        "worker_base_url": "http://a-remote-gpu:8000/v1",
-        "worker_temperature": 0,
-        "worker_seed": 7,
-        "worker_quant": "Q4_K_M",
+    assert meta == {
+        "provider": "ollama",
+        "setup": "qwen-remote",
+        "base_url": "http://a-remote-gpu:8000/v1",
+        "temperature": 0,
+        "seed": 7,
+        "quant": "Q4_K_M",
     }
 
 
-def test_build_worker_anthropic_records_only_the_setup_name(monkeypatch):
+def test_build_client_anthropic_records_provider_and_setup(monkeypatch):
     import anthropic
 
     sentinel = object()
     monkeypatch.setattr(anthropic, "Anthropic", lambda: sentinel)
-    client, prov = build_worker({"name": "opus", "model": "claude-opus-4-8"})
+    client, meta = build_client(
+        {"name": "opus", "provider": "anthropic", "model": "claude-opus-4-8"}
+    )
     assert client is sentinel
-    assert prov == {"worker_setup": "opus"}
+    assert meta == {"provider": "anthropic", "setup": "opus"}
 
 
-def test_build_worker_anonymous_default_records_nothing_extra(monkeypatch):
-    import anthropic
-
-    monkeypatch.setattr(anthropic, "Anthropic", lambda: object())
-    _, prov = build_worker({"model": "claude-opus-4-8"})  # no name -> the model says it all
-    assert prov == {}
+def test_unknown_provider_falls_back_to_chat_completions():
+    client, meta = build_client({"provider": "together", "model": "x", "base_url": "http://x/v1"})
+    assert isinstance(client, ChatCompletionsClient)
+    assert meta["provider"] == "together"
 
 
-def test_load_worker_reads_a_named_setup(tmp_path):
+def test_chat_provider_without_a_base_url_is_rejected():
+    with pytest.raises(SystemExit, match="needs a base_url"):
+        build_client({"name": "oops", "provider": "openai", "model": "gpt-4o"})
+
+
+def test_load_setup_reads_a_named_setup(tmp_path):
     cfg = tmp_path / "workers.yaml"
-    cfg.write_text("qwen-local:\n  model: qwen2.5:7b\n  base_url: http://localhost:11434/v1\n")
-    setup = load_worker("qwen-local", cfg)
-    assert setup == {
-        "name": "qwen-local",
+    cfg.write_text("qwen:\n  provider: ollama\n  model: qwen2.5:7b\n  base_url: http://x/v1\n")
+    assert load_setup("qwen", cfg) == {
+        "name": "qwen",
+        "provider": "ollama",
         "model": "qwen2.5:7b",
-        "base_url": "http://localhost:11434/v1",
+        "base_url": "http://x/v1",
     }
 
 
-def test_load_worker_rejects_an_unknown_setup(tmp_path):
+def test_load_setup_rejects_an_unknown_name(tmp_path):
     cfg = tmp_path / "workers.yaml"
-    cfg.write_text("opus:\n  model: claude-opus-4-8\n")
-    with pytest.raises(SystemExit, match="no worker setup 'nope'"):
-        load_worker("nope", cfg)
+    cfg.write_text("opus:\n  provider: anthropic\n  model: claude-opus-4-8\n")
+    with pytest.raises(SystemExit, match="no setup 'nope'"):
+        load_setup("nope", cfg)
 
 
-def test_build_worker_reads_the_key_from_the_named_env_var(monkeypatch):
+def test_build_client_reads_the_key_from_the_named_env_var(monkeypatch):
     monkeypatch.setenv("SOME_PROVIDER_KEY", "sk-from-env")
     captured: dict[str, object] = {}
     import resgraph.evals.providers as providers
@@ -321,9 +327,10 @@ def test_build_worker_reads_the_key_from_the_named_env_var(monkeypatch):
     monkeypatch.setattr(
         providers, "ChatCompletionsClient", lambda **kw: captured.update(kw) or object()
     )
-    build_worker(
+    build_client(
         {
             "name": "hosted",
+            "provider": "openai",
             "model": "gpt-4o",
             "base_url": "https://api.example.com/v1",
             "api_key_env": "SOME_PROVIDER_KEY",
@@ -332,8 +339,13 @@ def test_build_worker_reads_the_key_from_the_named_env_var(monkeypatch):
     assert captured["api_key"] == "sk-from-env"
 
 
-def test_build_worker_refuses_an_inline_secret():
+def test_build_client_refuses_an_inline_secret():
     with pytest.raises(SystemExit, match="api_key_env"):
-        build_worker(
-            {"name": "leaky", "model": "gpt-4o", "base_url": "http://x/v1", "api_key": "sk-leak"}
+        build_client(
+            {
+                "provider": "openai",
+                "model": "gpt-4o",
+                "base_url": "http://x/v1",
+                "api_key": "sk-leak",
+            }
         )

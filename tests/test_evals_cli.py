@@ -69,6 +69,35 @@ def test_run_wires_flags_into_run_eval(monkeypatch, tmp_path):
     assert captured["n_scenarios"] == 30
 
 
+def test_run_resolves_worker_and_judge_from_setups(monkeypatch, tmp_path):
+    cfg = tmp_path / "w.yaml"
+    cfg.write_text(
+        "qwen:\n  provider: ollama\n  model: qwen2.5:7b\n  base_url: http://x/v1\n"
+        "opus:\n  provider: anthropic\n  model: claude-opus-4-8\n"
+    )
+    captured = {}
+    _stub_run(monkeypatch, tmp_path, captured)
+    result = runner.invoke(
+        app,
+        [
+            "run",
+            "--worker",
+            "qwen",
+            "--judge",
+            "opus",
+            "--workers-config",
+            str(cfg),
+            "--trials",
+            "1",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert captured["model"] == "qwen2.5:7b"
+    assert captured["judge_model"] == "claude-opus-4-8"
+    assert captured["provenance"]["worker_provider"] == "ollama"
+    assert captured["provenance"]["judge_provider"] == "anthropic"
+
+
 def test_run_defaults_mean_no_cost_cap_and_preflight_on(monkeypatch, tmp_path):
     captured = {}
     _stub_run(monkeypatch, tmp_path, captured)

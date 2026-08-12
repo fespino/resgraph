@@ -255,38 +255,30 @@ class ChatCompletionsClient:
         )
 
 
-def load_worker(name: str, path: Path) -> dict[str, Any]:
-    """Read a named worker setup from the YAML config. Secrets are never here —
-    API keys come from the environment; the file holds only model, endpoint, and
-    determinism knobs."""
+def load_setup(name: str, path: Path) -> dict[str, Any]:
+    """Read a named client setup from the YAML config. Secrets are never here —
+    keys come from the environment (``api_key_env`` names the variable); the file
+    holds only provider, model, endpoint, and determinism knobs."""
     setups = yaml.safe_load(path.read_text()) or {}
     if name not in setups:
-        raise SystemExit(f"no worker setup {name!r} in {path}; have: {', '.join(sorted(setups))}")
+        raise SystemExit(f"no setup {name!r} in {path}; have: {', '.join(sorted(setups))}")
     return {"name": name, **setups[name]}
 
 
-def build_worker(setup: dict[str, Any]) -> tuple[Any, dict[str, Any]]:
-    """Resolve a worker client and its provenance from a setup dict (one entry of
-    the workers config). No ``base_url`` means the Anthropic SDK; a ``base_url``
-    runs the worker against a chat-completions endpoint, wherever it lives — so a
-    new provider (OpenAI, OpenRouter, a hosted endpoint) is a config entry, not
-    code. The credential is named by env var (``api_key_env``), never inline, so
-    a secret never lands in the file. The setup name is the provenance handle;
-    the model and judge are recorded/resolved elsewhere.
-    """
-    if "api_key" in setup:
-        raise SystemExit(
-            "worker setup carries an inline api_key; keep the secret in the "
-            "environment and name it with api_key_env instead"
-        )
-    name = setup.get("name")
-    base_url = setup.get("base_url", "")
-    if not base_url:
-        from anthropic import Anthropic
+def _build_anthropic(setup: dict[str, Any]) -> Any:
+    from anthropic import Anthropic
 
-        return Anthropic(), ({"worker_setup": name} if name else {})
+    return Anthropic()
+
+
+def _build_chat_completions(setup: dict[str, Any]) -> Any:
+    base_url = setup.get("base_url")
+    if not base_url:
+        raise SystemExit(
+            f"setup {setup.get('name')!r} (provider {setup.get('provider')!r}) needs a base_url"
+        )
     key_env = setup.get("api_key_env")
-    client = ChatCompletionsClient(
+    return ChatCompletionsClient(
         base_url=base_url,
         api_key=os.environ.get(key_env) if key_env else None,
         temperature=setup.get("temperature", 0.0),
@@ -294,12 +286,33 @@ def build_worker(setup: dict[str, Any]) -> tuple[Any, dict[str, Any]]:
         tool_choice=setup.get("tool_choice", "auto"),
         extra_args=setup.get("extra_args"),
     )
-    provenance: dict[str, Any] = {
-        "worker_base_url": base_url,
-        "worker_temperature": setup.get("temperature", 0.0),
-        "worker_seed": setup.get("seed"),
-        "worker_quant": setup.get("quant"),
-    }
-    if name:
-        provenance = {"worker_setup": name, **provenance}
-    return client, provenance
+
+
+# Only Anthropic needs its own entry — its messages API carries caching and
+# thinking the harness uses; every other provider falls through to chat-completions.
+CLIENTS: dict[str, Callable[[dict[str, Any]], Any]] = {"anthropic": _build_anthropic}
+
+
+def build_client(setup: dict[str, Any]) -> tuple[Any, dict[str, Any]]:
+    """Resolve a client and its provenance from a setup, picking by ``provider``
+    and falling back to chat-completions for anything without its own builder.
+    Role-neutral — worker or judge resolve the same way, so the judge is not tied
+    to a provider (the caller keeps it constant across arms)."""
+    if "api_key" in setup:
+        raise SystemExit(
+            "setup carries an inline api_key; keep the secret in the environment "
+            "and name it with api_key_env instead"
+        )
+    provider = setup.get("provider")
+    client = CLIENTS.get(provider or "", _build_chat_completions)(setup)
+    meta: dict[str, Any] = {"provider": provider}
+    if setup.get("name"):
+        meta["setup"] = setup["name"]
+    if setup.get("base_url"):
+        meta |= {
+            "base_url": setup["base_url"],
+            "temperature": setup.get("temperature", 0.0),
+            "seed": setup.get("seed"),
+            "quant": setup.get("quant"),
+        }
+    return client, meta

@@ -1777,6 +1777,68 @@ fabrications (the honesty property is not a threshold to negotiate).
 per-PR suite runs viable — the gate mechanism is unchanged, only its
 trigger moves from committed-run to fresh-run.
 
+## D29c — The eval worker is provider-pluggable; local is the daily driver, Anthropic the reference arm (phase 10)
+
+The cluster prices a worker, and everything downstream of a run —
+aggregation, the D29b gate, the `arms` comparison, the skill-value
+ledger — reads JSONL rows and is blind to what produced them. The
+instrument is already model-agnostic; only the runner's client
+construction and its tool shaping are not. So the worker becomes
+pluggable and the daily loop stops paying API tokens for the *worker*
+(#192). The judge is the asterisk: pinned on Opus by the confound
+guardrail below, it is a deliberate Anthropic cost on the reference
+runs and on any run that grades the narrative dimension — the daily
+loop is free only when it runs the deterministic graders
+(`--no-judge`). Free worker, judge on demand.
+
+- **The seam is an in-process client factory, not a gateway.** The
+  runner selects its worker by spec: an Anthropic model → the Anthropic
+  SDK; a local model → an OpenAI-compatible `base_url` (local engines
+  already speak `/v1/chat/completions`). TLS, auth, and rate limiting
+  are network-front-door concerns a single-user `localhost` process
+  does not have — that is D30's gateway, a different layer. This
+  decision imports only the swappable-backend abstraction, not the
+  serving plumbing.
+- **Per-role resolution.** Worker and judge resolve independently —
+  `--model` may point the worker at a local endpoint while
+  `--judge-model` keeps the judge on Anthropic. The runner already
+  separates the two; the factory preserves that so the judge-pin (the
+  model-arms discipline) is structural, not remembered. **Rejected:** a
+  single global provider switch — it lets the judge silently follow the
+  worker to local and corrupts every baseline.
+- **The tool surface is the real work; "nothing downstream changes" is
+  true only of the rows.** resgraph is built to Anthropic's
+  `tool_use`/`tool_result` blocks; the OpenAI-compatible shape is
+  `tool_calls`/`role:tool`. The transport needs no shim, but the tool
+  definitions and the tool-call parsing need an adapter between the two
+  shapes. Scope is factory + tool-surface adapter, not a factory alone.
+- **The re-centering.** The local worker is the daily driver (free with
+  deterministic graders); Anthropic (Opus) is a periodic reference arm,
+  compared on the SAME item set via `arms` (cost per passed triage) to
+  answer "how much better, and worth it when." The barbell: own the
+  small model, rent the frontier by the token.
+
+**Invariants that keep the cheap loop honest.** Provenance is recorded
+in full per row — provider + model + quant + temperature + seed — so
+the local baseline cannot drift silently under the reference. A
+measured run pins its worker with **no failover**: local-down fails
+loudly, because a silent fallback to Opus both spends unintended money
+and confounds the comparison the design exists to make (failover is a
+gateway feature and a bug here). Constrained/grammar decoding for tool
+calls removes "the small model emitted malformed JSON" as a failure
+mode that otherwise masquerades as a harness bug; and the local worker
+must be capable enough to exercise the paths — tools, the injection
+slice, the deferral terminal state — or "harness bug" and "the model
+cannot" are indistinguishable, which makes the reference run
+dual-purpose: cost calibration AND harness calibration.
+
+**Relationship:** this is the adapter seam D30's gateway reuses ("one
+base-URL change"), pulled ahead so the cheap loop lands without the
+serving build. It generalizes #100 (model arms) from Anthropic-tier
+arms to any worker. **Rejected:** silent worker substitution to cut
+cost — it changes what the numbers describe rather than measuring the
+same thing cheaper; the re-centering is explicit and by design.
+
 ## Phase contracts
 - The generator MUST emit D2 messages exactly and expose `--seed`
   for reproducibility.

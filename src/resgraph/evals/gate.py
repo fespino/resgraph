@@ -251,3 +251,25 @@ def render_verdict(verdict: GateVerdict) -> str:
         lines += _slice_table(verdict.run, verdict.baseline, verdict.slice_drop)
         lines += _failing(verdict.run)
     return "\n".join(lines)
+
+
+def verdict_status(verdict: GateVerdict) -> tuple[str, str]:
+    if verdict.undecided:
+        return "UNDECIDED", "⚠️"
+    return ("PASS", "✅") if verdict.passed else ("BLOCK", "❌")
+
+
+def render_verdict_md(verdict: GateVerdict, *, note: str = "") -> str:
+    """A titled Markdown comment so the gate reads like the other PR
+    diagnostics: a status heading, the selection note, and the full
+    text detail folded into a monospace block that keeps the table."""
+    label, emoji = verdict_status(verdict)
+    parts = [f"## {emoji} Eval gate — {label}", ""]
+    if note:
+        parts += [note, ""]
+    parts += ["<details><summary>details</summary>", "", "```", render_verdict(verdict), "```", "", "</details>"]
+    return "\n".join(parts)
+
+
+def render_skip_md(message: str) -> str:
+    return f"## ⏭️ Eval gate — skipped\n\n{message}"

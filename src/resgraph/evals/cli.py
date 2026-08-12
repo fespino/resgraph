@@ -111,6 +111,7 @@ def _newest_gateable(run_dir: Path) -> tuple[Path | None, list[str]]:
 def gate(
     run_path: str,
     baseline: str = "evals/baseline.json",
+    md: bool = False,
 ) -> None:
     """Block a merge on an eval regression (D29b). Aggregates the run,
     compares it to the committed baseline, prints the verdict.
@@ -128,33 +129,37 @@ def gate(
 
     Exit codes: 0 passed (or nothing gateable), 1 blocked, 3 declined
     (cannot verdict), 4 evidence unreadable."""
-    from .gate import evaluate, render_verdict
+    from .gate import evaluate, render_skip_md, render_verdict, render_verdict_md
     from .report import aggregate
 
     baseline_path = Path(baseline)
     if not baseline_path.exists():
         raise typer.BadParameter(f"no baseline at {baseline}; nothing to gate against")
     target = Path(run_path)
+    note = ""
     if target.is_dir():
         selected, skipped = _newest_gateable(target)
         if selected is None:
-            print(
-                "EVAL GATE: no gateable run committed (companion sets and sub-k runs "
-                "are not gate candidates) — skipping"
+            msg = (
+                "No gateable run committed — companion sets and sub-k runs are not gate "
+                "candidates. A behavior change ships its own k=3 run of the base dataset."
             )
+            print(render_skip_md(msg) if md else f"EVAL GATE: {msg}")
             return
-        if skipped:
-            print(f"skipped {len(skipped)} non-gateable run(s): {', '.join(skipped)}")
-        print(f"gating {selected.name}")
+        note = (f"skipped {len(skipped)} non-gateable run(s): {', '.join(skipped)}\n" if skipped else "")
+        note += f"gating `{selected.name}`"
+        if not md:
+            print(note)
         target = selected
     try:
         rows = [json.loads(line) for line in target.read_text().splitlines() if line.strip()]
         base = json.loads(baseline_path.read_text())
     except (OSError, ValueError) as exc:
-        print(f"EVAL GATE: ERROR — cannot read the evidence: {exc}")
+        detail = f"cannot read the evidence: {exc}"
+        print(render_skip_md(f"**ERROR** — {detail}") if md else f"EVAL GATE: ERROR — {detail}")
         raise typer.Exit(4) from exc
     verdict = evaluate(aggregate(rows), base)
-    print(render_verdict(verdict))
+    print(render_verdict_md(verdict, note=note) if md else render_verdict(verdict))
     if verdict.undecided:
         raise typer.Exit(3)
     if not verdict.passed:

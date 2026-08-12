@@ -57,6 +57,32 @@ def test_prefix_carries_discipline_and_contract():
     assert "read-only" in text
 
 
+def test_no_skill_drops_the_playbook_but_keeps_the_contract():
+    text = prefix_text(with_skill=False)
+    assert "Bracket the window tightly" not in text
+    assert "Intersect before you inspect" not in text
+    for kept in ("# Identity", "# Output contract", "# Worked examples", "read-only"):
+        assert kept in text
+
+
+def test_dropping_the_skill_changes_the_cache_fingerprint():
+    from resgraph.analyst.tools import RegistryToolset
+    from resgraph.query.executor import QueryContext
+
+    tools = RegistryToolset(QueryContext)
+    with_skill = build_prompt(
+        resource_id="vm-000002", symptom="unreachable", fired_at=T1, summary=SUMMARY
+    )
+    without = build_prompt(
+        resource_id="vm-000002",
+        symptom="unreachable",
+        fired_at=T1,
+        summary=SUMMARY,
+        with_skill=False,
+    )
+    assert cache_fingerprint(with_skill, tools) != cache_fingerprint(without, tools)
+
+
 def test_prefix_names_no_budget_numbers():
     # Budgets are enforced in the harness; the prompt describes the
     # behavior on exhaustion but never a number a code change could orphan.

@@ -2,6 +2,7 @@
 
 import json
 from pathlib import Path
+from typing import Any
 
 import typer
 
@@ -26,6 +27,7 @@ def run(
     max_item_cost: float = 0.0,
     max_item_seconds: float = 0.0,
     judge_daily_cap: float = 10.0,
+    no_skill: bool = False,
 ) -> None:
     """Run every scenario x trials against docker stores + the API;
     one JSONL row per (item, trial) lands in out_dir. --resume PATH
@@ -35,9 +37,11 @@ def run(
     --max-item-seconds are per-run harness ceilings (D29): breach
     injects a final conclude-now turn and the row lands degraded with
     its cutoff_reason. --judge-daily-cap USD trips the judge spend
-    breaker (ledger in data/judge-spend.json). Run with a
-    project-scoped API key that carries its own spend cap — the key
-    is read from the environment and never written anywhere."""
+    breaker (ledger in data/judge-spend.json). --no-skill drops the
+    playbook from the prefix (a labeled fingerprint change, the skill
+    arm). Run with a project-scoped API key that carries its own spend
+    cap — the key is read from the environment and never written
+    anywhere."""
     from anthropic import Anthropic
 
     from resgraph.graph.client import get_driver
@@ -62,6 +66,7 @@ def run(
         max_item_cost=max_item_cost or None,
         max_item_seconds=max_item_seconds or None,
         judge_daily_cap=judge_daily_cap,
+        with_skill=not no_skill,
     )
     print(out)
 
@@ -142,4 +147,22 @@ def arms(
     comparison = compare(summaries, baseline)
     print(render(summaries, comparison))
     if not comparison["comparable"]:
+        raise typer.Exit(3)
+
+
+@app.command("skill-value")
+def skill_value_cmd(with_run: str, without_run: str) -> None:
+    """Ledger the change-forensics playbook's value across the paired
+    skill arm: available / retrieved / invoked / relevant. Pass the
+    with-skill and without-skill run files.
+
+    Exit code 3 if the two arms measure different item sets."""
+    from .skillvalue import render, skill_value
+
+    def _load(path: str) -> list[dict[str, Any]]:
+        return [json.loads(line) for line in Path(path).read_text().splitlines() if line.strip()]
+
+    value = skill_value(_load(with_run), _load(without_run))
+    print(render(value))
+    if not value["comparable"]:
         raise typer.Exit(3)

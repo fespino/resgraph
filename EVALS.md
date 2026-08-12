@@ -872,6 +872,39 @@ constant across arms and is excluded from the worker-cost comparison.
 Batches with the skill arm (same analysis, skill on/off is another
 arm) and the injection set (resistance by tier reuses these runs).
 
+## Pre-registered experiment — the paired skill arm (run pending)
+
+Does the change-forensics playbook earn its ~3.6k prefix tokens? The
+same 30 scenarios run with and without the skill body, so its value is
+a measured number rather than an assumption. Dropping the skill moves
+the prompt fingerprint, so the without-skill arm is labeled and never
+silently compared to the certified with-skill baseline.
+
+- **Arms:** with-skill (the certified prefix) and without-skill
+  (`--no-skill`, the skill section dropped, everything else identical),
+  same worker and pinned judge, k=3. ~$10; pilot each way at k=1 first,
+  and the pilot fails if the fingerprint does not move (the toggle
+  wired wrong is a $0 discovery).
+- **Ledger, four stages, with the credit rule stated now:** available
+  (in the prompt) → retrieved (the agent read it) → invoked (the agent
+  followed the method) → relevant (following it changed the outcome). A
+  with-skill pass is credited to the skill ONLY if invoked; an item
+  both arms pass is scored by cost, not counted as a skill win.
+  `resgraph-evals skill-value with without` renders it.
+- **Two honest limits, registered before the numbers exist:**
+  *retrieved collapses into available* — the skill lives statically in
+  the prefix, so this architecture cannot separate "in context" from
+  "read", and the ledger says so instead of inventing a number.
+  *invoked is a coarse proxy* — the tool trace carries names not
+  arguments, so "followed the intersect-first method" is read as
+  world_diff and blast_radius both appearing, presence not tightness.
+  A cleaner invoked signal is a later instrument change, not a
+  post-hoc reinterpretation of this run.
+- **By tier (with the model arms):** the skill's value at Sonnet/Haiku
+  is the more interesting question than at Opus — a cheaper worker that
+  the playbook lifts to Opus-parity is the structure-dominance result
+  made concrete.
+
 ## Phase 9 — certification completion and probes
 
 ### k=3 certification — completed 2026-08-05, run `20260803T221121Z` (resumed 71 rows, ≈$10.63 worker estimate)

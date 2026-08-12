@@ -185,3 +185,54 @@ def test_arms_rejects_a_spec_without_a_label(tmp_path):
     opus = _arm_file(tmp_path, "opus.jsonl", "claude-opus-4-8", [True])
     result = runner.invoke(app, ["arms", str(opus)])
     assert result.exit_code == 2
+
+
+def _skill_arm_file(tmp_path, name, passes_and_tools):
+    rows = [
+        {
+            "scenario_id": f"s{i}",
+            "scenario_type": "direct",
+            "tags": ["direct"],
+            "trial": 0,
+            "dims": {
+                "found_top3": {"passed": p, "detail": ""},
+                "evidence": {"passed": True, "detail": ""},
+            },
+            "tool_trace": [{"tool": t, "ok": True} for t in tools],
+        }
+        for i, (p, tools) in enumerate(passes_and_tools)
+    ]
+    f = tmp_path / name
+    f.write_text("".join(json.dumps(r) + "\n" for r in rows))
+    return f
+
+
+def test_skill_value_renders_the_ledger(tmp_path):
+    withf = _skill_arm_file(tmp_path, "with.jsonl", [(True, ["world_diff", "blast_radius"])])
+    without = _skill_arm_file(tmp_path, "without.jsonl", [(False, ["resource_history"])])
+    result = runner.invoke(app, ["skill-value", str(withf), str(without)])
+    assert result.exit_code == 0
+    assert "relevant" in result.output and "invoked" in result.output
+
+
+def test_skill_value_declines_on_mismatched_item_sets(tmp_path):
+    withf = _skill_arm_file(tmp_path, "with.jsonl", [(True, ["world_diff", "blast_radius"])])
+    without = tmp_path / "without.jsonl"
+    without.write_text(
+        json.dumps(
+            {
+                "scenario_id": "other",
+                "scenario_type": "direct",
+                "tags": ["direct"],
+                "trial": 0,
+                "dims": {
+                    "found_top3": {"passed": True, "detail": ""},
+                    "evidence": {"passed": True, "detail": ""},
+                },
+                "tool_trace": [],
+            }
+        )
+        + "\n"
+    )
+    result = runner.invoke(app, ["skill-value", str(withf), str(without)])
+    assert result.exit_code == 3

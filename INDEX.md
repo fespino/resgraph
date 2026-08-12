@@ -10,7 +10,8 @@
   pre-registrations and outcomes, conclusions with receipts, honest review
 - evals/ — eval artifacts: scenarios/ (committed recipes + the
   trace-mining sanitization checklist), runs/ (envpinned
-  row files), baseline.json, meta/ (grader mutation gate, also a CI step)
+  row files), baseline.json, workers.yaml (named worker setups, --worker),
+  meta/ (grader mutation gate, also a CI step)
 - docs/discovery/ — problem-discovery memos written before code (the
   quality bar's git history is the witness)
 - docs/prompt-audit.md — PREFIX/SUFFIX verdict table + cache diagnosis

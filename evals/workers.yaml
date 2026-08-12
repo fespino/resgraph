@@ -1,0 +1,24 @@
+# Named worker setups for the eval harness (--worker NAME).
+#
+# The setup name is the arm label and the provenance recorded on every row.
+# Secrets never live here: API keys come from the environment
+# (ANTHROPIC_API_KEY, or RESGRAPH_LOCAL_API_KEY for an endpoint that needs one).
+# A setup with no base_url runs on the Anthropic SDK; one with a base_url runs
+# against a chat-completions endpoint, wherever it lives (localhost or remote).
+
+opus:
+  model: claude-opus-4-8
+
+sonnet:
+  model: claude-sonnet-4-6
+
+# A self-hosted model, on localhost or a remote GPU — same setup, only the URL
+# changes. tool_choice: required forces a tool call (the constrained-decoding
+# lever); add extra_args (e.g. guided_json) if the model emits malformed calls.
+qwen-local:
+  model: qwen2.5:7b
+  base_url: http://localhost:11434/v1
+  temperature: 0
+  seed: 7
+  quant: Q4_K_M
+  tool_choice: required

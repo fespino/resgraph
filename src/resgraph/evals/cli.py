@@ -88,10 +88,10 @@ def report(
 
 
 def _newest_gateable(run_dir: Path) -> tuple[Path | None, list[str]]:
-    """Newest run that is not a companion-only set, and the names of the
-    companion runs skipped to reach it. Filenames are timestamps, so
-    reverse-sorted is newest-first."""
-    from .gate import is_companion_only
+    """Newest run the gate can actually verdict, and the runs skipped to
+    reach it (each with why — companion set or too few trials). Filenames
+    are timestamps, so reverse-sorted is newest-first."""
+    from .gate import gate_skip_reason
 
     skipped: list[str] = []
     for path in sorted(run_dir.glob("*.jsonl"), reverse=True):
@@ -99,8 +99,9 @@ def _newest_gateable(run_dir: Path) -> tuple[Path | None, list[str]]:
             rows = [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
         except (OSError, ValueError):
             continue
-        if is_companion_only(rows):
-            skipped.append(path.name)
+        reason = gate_skip_reason(rows)
+        if reason:
+            skipped.append(f"{path.name} ({reason})")
             continue
         return path, skipped
     return None, skipped
@@ -137,10 +138,13 @@ def gate(
     if target.is_dir():
         selected, skipped = _newest_gateable(target)
         if selected is None:
-            print("EVAL GATE: no gateable run committed (every run is a companion set) — skipping")
+            print(
+                "EVAL GATE: no gateable run committed (companion sets and sub-k runs "
+                "are not gate candidates) — skipping"
+            )
             return
         if skipped:
-            print(f"skipped {len(skipped)} companion-set run(s): {', '.join(skipped)}")
+            print(f"skipped {len(skipped)} non-gateable run(s): {', '.join(skipped)}")
         print(f"gating {selected.name}")
         target = selected
     try:

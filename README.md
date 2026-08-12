@@ -27,9 +27,9 @@
 | src/resgraph/evals/\_\_init\_\_.py           |        0 |        0 |    100% |           |
 | src/resgraph/evals/arms.py                   |       42 |        0 |    100% |           |
 | src/resgraph/evals/breaker.py                |       38 |        0 |    100% |           |
-| src/resgraph/evals/cli.py                    |       66 |        1 |     98% |        86 |
+| src/resgraph/evals/cli.py                    |       94 |        1 |     99% |        86 |
 | src/resgraph/evals/faults.py                 |       23 |        0 |    100% |           |
-| src/resgraph/evals/gate.py                   |      126 |        4 |     97% |107, 148, 160, 178 |
+| src/resgraph/evals/gate.py                   |      156 |        4 |     97% |138, 179, 191, 209 |
 | src/resgraph/evals/graders.py                |       67 |        2 |     97% |   76, 139 |
 | src/resgraph/evals/injection.py              |        6 |        0 |    100% |           |
 | src/resgraph/evals/judge.py                  |       16 |        0 |    100% |           |
@@ -69,7 +69,7 @@
 | src/resgraph/tools/context.py                |        9 |        0 |    100% |           |
 | src/resgraph/tools/http.py                   |       21 |        0 |    100% |           |
 | src/resgraph/tools/registry.py               |       24 |        0 |    100% |           |
-| **TOTAL**                                    | **3674** |  **133** | **96%** |           |
+| **TOTAL**                                    | **3732** |  **133** | **96%** |           |
 
 
 ## Setup coverage badge

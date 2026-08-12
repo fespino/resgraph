@@ -1,10 +1,11 @@
-"""Tool-surface adapter: present an Anthropic ``messages.create`` face over an
-OpenAI-compatible endpoint, so the analyst harness can drive a local model
-without knowing it is not Anthropic.
+"""Tool-surface adapter: present an Anthropic ``messages.create`` face over the
+chat-completions wire format — the API that vLLM, Ollama, and llama.cpp expose
+(commonly called OpenAI-compatible) — so the analyst harness can drive any such
+model without knowing it is not Anthropic.
 
 The harness speaks one vocabulary — ``resp.content`` blocks (``text`` /
-``thinking`` / ``tool_use``) and ``tool_result`` message parts. Everything
-here translates that vocabulary to and from the OpenAI chat shape
+``thinking`` / ``tool_use``) and ``tool_result`` message parts. Everything here
+translates that vocabulary to and from the chat-completions shape
 (``tool_calls`` on the assistant message, ``role:tool`` messages carrying
 results). The transport is the only I/O; the translators are pure so the whole
 adapter is exercised offline against fixtures.
@@ -59,8 +60,8 @@ def _field(block: Any, name: str) -> Any:
     return getattr(block, name, None)
 
 
-def to_openai_tools(tools: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Anthropic ``{name, description, input_schema}`` → OpenAI function tool."""
+def to_chat_tools(tools: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Anthropic ``{name, description, input_schema}`` → a chat-completions function tool."""
     return [
         {
             "type": "function",
@@ -94,7 +95,7 @@ def _assistant_message(content: Any) -> dict[str, Any]:
                     },
                 }
             )
-        # thinking blocks are dropped: the OpenAI shape has no equivalent and a
+        # thinking blocks are dropped: the chat-completions shape has no equivalent and a
         # local model does not replay them.
     msg: dict[str, Any] = {"role": "assistant", "content": "".join(texts) or None}
     if tool_calls:
@@ -129,7 +130,7 @@ def _user_messages(content: Any) -> list[dict[str, Any]]:
     return out
 
 
-def to_openai_messages(system: str | None, messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def to_chat_messages(system: str | None, messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     if system:
         out.append({"role": "system", "content": system})
@@ -141,7 +142,7 @@ def to_openai_messages(system: str | None, messages: list[dict[str, Any]]) -> li
     return out
 
 
-def from_openai_response(data: dict[str, Any]) -> Response:
+def from_chat_response(data: dict[str, Any]) -> Response:
     msg = data["choices"][0]["message"]
     blocks: list[Any] = []
     if msg.get("content"):
@@ -215,20 +216,20 @@ class _Messages:
             "model": model,
             "max_tokens": max_tokens,
             "temperature": self._temperature,
-            "messages": to_openai_messages(system, messages),
+            "messages": to_chat_messages(system, messages),
         }
         if self._seed is not None:
             payload["seed"] = self._seed
         if tools:
-            payload["tools"] = to_openai_tools(tools)
+            payload["tools"] = to_chat_tools(tools)
             payload["tool_choice"] = self._tool_choice
         payload.update(self._extra_args)
         headers = {"Authorization": f"Bearer {self._api_key}"} if self._api_key else {}
-        return from_openai_response(self._transport(self._url, payload, headers))
+        return from_chat_response(self._transport(self._url, payload, headers))
 
 
-class OpenAICompatClient:
-    """An Anthropic-shaped client backed by an OpenAI-compatible endpoint."""
+class ChatCompletionsClient:
+    """An Anthropic-shaped client backed by a chat-completions endpoint."""
 
     def __init__(
         self,
@@ -265,7 +266,7 @@ def build_worker(
 ) -> tuple[Any, dict[str, Any]]:
     """Resolve the worker client and its provenance. An empty ``base_url`` means
     the Anthropic SDK — today's default worker. A ``base_url`` points the worker
-    at a local OpenAI-compatible endpoint and pins its full identity into the
+    at a local chat-completions endpoint and pins its full identity into the
     provenance the runner records per row, so the local daily baseline cannot
     drift underneath the periodic Anthropic reference. The judge is resolved
     separately by the caller and never follows the worker through here.
@@ -274,7 +275,7 @@ def build_worker(
         from anthropic import Anthropic
 
         return Anthropic(), {"worker_provider": "anthropic"}
-    client = OpenAICompatClient(
+    client = ChatCompletionsClient(
         base_url=base_url,
         api_key=api_key,
         temperature=temperature,

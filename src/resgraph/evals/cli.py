@@ -87,6 +87,25 @@ def report(
     print(render(aggregate(rows), base))
 
 
+def _newest_gateable(run_dir: Path) -> tuple[Path | None, list[str]]:
+    """Newest run that is not a companion-only set, and the names of the
+    companion runs skipped to reach it. Filenames are timestamps, so
+    reverse-sorted is newest-first."""
+    from .gate import is_companion_only
+
+    skipped: list[str] = []
+    for path in sorted(run_dir.glob("*.jsonl"), reverse=True):
+        try:
+            rows = [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
+        except (OSError, ValueError):
+            continue
+        if is_companion_only(rows):
+            skipped.append(path.name)
+            continue
+        return path, skipped
+    return None, skipped
+
+
 @app.command()
 def gate(
     run_path: str,
@@ -100,18 +119,32 @@ def gate(
     honors the eval-baseline-refresh label; this command does not — it
     only reports what the numbers say.
 
-    Exit codes: 0 passed, 1 blocked, 3 declined (cannot verdict),
-    4 evidence unreadable."""
+    RUN_PATH may be a run file or a directory of runs; a directory
+    selects the newest GATEABLE run — companion-set runs (their own
+    dataset and slice) are skipped, and the skipped list is named in the
+    output. A base run whose dataset drifted is not companion-only, so
+    it is still selected and declines loudly.
+
+    Exit codes: 0 passed (or nothing gateable), 1 blocked, 3 declined
+    (cannot verdict), 4 evidence unreadable."""
     from .gate import evaluate, render_verdict
     from .report import aggregate
 
     baseline_path = Path(baseline)
     if not baseline_path.exists():
         raise typer.BadParameter(f"no baseline at {baseline}; nothing to gate against")
+    target = Path(run_path)
+    if target.is_dir():
+        selected, skipped = _newest_gateable(target)
+        if selected is None:
+            print("EVAL GATE: no gateable run committed (every run is a companion set) — skipping")
+            return
+        if skipped:
+            print(f"skipped {len(skipped)} companion-set run(s): {', '.join(skipped)}")
+        print(f"gating {selected.name}")
+        target = selected
     try:
-        rows = [
-            json.loads(line) for line in Path(run_path).read_text().splitlines() if line.strip()
-        ]
+        rows = [json.loads(line) for line in target.read_text().splitlines() if line.strip()]
         base = json.loads(baseline_path.read_text())
     except (OSError, ValueError) as exc:
         print(f"EVAL GATE: ERROR — cannot read the evidence: {exc}")

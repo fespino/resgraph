@@ -219,3 +219,17 @@ def test_is_companion_only_distinguishes_companion_runs_from_drifted_base_runs()
     assert not is_companion_only([row(["direct"]), row(["store_degraded"])])
     assert not is_companion_only([row(["direct"])])
     assert not is_companion_only([])
+
+
+def test_render_verdict_md_has_a_titled_status_and_folds_details():
+    from resgraph.evals.gate import GateVerdict, render_verdict_md
+
+    passed = render_verdict_md(GateVerdict(passed=True), note="gating `x.jsonl`")
+    assert passed.startswith("## ✅ Eval gate — PASS")
+    assert "gating `x.jsonl`" in passed and "<details>" in passed
+
+    blocked = render_verdict_md(GateVerdict(passed=False, blocks=["boom"]))
+    assert blocked.startswith("## ❌ Eval gate — BLOCK") and "boom" in blocked
+
+    undecided = render_verdict_md(GateVerdict(passed=False, undecided=True, undecided_reason="k=1"))
+    assert undecided.startswith("## ⚠️ Eval gate — UNDECIDED")

@@ -12,7 +12,7 @@
 | src/resgraph/analyst/executor.py             |      111 |        1 |     99% |       210 |
 | src/resgraph/analyst/harness.py              |      186 |        5 |     97% |57, 61, 163-164, 277 |
 | src/resgraph/analyst/models.py               |       16 |        0 |    100% |           |
-| src/resgraph/analyst/prompts.py              |       32 |        0 |    100% |           |
+| src/resgraph/analyst/prompts.py              |       35 |        0 |    100% |           |
 | src/resgraph/analyst/remediation.py          |      103 |        1 |     99% |       136 |
 | src/resgraph/analyst/tools.py                |       63 |        0 |    100% |           |
 | src/resgraph/api/\_\_init\_\_.py             |        0 |        0 |    100% |           |
@@ -27,15 +27,16 @@
 | src/resgraph/evals/\_\_init\_\_.py           |        0 |        0 |    100% |           |
 | src/resgraph/evals/arms.py                   |       42 |        0 |    100% |           |
 | src/resgraph/evals/breaker.py                |       38 |        0 |    100% |           |
-| src/resgraph/evals/cli.py                    |       56 |        1 |     98% |        81 |
+| src/resgraph/evals/cli.py                    |       66 |        1 |     98% |        86 |
 | src/resgraph/evals/faults.py                 |       23 |        0 |    100% |           |
 | src/resgraph/evals/gate.py                   |      126 |        4 |     97% |107, 148, 160, 178 |
 | src/resgraph/evals/graders.py                |       67 |        2 |     97% |   76, 139 |
 | src/resgraph/evals/injection.py              |        6 |        0 |    100% |           |
 | src/resgraph/evals/judge.py                  |       16 |        0 |    100% |           |
 | src/resgraph/evals/report.py                 |       73 |        1 |     99% |       152 |
-| src/resgraph/evals/runner.py                 |      227 |       35 |     85% |163-168, 177-183, 190-198, 200-203, 210, 216, 234-235, 247-248, 332, 407, 414, 502-503 |
+| src/resgraph/evals/runner.py                 |      227 |       35 |     85% |163-168, 177-183, 190-198, 200-203, 210, 216, 234-235, 247-248, 332, 410, 417, 505-506 |
 | src/resgraph/evals/sanitize.py               |       45 |        2 |     96% |   38, 150 |
+| src/resgraph/evals/skillvalue.py             |       42 |        1 |     98% |        93 |
 | src/resgraph/gen/\_\_init\_\_.py             |        0 |        0 |    100% |           |
 | src/resgraph/gen/churn.py                    |       65 |        4 |     94% |47-49, 108 |
 | src/resgraph/gen/cli.py                      |       75 |       13 |     83% |89-94, 105-110, 149-150 |
@@ -68,7 +69,7 @@
 | src/resgraph/tools/context.py                |        9 |        0 |    100% |           |
 | src/resgraph/tools/http.py                   |       21 |        0 |    100% |           |
 | src/resgraph/tools/registry.py               |       24 |        0 |    100% |           |
-| **TOTAL**                                    | **3607** |  **133** | **96%** |           |
+| **TOTAL**                                    | **3662** |  **134** | **96%** |           |
 
 
 ## Setup coverage badge

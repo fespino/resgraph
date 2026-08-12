@@ -277,7 +277,7 @@ def estimate_cost(tokens: dict[str, int], model: str) -> float:
     calls are not in it, so this undercounts slightly: the guard is a
     brake, not a bill — the ledger still comes from the console."""
     if model not in PRICES_PER_MTOK:
-        raise SystemExit(f"--max-cost has no pricing for {model}; extend PRICES_PER_MTOK")
+        return 0.0  # no price on file — an unmetered model, wherever it runs
     input_rate, output_rate = PRICES_PER_MTOK[model]
     return (
         tokens["input"] * input_rate
@@ -361,17 +361,10 @@ def run_eval(
     with_skill: bool = True,
     judge_client: Any = None,
     provenance: dict[str, Any] | None = None,
-    price_worker: bool = True,
 ) -> Path:
-    if price_worker and (max_cost is not None or max_item_cost is not None):
-        estimate_cost({"input": 0, "output": 0, "cache_read": 0, "cache_creation": 0}, model)
-    # The judge resolves independently of the worker (D29c): a local worker
-    # never drags the judge off Anthropic. A local worker's tokens are unpriced
-    # (electricity, not API spend), so its per-item cost cutoff reads zero.
+    if (max_cost is not None or max_item_cost is not None) and model not in PRICES_PER_MTOK:
+        raise SystemExit(f"cost cap set but {model} has no price; add it to PRICES_PER_MTOK")
     judge = judge_client if judge_client is not None else client
-    worker_cost_fn = (
-        (lambda u: estimate_cost(_usage_tokens(u), model)) if price_worker else (lambda u: 0.0)
-    )
     judge_breaker = (
         JudgeSpendBreaker(
             cap_usd=judge_daily_cap, model=judge_model, prices_per_mtok=PRICES_PER_MTOK
@@ -451,7 +444,11 @@ def run_eval(
                         max_tool_calls=item_max_calls,
                         thinking=thinking,
                         max_cost_usd=max_item_cost,
-                        cost_fn=worker_cost_fn if max_item_cost is not None else None,
+                        cost_fn=(
+                            (lambda u: estimate_cost(_usage_tokens(u), model))
+                            if max_item_cost is not None
+                            else None
+                        ),
                         max_wall_s=max_item_seconds,
                     )
                     latency = time.monotonic() - started

@@ -53,8 +53,8 @@ def test_estimate_cost_math_and_unknown_model():
     assert estimate_cost(tokens, "claude-opus-4-8") == pytest.approx(36.75)
     zero = {"input": 0, "output": 0, "cache_read": 0, "cache_creation": 0}
     assert estimate_cost(zero, "claude-haiku-4-5") == 0.0
-    with pytest.raises(SystemExit, match="no pricing"):
-        estimate_cost(zero, "claude-2")
+    # a model with no price on file is unmetered (e.g. a self-hosted one), not an error
+    assert estimate_cost(tokens, "claude-2") == 0.0
 
 
 def test_row_scan_refuses_secret_shaped_content_without_echoing_it():

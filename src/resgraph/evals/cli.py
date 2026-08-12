@@ -45,11 +45,11 @@ def run(
     playbook from the prefix (a labeled fingerprint change, the skill
     arm). Run with a project-scoped API key that carries its own spend
     cap — the key is read from the environment and never written
-    anywhere. --worker-base-url points the worker at a local
-    OpenAI-compatible endpoint (the judge stays on Anthropic); the
-    worker is then unpriced and its identity — seed, quant, temperature
-    — is pinned into every row (D29c). A local worker never sends
-    thinking, which that backend has no equivalent for."""
+    anywhere. --worker-base-url runs the worker against a
+    chat-completions endpoint, wherever it lives (the judge stays on
+    Anthropic), pinning its identity — base URL, seed, quant,
+    temperature — into every row (D29c). Token price is by model
+    (PRICES_PER_MTOK); a model with no listed price is unmetered."""
     from anthropic import Anthropic
 
     from resgraph.graph.client import get_driver
@@ -57,7 +57,6 @@ def run(
     from .providers import build_worker
     from .runner import load_scenarios, run_eval
 
-    local = bool(worker_base_url)
     worker_client, provenance = build_worker(
         model,
         base_url=worker_base_url,
@@ -77,7 +76,7 @@ def run(
         trials=trials,
         out_dir=Path(out_dir),
         max_tool_calls=max_tool_calls,
-        thinking=None if local else ({"type": "adaptive"} if thinking == "adaptive" else None),
+        thinking={"type": "adaptive"} if thinking == "adaptive" else None,
         resume_path=Path(resume) if resume else None,
         max_cost=max_cost or None,
         skip_preflight=skip_preflight,
@@ -87,7 +86,6 @@ def run(
         with_skill=not no_skill,
         judge_client=judge_client,
         provenance=provenance,
-        price_worker=not local,
     )
     print(out)
 

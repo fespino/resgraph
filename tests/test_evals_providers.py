@@ -253,18 +253,19 @@ def test_extra_args_merge_into_the_payload():
     assert payload["tool_choice"] == "required"
 
 
-def test_build_worker_local_pins_full_identity():
+def test_build_worker_endpoint_pins_full_identity():
+    # A chat-completions endpoint, whether on localhost or a remote GPU.
     client, prov = build_worker(
         "qwen2.5:7b",
-        base_url="http://localhost:11434/v1",
+        base_url="http://a-remote-gpu:8000/v1",
         seed=7,
         quant="Q4_K_M",
         temperature=0.0,
     )
     assert isinstance(client, ChatCompletionsClient)
     assert prov == {
-        "worker_provider": "local",
-        "worker_base_url": "http://localhost:11434/v1",
+        "worker_provider": "chat_completions",
+        "worker_base_url": "http://a-remote-gpu:8000/v1",
         "worker_temperature": 0.0,
         "worker_seed": 7,
         "worker_quant": "Q4_K_M",

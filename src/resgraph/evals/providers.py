@@ -265,10 +265,10 @@ def build_worker(
     extra_args: dict[str, Any] | None = None,
 ) -> tuple[Any, dict[str, Any]]:
     """Resolve the worker client and its provenance. An empty ``base_url`` means
-    the Anthropic SDK — today's default worker. A ``base_url`` points the worker
-    at a local chat-completions endpoint and pins its full identity into the
-    provenance the runner records per row, so the local daily baseline cannot
-    drift underneath the periodic Anthropic reference. The judge is resolved
+    the Anthropic SDK — today's default worker. A ``base_url`` runs the worker
+    against a chat-completions endpoint, wherever it lives, and pins its full
+    identity into the provenance the runner records per row so the daily
+    baseline cannot drift under the periodic reference. The judge is resolved
     separately by the caller and never follows the worker through here.
     """
     if not base_url:
@@ -284,7 +284,7 @@ def build_worker(
         extra_args=extra_args,
     )
     provenance = {
-        "worker_provider": "local",
+        "worker_provider": "chat_completions",
         "worker_base_url": base_url,
         "worker_temperature": temperature,
         "worker_seed": seed,

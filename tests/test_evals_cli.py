@@ -304,3 +304,24 @@ def test_gate_directory_skips_a_sub_k_base_run_to_find_a_verdictable_one(tmp_pat
     result = runner.invoke(app, ["gate", str(runs), "--baseline", str(baseline)])
     assert result.exit_code == 0
     assert "k=1<3" in result.output and "gating `20260101T000000Z.jsonl`" in result.output
+
+
+def test_gate_directory_md_skip_is_titled(tmp_path):
+    runs = tmp_path / "runs"
+    runs.mkdir()
+    _companion_run(runs, "20260101T000000Z.jsonl")
+    baseline = _baseline_file(tmp_path, _base_run(tmp_path, "seed.jsonl"))
+    result = runner.invoke(app, ["gate", str(runs), "--baseline", str(baseline), "--md"])
+    assert result.exit_code == 0
+    assert result.output.startswith("## ⏭️ Eval gate — skipped")
+
+
+def test_gate_directory_skips_an_unreadable_run_file(tmp_path):
+    runs = tmp_path / "runs"
+    runs.mkdir()
+    base = _base_run(runs, "20260101T000000Z.jsonl")
+    (runs / "20260102T000000Z.jsonl").write_text("{not json\n")  # newest, unreadable
+    baseline = _baseline_file(tmp_path, base)
+    result = runner.invoke(app, ["gate", str(runs), "--baseline", str(baseline)])
+    assert result.exit_code == 0
+    assert "gating `20260101T000000Z.jsonl`" in result.output

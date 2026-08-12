@@ -369,7 +369,7 @@ def run_eval(
         JudgeSpendBreaker(
             cap_usd=judge_daily_cap, model=judge_model, prices_per_mtok=PRICES_PER_MTOK
         )
-        if judge_model
+        if judge_model and judge_model in PRICES_PER_MTOK  # an unpriced judge has nothing to cap
         else None
     )
     if not skip_preflight:

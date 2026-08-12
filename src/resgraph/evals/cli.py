@@ -29,6 +29,7 @@ def run(
     judge_daily_cap: float = 10.0,
     no_skill: bool = False,
     worker: str = "",
+    judge: str = "",
     workers_config: str = "evals/workers.yaml",
 ) -> None:
     """Run every scenario x trials against docker stores + the API;
@@ -43,30 +44,43 @@ def run(
     playbook from the prefix (a labeled fingerprint change, the skill
     arm). Run with a project-scoped API key that carries its own spend
     cap — the key is read from the environment and never written
-    anywhere. --worker NAME selects a setup from --workers-config (model,
-    endpoint, and determinism knobs; the name is recorded per row and is
-    the arm label). Without it the worker is --model on the Anthropic SDK.
-    The judge stays on Anthropic. Token price is by model (PRICES_PER_MTOK);
-    a model with no listed price is unmetered."""
-    from anthropic import Anthropic
-
+    anywhere. --worker NAME selects a setup from --workers-config (provider,
+    model, endpoint, and determinism knobs; the name is recorded per row and
+    is the arm label); without it the worker is --model on the Anthropic SDK.
+    --judge NAME selects the judge setup the same way (keep it constant across
+    arms); without it the judge is --judge-model on Anthropic. Token price is
+    by model (PRICES_PER_MTOK); a model with no listed price is unmetered."""
     from resgraph.graph.client import get_driver
 
-    from .providers import build_worker, load_worker
+    from .providers import build_client, load_setup
     from .runner import load_scenarios, run_eval
 
-    setup = load_worker(worker, Path(workers_config)) if worker else {"model": model}
-    model = setup["model"]
-    worker_client, provenance = build_worker(setup)
-    judge_client = None if no_judge else Anthropic()
+    cfg = Path(workers_config)
+    worker_setup: dict[str, Any] = (
+        load_setup(worker, cfg) if worker else {"provider": "anthropic", "model": model}
+    )
+    worker_model: str = worker_setup["model"]
+    worker_client, worker_meta = build_client(worker_setup)
+    provenance = {f"worker_{k}": v for k, v in worker_meta.items()}
+
+    judge_client = None
+    judge_model_resolved: str | None = None
+    if not no_judge:
+        judge_setup: dict[str, Any] = (
+            load_setup(judge, cfg) if judge else {"provider": "anthropic", "model": judge_model}
+        )
+        judge_model_resolved = judge_setup["model"]
+        judge_client, judge_meta = build_client(judge_setup)
+        provenance |= {f"judge_{k}": v for k, v in judge_meta.items()}
+
     driver = get_driver()
     driver.verify_connectivity()
     out = run_eval(
         load_scenarios(Path(scenarios)),
         worker_client,
         driver,
-        model=model,
-        judge_model=None if no_judge else judge_model,
+        model=worker_model,
+        judge_model=judge_model_resolved,
         trials=trials,
         out_dir=Path(out_dir),
         max_tool_calls=max_tool_calls,

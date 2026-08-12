@@ -25,6 +25,27 @@ def is_companion_only(rows: list[dict[str, Any]]) -> bool:
     return bool(rows) and all(any(t in COMPANION_TAGS for t in row.get("tags", [])) for row in rows)
 
 
+def _run_trials(rows: list[dict[str, Any]]) -> int:
+    counts: dict[str, int] = {}
+    for row in rows:
+        counts[row["scenario_id"]] = counts.get(row["scenario_id"], 0) + 1
+    return max(counts.values(), default=0)
+
+
+def gate_skip_reason(rows: list[dict[str, Any]]) -> str:
+    """Empty when this run is a gate candidate; otherwise why it is not.
+    Both companion sets and sub-k runs are "not a gate candidate" (D29b),
+    so selection skips past both to find the newest run it can verdict."""
+    if not rows:
+        return "empty"
+    if is_companion_only(rows):
+        return "companion-set"
+    trials = _run_trials(rows)
+    if trials < MIN_TRIALS:
+        return f"k={trials}<{MIN_TRIALS}"
+    return ""
+
+
 @dataclass(frozen=True)
 class GateVerdict:
     passed: bool

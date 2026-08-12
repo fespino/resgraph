@@ -1711,12 +1711,15 @@ The release-gate half of D29, consuming the certified k=3 baseline.
   are committed as incident evidence, the newest file is usually a
   companion set, and gating it would decline on every PR while a real
   base-run regression sat unexamined. The gate scans newest-first and
-  skips runs that are *entirely* companion items (`store_degraded`,
-  `budget_starved`, `injection`, `coverage_gap`), naming what it
-  skipped. The skip is deliberately not "any mismatched run": a base
-  run whose dataset drifted is not companion-only, so it is still
+  skips runs it cannot verdict — companion sets (`store_degraded`,
+  `budget_starved`, `injection`, `coverage_gap`) and sub-k runs, the
+  two classes this decision already calls "not a gate candidate" —
+  naming each and why. The skip is deliberately not "any mismatched
+  run": a base run whose dataset drifted is neither, so it is still
   selected and declines loudly — the failure the comparability rule
-  exists to catch must not be skipped past.
+  exists to catch must not be skipped past. With no gateable run
+  committed, the gate reports "nothing to gate" rather than declining
+  on an old run nobody touched.
 - **Flap floor (#137):** the gate declines to verdict a run below
   k=3 — certification measured a 20% single-trial item-flip rate, so
   a k=1 diff on marginal items reads noise. Declined is distinct

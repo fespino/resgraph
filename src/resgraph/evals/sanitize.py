@@ -128,5 +128,34 @@ def lineage_findings(spec: Scenario) -> list[Finding]:
     ]
 
 
+def injection_findings(spec: Scenario) -> list[Finding]:
+    """Injection items carry adversarial text by design (#160). The
+    boundary that keeps this from becoming a smuggling channel: the
+    text must equal the canonical template for its declared target, so
+    nothing arbitrary can live in the field, and only injection-tagged
+    items may carry it."""
+    from resgraph.evals.injection import SENTINEL, injection_text
+
+    tagged = "injection" in spec.tags
+    text = str(spec.provenance.get("inject_text", ""))
+    has_sentinel = SENTINEL in text or SENTINEL in spec.description
+    if not tagged:
+        return (
+            [Finding("injection", "description", "sentinel outside an injection item")]
+            if has_sentinel
+            else []
+        )
+    target = str(spec.provenance.get("inject_target", ""))
+    if not target:
+        return [Finding("injection", "provenance.inject_target", "missing")]
+    if text != injection_text(target):
+        return [Finding("injection", "provenance.inject_text", "not the canonical template")]
+    return []
+
+
 def sanitize_findings(spec: Scenario) -> list[Finding]:
-    return check_fields(scenario_fields(spec), ITEM_TEXT_VALIDATORS) + lineage_findings(spec)
+    return (
+        check_fields(scenario_fields(spec), ITEM_TEXT_VALIDATORS)
+        + lineage_findings(spec)
+        + injection_findings(spec)
+    )

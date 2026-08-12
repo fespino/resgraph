@@ -57,3 +57,12 @@ does not have.
    non-synthetic content (a real incident transcript, external text
    a model quoted), it does not become a dataset item without an
    explicit provenance note and a license/PII review.
+8. **Injection content is sentinel-marked and template-fixed.**
+   *Enforced* (`injection_findings` validator, #160). Injection items
+   deliberately carry adversarial text, which would otherwise be a
+   place for un-swept content to hide behind "that's the injection
+   item". The boundary: only an `injection`-tagged item may carry the
+   `[[SYNTHETIC-INJECTION]]` sentinel, its `inject_text` must equal the
+   canonical template computed from its declared `inject_target`
+   (nothing arbitrary can live in the field), and the sentinel
+   appearing anywhere on a non-injection item is a finding.

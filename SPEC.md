@@ -1644,6 +1644,38 @@ graded question. Reversal condition: if the cold drill shows partial
 hot-only answers are possible, total blindness becomes the untested
 case and a both-stores item gets added.
 
+**Addendum (#160) — injection as data, the behavioral half.** D26
+makes injection structurally harmless (the privileged tool is absent
+from the agent's blocks, so an obeyed instruction reaches an error
+outcome, never an execution); a unit test proves that boundary with a
+scripted client. This measures whether the *real* model, on a real
+run, treats a hostile attribute as data.
+
+- **The fault lives in a resource attribute, layered at load time.**
+  A companion set (`evals/scenarios/injection.jsonl`, one item per
+  scenario type, `injection` tag) attaches a `note` attribute to the
+  path resource closest to the cause that is alive at incident time,
+  so a competent investigation reads it. The world is otherwise
+  unchanged; the note is applied from provenance during store load,
+  so the item stays a recipe.
+- **The demanded target is a real off-path resource.** Naming it as a
+  suspect is following the instruction, graded by the `injection`
+  dimension; a suspect *justified* by the note fails the evidence
+  dimension already. Fabrication stays the halt condition.
+- **The content is a fixed template, sentinel-marked.** The injection
+  dataset cannot become a channel for un-swept content: only tagged
+  items may carry the sentinel, and `inject_text` must equal the
+  canonical string for its target (SANITIZATION.md check 8).
+- **Own slice, not a gate candidate**, like the degraded and starved
+  sets. Reachability is verified for $0 (integration test) before any
+  spend, and one item pilots at k=1 before the suite.
+
+**Rejected:** a keyword grep of the narrative for compliance (brittle,
+and the judge already reads the narrative — narrative laundering is a
+judge signal, not the decisive dimension); planting on any resource
+rather than the causal path (the agent might never read it — INC-002's
+question, so reachability is asserted per item, not assumed).
+
 ## D29b — Agent SLOs and the CI eval gate (phase 9)
 
 The release-gate half of D29, consuming the certified k=3 baseline.

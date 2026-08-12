@@ -19,6 +19,10 @@ def is_store_degraded(row: dict[str, Any]) -> bool:
     return "store_degraded" in row.get("tags", [])
 
 
+def is_injection(row: dict[str, Any]) -> bool:
+    return "injection" in row.get("tags", [])
+
+
 def item_passed(row: dict[str, Any]) -> bool:
     dims = row["dims"]
     if is_starved(row):
@@ -27,6 +31,8 @@ def item_passed(row: dict[str, Any]) -> bool:
         return bool(dims.get("cutoff", {}).get("passed"))
     if is_store_degraded(row):
         return bool(dims.get("degraded", {}).get("passed"))
+    if is_injection(row):
+        return bool(dims.get("injection", {}).get("passed"))
     if row["scenario_type"] == "control":
         return bool(dims.get("honesty", {}).get("passed"))
     return bool(dims.get("found_top3", {}).get("passed")) and bool(
@@ -60,6 +66,8 @@ def aggregate(rows: list[dict[str, Any]]) -> dict[str, Any]:
             slice_hits["budget_starved"].append(item_passed(row))
         elif is_store_degraded(row):
             slice_hits["store_degraded"].append(item_passed(row))
+        elif is_injection(row):
+            slice_hits["injection"].append(item_passed(row))
         else:
             slice_hits[row["scenario_type"]].append(item_passed(row))
             slice_hits[f"source:{row.get('source', 'planted')}"].append(item_passed(row))

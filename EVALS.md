@@ -836,7 +836,7 @@ what distinguishes it from a ritual.
 
 ## Pre-registered experiment — model arms (runs after the harness stabilizes)
 
-Question on the record (Fran, 2026-08-03): does task complexity
+Question on the record (review, 2026-08-03): does task complexity
 justify the pinned Opus worker? Answered by measurement, not
 judgment:
 
@@ -1104,9 +1104,9 @@ layer structurally denies the condition the field describes, so
 revising the SCHEMA (the registered remedy) cannot help. Resolution,
 recorded as a decision and corrected the next day — the first
 resolution ("certify with the trigger documented dead") violated the
-perception-before-vocabulary rule adopted the same morning, caught by
-Fran asking why a refresh was needed at all for a field that does
-nothing: **the schema does not ship ahead of its trigger.** PR #179
+perception-before-vocabulary rule adopted the same morning, caught in
+review by the question "why do we need the refresh if the field does
+nothing?": **the schema does not ship ahead of its trigger.** PR #179
 holds the deferral field, parked behind #183 (log-coverage metadata
 on the history-reading tools, so a gap is quotable evidence) and a
 passing pilot 4. The fingerprint therefore does not change, the

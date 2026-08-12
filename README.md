@@ -25,8 +25,9 @@
 | src/resgraph/cold/store.py                   |       59 |        1 |     98% |       122 |
 | src/resgraph/consumer.py                     |      155 |        7 |     95% |84, 99, 111, 114, 130, 132-133 |
 | src/resgraph/evals/\_\_init\_\_.py           |        0 |        0 |    100% |           |
+| src/resgraph/evals/arms.py                   |       42 |        0 |    100% |           |
 | src/resgraph/evals/breaker.py                |       38 |        0 |    100% |           |
-| src/resgraph/evals/cli.py                    |       42 |        1 |     98% |        81 |
+| src/resgraph/evals/cli.py                    |       56 |        1 |     98% |        81 |
 | src/resgraph/evals/faults.py                 |       23 |        0 |    100% |           |
 | src/resgraph/evals/gate.py                   |      126 |        4 |     97% |107, 148, 160, 178 |
 | src/resgraph/evals/graders.py                |       67 |        2 |     97% |   76, 139 |
@@ -67,7 +68,7 @@
 | src/resgraph/tools/context.py                |        9 |        0 |    100% |           |
 | src/resgraph/tools/http.py                   |       21 |        0 |    100% |           |
 | src/resgraph/tools/registry.py               |       24 |        0 |    100% |           |
-| **TOTAL**                                    | **3551** |  **133** | **96%** |           |
+| **TOTAL**                                    | **3607** |  **133** | **96%** |           |
 
 
 ## Setup coverage badge

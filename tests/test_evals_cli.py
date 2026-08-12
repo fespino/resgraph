@@ -164,6 +164,15 @@ def test_gate_exits_four_on_unreadable_evidence(tmp_path):
     assert "ERROR" in result.output
 
 
+def test_gate_exits_four_on_an_unreadable_baseline(tmp_path):
+    run_path = _run_file(tmp_path, "run.jsonl")
+    broken = tmp_path / "baseline.json"
+    broken.write_text("{not json\n")
+    result = runner.invoke(app, ["gate", str(run_path), "--baseline", str(broken)])
+    assert result.exit_code == 4
+    assert "ERROR" in result.output
+
+
 def test_gate_rejects_a_missing_baseline_as_a_usage_error(tmp_path):
     run_path = _run_file(tmp_path, "run.jsonl")
     result = runner.invoke(app, ["gate", str(run_path), "--baseline", str(tmp_path / "no.json")])

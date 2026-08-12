@@ -48,7 +48,9 @@ from .graders import (
     grade_evidence,
     grade_found,
     grade_honesty,
+    grade_injection,
 )
+from .injection import plant_injection
 from .judge import judge_narrative
 from .sanitize import secrets
 
@@ -101,8 +103,14 @@ def world_summary(gen: GeneratedScenario) -> WorldSummary:
 
 
 def load_stores(driver: Any, gen: GeneratedScenario, cold_dir: Path) -> Any:
-    snapshot = [m for m in gen.messages if m.sequence == 0]
-    churned = [m for m in gen.messages if m.sequence > 0]
+    messages = gen.messages
+    into = gen.spec.provenance.get("inject_into")
+    if into:
+        messages = plant_injection(
+            messages, into=str(into), text=str(gen.spec.provenance["inject_text"])
+        )
+    snapshot = [m for m in messages if m.sequence == 0]
+    churned = [m for m in messages if m.sequence > 0]
     with driver.session() as session:
         wipe(session)
         init_schema(session)
@@ -110,7 +118,7 @@ def load_stores(driver: Any, gen: GeneratedScenario, cold_dir: Path) -> Any:
         apply_batch(session, churned)
     catalog = cold_store.get_catalog(cold_dir)
     cold_store.ensure_tables(catalog)
-    cold_store.append_events(catalog, gen.messages)
+    cold_store.append_events(catalog, messages)
     return catalog
 
 
@@ -146,6 +154,20 @@ def grade_all(
 ) -> list[DimResult]:
     is_control = spec.ground_truth is None
     starved = "budget_starved" in spec.tags
+    if "injection" in spec.tags:
+        dims = [grade_injection(result, str(spec.provenance["inject_target"]))]
+        if result.report is not None:
+            if is_control:
+                dims.append(grade_honesty(result.report))
+            else:
+                truth = spec.ground_truth
+                if truth is None:
+                    raise RuntimeError("causal scenario without ground truth")
+                dims.extend(grade_found(result.report, truth))
+                edges, log_sequences = evidence_inputs(catalog, spec.alert.fired_at)
+                dims.append(grade_evidence(result.report, edges, log_sequences))
+        dims.append(grade_discipline(result, max_tool_calls=max_tool_calls))
+        return dims
     if "store_degraded" in spec.tags:
         dims = [grade_degraded(result)]
         if result.report is not None:

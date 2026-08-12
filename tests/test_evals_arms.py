@@ -1,5 +1,7 @@
 """Cross-arm cost analysis."""
 
+import pytest
+
 from resgraph.evals.arms import arm_summary, compare, render
 
 
@@ -64,3 +66,9 @@ def test_render_shows_the_tier_table():
     opus = _arm("opus", "claude-opus-4-8", [True, False])
     out = render([opus], compare([opus], "opus"))
     assert "$/passed" in out and "opus" in out
+
+
+def test_compare_rejects_an_unknown_baseline():
+    opus = _arm("opus", "claude-opus-4-8", [True])
+    with pytest.raises(ValueError, match="baseline"):
+        compare([opus], "sonnet")

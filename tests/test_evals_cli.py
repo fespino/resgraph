@@ -136,3 +136,52 @@ def test_gate_rejects_a_missing_baseline_as_a_usage_error(tmp_path):
     run_path = _run_file(tmp_path, "run.jsonl")
     result = runner.invoke(app, ["gate", str(run_path), "--baseline", str(tmp_path / "no.json")])
     assert result.exit_code == 2
+
+
+def _arm_file(tmp_path, name, model, passes):
+    rows = [
+        {
+            "scenario_id": f"s{i}",
+            "scenario_type": "direct",
+            "tags": ["direct"],
+            "trial": 0,
+            "dims": {
+                "found_top3": {"passed": p, "detail": ""},
+                "evidence": {"passed": True, "detail": ""},
+            },
+            "tokens": {
+                "input": 0,
+                "output": 100_000,
+                "cache_read": 0,
+                "cache_creation": 0,
+                "total": 100_000,
+            },
+            "model": model,
+        }
+        for i, p in enumerate(passes)
+    ]
+    f = tmp_path / name
+    f.write_text("".join(json.dumps(r) + "\n" for r in rows))
+    return f
+
+
+def test_arms_renders_the_tier_table(tmp_path):
+    opus = _arm_file(tmp_path, "opus.jsonl", "claude-opus-4-8", [True, True, False])
+    sonnet = _arm_file(tmp_path, "sonnet.jsonl", "claude-sonnet-4-6", [True, False, False])
+    result = runner.invoke(app, ["arms", f"opus={opus}", f"sonnet={sonnet}", "--baseline", "opus"])
+    assert result.exit_code == 0
+    assert "$/passed" in result.output and "sonnet" in result.output
+
+
+def test_arms_declines_on_mismatched_item_sets(tmp_path):
+    opus = _arm_file(tmp_path, "opus.jsonl", "claude-opus-4-8", [True, True])
+    sonnet = _arm_file(tmp_path, "sonnet.jsonl", "claude-sonnet-4-6", [True])
+    result = runner.invoke(app, ["arms", f"opus={opus}", f"sonnet={sonnet}", "--baseline", "opus"])
+    assert result.exit_code == 3
+    assert "DECLINED" in result.output
+
+
+def test_arms_rejects_a_spec_without_a_label(tmp_path):
+    opus = _arm_file(tmp_path, "opus.jsonl", "claude-opus-4-8", [True])
+    result = runner.invoke(app, ["arms", str(opus)])
+    assert result.exit_code == 2

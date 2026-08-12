@@ -146,7 +146,9 @@ def gate(
             )
             print(render_skip_md(msg) if md else f"EVAL GATE: {msg}")
             return
-        note = (f"skipped {len(skipped)} non-gateable run(s): {', '.join(skipped)}\n" if skipped else "")
+        note = (
+            f"skipped {len(skipped)} non-gateable run(s): {', '.join(skipped)}\n" if skipped else ""
+        )
         note += f"gating `{selected.name}`"
         if not md:
             print(note)

@@ -8,9 +8,10 @@ the skill on/off), and the money metric is worker cost divided by the
 triages that actually passed at k.
 """
 
+from collections import defaultdict
 from typing import Any
 
-from .report import aggregate
+from .report import aggregate, item_passed
 from .runner import estimate_cost
 
 
@@ -35,10 +36,6 @@ def arm_summary(label: str, rows: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 def _by_item(rows: list[dict[str, Any]]) -> dict[str, list[bool]]:
-    from collections import defaultdict
-
-    from .report import item_passed
-
     by_item: dict[str, list[bool]] = defaultdict(list)
     for row in rows:
         by_item[row["scenario_id"]].append(item_passed(row))

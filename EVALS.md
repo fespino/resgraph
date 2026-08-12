@@ -891,15 +891,18 @@ silently compared to the certified with-skill baseline.
   with-skill pass is credited to the skill ONLY if invoked; an item
   both arms pass is scored by cost, not counted as a skill win.
   `resgraph-evals skill-value with without` renders it.
-- **Two honest limits, registered before the numbers exist:**
+- **Two limits, registered before the numbers exist:**
   *retrieved collapses into available* — the skill lives statically in
   the prefix, so this architecture cannot separate "in context" from
-  "read", and the ledger says so instead of inventing a number.
-  *invoked is a coarse proxy* — the tool trace carries names not
-  arguments, so "followed the intersect-first method" is read as
-  world_diff and blast_radius both appearing, presence not tightness.
-  A cleaner invoked signal is a later instrument change, not a
-  post-hoc reinterpretation of this run.
+  "read", and the ledger says so instead of inventing a number. Its
+  resolution is retrieval-architecture work (RAG ch, §22.8), not this
+  experiment. *invoked is a heuristic, now scored from the method's
+  shape* — #189 sharpened it from tool-presence to the call arguments:
+  a tightly bracketed diff window and a blast radius reconstructed at
+  incident time, the playbook's two load-bearing instructions. Landed
+  before this run so the ledger records the sharp signal first-time;
+  it remains a heuristic read of a trajectory, not a certainty, and
+  the code says so where the number renders.
 - **By tier (with the model arms):** the skill's value at Sonnet/Haiku
   is the more interesting question than at Opus — a cheaper worker that
   the playbook lifts to Opus-parity is the structure-dominance result

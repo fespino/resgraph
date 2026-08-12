@@ -187,6 +187,7 @@ def _arm_file(tmp_path, name, model, passes):
                 "cache_creation": 0,
                 "total": 100_000,
             },
+            "latency_s": 12.0,
             "model": model,
         }
         for i, p in enumerate(passes)
@@ -202,6 +203,7 @@ def test_arms_renders_the_tier_table(tmp_path):
     result = runner.invoke(app, ["arms", f"opus={opus}", f"sonnet={sonnet}", "--baseline", "opus"])
     assert result.exit_code == 0
     assert "$/passed" in result.output and "sonnet" in result.output
+    assert "p95s" in result.output and "12.0" in result.output  # latency rides alongside cost
 
 
 def test_arms_declines_on_mismatched_item_sets(tmp_path):

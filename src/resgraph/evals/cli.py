@@ -28,10 +28,8 @@ def run(
     max_item_seconds: float = 0.0,
     judge_daily_cap: float = 10.0,
     no_skill: bool = False,
-    worker_base_url: str = "",
-    worker_seed: int = 0,
-    worker_quant: str = "",
-    worker_tool_choice: str = "auto",
+    worker: str = "",
+    workers_config: str = "evals/workers.yaml",
 ) -> None:
     """Run every scenario x trials against docker stores + the API;
     one JSONL row per (item, trial) lands in out_dir. --resume PATH
@@ -45,25 +43,21 @@ def run(
     playbook from the prefix (a labeled fingerprint change, the skill
     arm). Run with a project-scoped API key that carries its own spend
     cap — the key is read from the environment and never written
-    anywhere. --worker-base-url runs the worker against a
-    chat-completions endpoint, wherever it lives (the judge stays on
-    Anthropic), pinning its identity — base URL, seed, quant,
-    temperature — into every row (D29c). Token price is by model
-    (PRICES_PER_MTOK); a model with no listed price is unmetered."""
+    anywhere. --worker NAME selects a setup from --workers-config (model,
+    endpoint, and determinism knobs; the name is recorded per row and is
+    the arm label). Without it the worker is --model on the Anthropic SDK.
+    The judge stays on Anthropic. Token price is by model (PRICES_PER_MTOK);
+    a model with no listed price is unmetered."""
     from anthropic import Anthropic
 
     from resgraph.graph.client import get_driver
 
-    from .providers import build_worker
+    from .providers import build_worker, load_worker
     from .runner import load_scenarios, run_eval
 
-    worker_client, provenance = build_worker(
-        model,
-        base_url=worker_base_url,
-        seed=worker_seed or None,
-        quant=worker_quant,
-        tool_choice=worker_tool_choice,
-    )
+    setup = load_worker(worker, Path(workers_config)) if worker else {"model": model}
+    model = setup["model"]
+    worker_client, provenance = build_worker(setup)
     judge_client = None if no_judge else Anthropic()
     driver = get_driver()
     driver.verify_connectivity()

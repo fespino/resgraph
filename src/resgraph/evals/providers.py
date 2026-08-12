@@ -15,9 +15,11 @@ import json
 import os
 from collections.abc import Callable
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import httpx
+import yaml
 
 Transport = Callable[[str, dict[str, Any], dict[str, str]], dict[str, Any]]
 
@@ -253,41 +255,43 @@ class ChatCompletionsClient:
         )
 
 
-def build_worker(
-    model: str,
-    *,
-    base_url: str = "",
-    api_key: str | None = None,
-    temperature: float = 0.0,
-    seed: int | None = None,
-    quant: str = "",
-    tool_choice: str = "auto",
-    extra_args: dict[str, Any] | None = None,
-) -> tuple[Any, dict[str, Any]]:
-    """Resolve the worker client and its provenance. An empty ``base_url`` means
-    the Anthropic SDK — today's default worker. A ``base_url`` runs the worker
-    against a chat-completions endpoint, wherever it lives, and pins its full
-    identity into the provenance the runner records per row so the daily
-    baseline cannot drift under the periodic reference. The judge is resolved
-    separately by the caller and never follows the worker through here.
+def load_worker(name: str, path: Path) -> dict[str, Any]:
+    """Read a named worker setup from the YAML config. Secrets are never here —
+    API keys come from the environment; the file holds only model, endpoint, and
+    determinism knobs."""
+    setups = yaml.safe_load(path.read_text()) or {}
+    if name not in setups:
+        raise SystemExit(f"no worker setup {name!r} in {path}; have: {', '.join(sorted(setups))}")
+    return {"name": name, **setups[name]}
+
+
+def build_worker(setup: dict[str, Any]) -> tuple[Any, dict[str, Any]]:
+    """Resolve a worker client and its provenance from a setup dict (one entry of
+    the workers config). No ``base_url`` means the Anthropic SDK; a ``base_url``
+    runs the worker against a chat-completions endpoint, wherever it lives. The
+    setup name is the provenance handle recorded per row — the model itself is
+    recorded separately by the runner. The judge is resolved by the caller and
+    never follows the worker through here.
     """
+    name = setup.get("name")
+    base_url = setup.get("base_url", "")
     if not base_url:
         from anthropic import Anthropic
 
-        return Anthropic(), {"worker_provider": "anthropic"}
+        return Anthropic(), ({"worker_setup": name} if name else {})
     client = ChatCompletionsClient(
         base_url=base_url,
-        api_key=api_key,
-        temperature=temperature,
-        seed=seed,
-        tool_choice=tool_choice,
-        extra_args=extra_args,
+        temperature=setup.get("temperature", 0.0),
+        seed=setup.get("seed"),
+        tool_choice=setup.get("tool_choice", "auto"),
+        extra_args=setup.get("extra_args"),
     )
-    provenance = {
-        "worker_provider": "chat_completions",
+    provenance: dict[str, Any] = {
         "worker_base_url": base_url,
-        "worker_temperature": temperature,
-        "worker_seed": seed,
-        "worker_quant": quant or None,
+        "worker_temperature": setup.get("temperature", 0.0),
+        "worker_seed": setup.get("seed"),
+        "worker_quant": setup.get("quant"),
     }
+    if name:
+        provenance = {"worker_setup": name, **provenance}
     return client, provenance

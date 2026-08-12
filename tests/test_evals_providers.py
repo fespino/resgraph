@@ -2,6 +2,8 @@
 
 import json
 
+import pytest
+
 from resgraph.analyst.harness import Usage as HarnessUsage
 from resgraph.evals.providers import (
     ChatCompletionsClient,
@@ -9,6 +11,7 @@ from resgraph.evals.providers import (
     ToolUseBlock,
     build_worker,
     from_chat_response,
+    load_worker,
     to_chat_messages,
     to_chat_tools,
 )
@@ -255,28 +258,56 @@ def test_extra_args_merge_into_the_payload():
 
 def test_build_worker_endpoint_pins_full_identity():
     # A chat-completions endpoint, whether on localhost or a remote GPU.
-    client, prov = build_worker(
-        "qwen2.5:7b",
-        base_url="http://a-remote-gpu:8000/v1",
-        seed=7,
-        quant="Q4_K_M",
-        temperature=0.0,
-    )
+    setup = {
+        "name": "qwen-remote",
+        "model": "qwen2.5:7b",
+        "base_url": "http://a-remote-gpu:8000/v1",
+        "seed": 7,
+        "quant": "Q4_K_M",
+        "temperature": 0,
+    }
+    client, prov = build_worker(setup)
     assert isinstance(client, ChatCompletionsClient)
     assert prov == {
-        "worker_provider": "chat_completions",
+        "worker_setup": "qwen-remote",
         "worker_base_url": "http://a-remote-gpu:8000/v1",
-        "worker_temperature": 0.0,
+        "worker_temperature": 0,
         "worker_seed": 7,
         "worker_quant": "Q4_K_M",
     }
 
 
-def test_build_worker_default_is_anthropic(monkeypatch):
+def test_build_worker_anthropic_records_only_the_setup_name(monkeypatch):
     import anthropic
 
     sentinel = object()
     monkeypatch.setattr(anthropic, "Anthropic", lambda: sentinel)
-    client, prov = build_worker("claude-opus-4-8")
+    client, prov = build_worker({"name": "opus", "model": "claude-opus-4-8"})
     assert client is sentinel
-    assert prov == {"worker_provider": "anthropic"}
+    assert prov == {"worker_setup": "opus"}
+
+
+def test_build_worker_anonymous_default_records_nothing_extra(monkeypatch):
+    import anthropic
+
+    monkeypatch.setattr(anthropic, "Anthropic", lambda: object())
+    _, prov = build_worker({"model": "claude-opus-4-8"})  # no name -> the model says it all
+    assert prov == {}
+
+
+def test_load_worker_reads_a_named_setup(tmp_path):
+    cfg = tmp_path / "workers.yaml"
+    cfg.write_text("qwen-local:\n  model: qwen2.5:7b\n  base_url: http://localhost:11434/v1\n")
+    setup = load_worker("qwen-local", cfg)
+    assert setup == {
+        "name": "qwen-local",
+        "model": "qwen2.5:7b",
+        "base_url": "http://localhost:11434/v1",
+    }
+
+
+def test_load_worker_rejects_an_unknown_setup(tmp_path):
+    cfg = tmp_path / "workers.yaml"
+    cfg.write_text("opus:\n  model: claude-opus-4-8\n")
+    with pytest.raises(SystemExit, match="no worker setup 'nope'"):
+        load_worker("nope", cfg)

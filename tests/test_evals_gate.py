@@ -204,3 +204,18 @@ def test_an_undecided_verdict_renders_no_misleading_table():
     text = render_verdict(evaluate(run(trials=1), BASE))
     assert "UNDECIDED" in text
     assert "BREACH" not in text and "failing items" not in text
+
+
+def test_is_companion_only_distinguishes_companion_runs_from_drifted_base_runs():
+    from resgraph.evals.gate import is_companion_only
+
+    def row(tags):
+        return {"scenario_id": "a", "tags": tags, "dims": {}}
+
+    assert is_companion_only([row(["store_degraded"]), row(["injection"])])
+    assert is_companion_only([row(["coverage_gap"]), row(["budget_starved"])])
+    # a base run (even a drifted one) is not companion-only — it must
+    # still be selected and decline loudly, never skipped
+    assert not is_companion_only([row(["direct"]), row(["store_degraded"])])
+    assert not is_companion_only([row(["direct"])])
+    assert not is_companion_only([])

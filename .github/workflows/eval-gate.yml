@@ -36,15 +36,10 @@ jobs:
       - id: gate
         shell: bash
         run: |
-          run=$(ls -1 evals/runs/*.jsonl 2>/dev/null | sort | tail -1)
-          if [ -z "$run" ]; then
-            echo "no committed run to gate against — skipping" | tee gate.out
-            echo "verdict=skip" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          echo "gating $run against evals/baseline.json" | tee gate.out
+          # The CLI selects the newest GATEABLE run from the directory,
+          # skipping companion-set runs and naming what it skipped.
           code=0
-          uv run resgraph-evals gate "$run" >> gate.out 2>&1 || code=$?
+          uv run resgraph-evals gate evals/runs >> gate.out 2>&1 || code=$?
           case "$code" in
             0) verdict=pass ;;
             1) verdict=block ;;

@@ -1707,6 +1707,16 @@ The release-gate half of D29, consuming the certified k=3 baseline.
   from the baseline's rather than comparing pass^k across different
   items — which silently scored a 7-item budget-starved run as PASS
   against the 30-item baseline it never measured.
+- **Selection precedes comparison (#185).** Once drill and pilot runs
+  are committed as incident evidence, the newest file is usually a
+  companion set, and gating it would decline on every PR while a real
+  base-run regression sat unexamined. The gate scans newest-first and
+  skips runs that are *entirely* companion items (`store_degraded`,
+  `budget_starved`, `injection`, `coverage_gap`), naming what it
+  skipped. The skip is deliberately not "any mismatched run": a base
+  run whose dataset drifted is not companion-only, so it is still
+  selected and declines loudly — the failure the comparability rule
+  exists to catch must not be skipped past.
 - **Flap floor (#137):** the gate declines to verdict a run below
   k=3 — certification measured a 20% single-trial item-flip rate, so
   a k=1 diff on marginal items reads noise. Declined is distinct

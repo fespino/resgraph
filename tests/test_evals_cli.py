@@ -236,3 +236,60 @@ def test_skill_value_declines_on_mismatched_item_sets(tmp_path):
     )
     result = runner.invoke(app, ["skill-value", str(withf), str(without)])
     assert result.exit_code == 3
+
+
+def _companion_run(tmp_path, name, tag="store_degraded"):
+    rows = [_row(f"c{i}", "direct", {"degraded": True}) for i in range(3)]
+    for r in rows:
+        r["tags"] = [tag]
+    f = tmp_path / name
+    f.write_text("".join(json.dumps(r) + "\n" for r in rows))
+    return f
+
+
+def _base_run(tmp_path, name, prefix="s"):
+    rows = [
+        {
+            **_row(f"{prefix}{i}", "direct", {"found_top3": True, "evidence": True}),
+            "tags": ["direct"],
+        }
+        for i in range(4)
+        for _ in range(3)
+    ]
+    f = tmp_path / name
+    f.write_text("".join(json.dumps(r) + "\n" for r in rows))
+    return f
+
+
+def test_gate_directory_skips_companion_runs_and_gates_the_base(tmp_path):
+    runs = tmp_path / "runs"
+    runs.mkdir()
+    base = _base_run(runs, "20260101T000000Z.jsonl")
+    _companion_run(runs, "20260102T000000Z.jsonl")  # newer, must be skipped
+    baseline = _baseline_file(tmp_path, base)
+    result = runner.invoke(app, ["gate", str(runs), "--baseline", str(baseline)])
+    assert result.exit_code == 0
+    assert "skipped 1 companion-set run" in result.output
+    assert "gating 20260101T000000Z.jsonl" in result.output
+
+
+def test_gate_directory_declines_a_drifted_base_run_it_must_not_skip(tmp_path):
+    runs = tmp_path / "runs"
+    runs.mkdir()
+    baseline = _baseline_file(tmp_path, _base_run(tmp_path, "seed.jsonl", prefix="s"))
+    _base_run(
+        runs, "20260103T000000Z.jsonl", prefix="drift"
+    )  # different item set, no companion tags
+    result = runner.invoke(app, ["gate", str(runs), "--baseline", str(baseline)])
+    assert result.exit_code == 3  # declined, not skipped
+    assert "UNDECIDED" in result.output
+
+
+def test_gate_directory_with_only_companion_runs_skips(tmp_path):
+    runs = tmp_path / "runs"
+    runs.mkdir()
+    _companion_run(runs, "20260101T000000Z.jsonl")
+    baseline = _baseline_file(tmp_path, _base_run(tmp_path, "seed.jsonl"))
+    result = runner.invoke(app, ["gate", str(runs), "--baseline", str(baseline)])
+    assert result.exit_code == 0
+    assert "no gateable run" in result.output

@@ -14,6 +14,16 @@ SLICE_DROP = 0.05
 MIN_TRIALS = 3
 PROTECTED_SLICES = ("source:failure_derived", "budget_starved", "store_degraded", "injection")
 
+# Companion sets carry their own dataset and slice; a run made entirely
+# of them is never a candidate against the base baseline. A base run
+# whose dataset drifted is NOT companion-only, so it is still selected
+# and declines loudly rather than being skipped.
+COMPANION_TAGS = frozenset({"budget_starved", "store_degraded", "injection", "coverage_gap"})
+
+
+def is_companion_only(rows: list[dict[str, Any]]) -> bool:
+    return bool(rows) and all(any(t in COMPANION_TAGS for t in row.get("tags", [])) for row in rows)
+
 
 @dataclass(frozen=True)
 class GateVerdict:

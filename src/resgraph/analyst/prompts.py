@@ -222,8 +222,7 @@ class WorldSummary:
 
 
 @cache
-def prefix_text() -> str:
-    discipline = "# Triage discipline\n\n" + load_skill(SKILL_PATH).body.strip()
+def prefix_text(with_skill: bool = True) -> str:
     schema = json.dumps(TriageReport.model_json_schema(), indent=2, sort_keys=True)
     output_contract = (
         "# Output contract\n\n"
@@ -231,7 +230,11 @@ def prefix_text() -> str:
         "and nothing else, matching this schema:\n\n"
         f"{schema}\n\n{_OUTPUT_RULES}"
     )
-    return "\n\n".join((_IDENTITY, discipline, _TOOL_GUIDANCE, output_contract, _WORKED_EXAMPLE))
+    sections = [_IDENTITY]
+    if with_skill:
+        sections.append("# Triage discipline\n\n" + load_skill(SKILL_PATH).body.strip())
+    sections += [_TOOL_GUIDANCE, output_contract, _WORKED_EXAMPLE]
+    return "\n\n".join(sections)
 
 
 def suffix_text(summary: WorldSummary) -> str:
@@ -255,10 +258,15 @@ def user_text(resource_id: str, symptom: str, fired_at: datetime) -> str:
 
 
 def build_prompt(
-    *, resource_id: str, symptom: str, fired_at: datetime, summary: WorldSummary
+    *,
+    resource_id: str,
+    symptom: str,
+    fired_at: datetime,
+    summary: WorldSummary,
+    with_skill: bool = True,
 ) -> Prompt:
     system: list[dict[str, Any]] = [
-        {"type": "text", "text": prefix_text(), "cache_control": {"type": "ephemeral"}},
+        {"type": "text", "text": prefix_text(with_skill), "cache_control": {"type": "ephemeral"}},
         {"type": "text", "text": suffix_text(summary)},
     ]
     return Prompt(system=system, user=user_text(resource_id, symptom, fired_at))

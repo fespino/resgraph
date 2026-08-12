@@ -358,6 +358,7 @@ def run_eval(
     max_item_cost: float | None = None,
     max_item_seconds: float | None = None,
     judge_daily_cap: float = JUDGE_DAILY_CAP_USD,
+    with_skill: bool = True,
 ) -> Path:
     if max_cost is not None or max_item_cost is not None:
         estimate_cost({"input": 0, "output": 0, "cache_read": 0, "cache_creation": 0}, model)
@@ -386,6 +387,7 @@ def run_eval(
         "model": model,
         "judge_model": judge_model,
         "thinking": thinking,
+        "with_skill": with_skill,
         "stores": _store_images(),
         "host": _host(),
     }
@@ -398,6 +400,7 @@ def run_eval(
                 symptom=spec.alert.symptom,
                 fired_at=spec.alert.fired_at,
                 summary=summary,
+                with_skill=with_skill,
             )
             for trial in range(trials):
                 if (spec.id, trial) in done:

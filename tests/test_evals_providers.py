@@ -300,10 +300,9 @@ def test_load_setup_rejects_an_unknown_name(tmp_path):
 def test_build_client_reads_the_key_from_the_named_env_var(monkeypatch):
     monkeypatch.setenv("SOME_PROVIDER_KEY", "sk-from-env")
     captured: dict[str, object] = {}
-    import resgraph.evals.providers as providers
-
     monkeypatch.setattr(
-        providers, "ChatCompletionsClient", lambda **kw: captured.update(kw) or object()
+        "resgraph.evals.providers.ChatCompletionsClient",
+        lambda **kw: captured.update(kw) or object(),
     )
     build_client(
         {

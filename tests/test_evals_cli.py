@@ -94,8 +94,10 @@ def test_run_resolves_worker_and_judge_from_setups(monkeypatch, tmp_path):
     assert result.exit_code == 0, result.output
     assert captured["model"] == "qwen2.5:7b"
     assert captured["judge_model"] == "claude-opus-4-8"
-    assert captured["provenance"]["worker_provider"] == "ollama"
-    assert captured["provenance"]["judge_provider"] == "anthropic"
+    # the resolved setup objects ride the run, self-contained (like git_ref)
+    assert captured["provenance"]["worker"]["provider"] == "ollama"
+    assert captured["provenance"]["worker"]["base_url"] == "http://x/v1"
+    assert captured["provenance"]["judge"]["provider"] == "anthropic"
 
 
 def test_run_defaults_mean_no_cost_cap_and_preflight_on(monkeypatch, tmp_path):

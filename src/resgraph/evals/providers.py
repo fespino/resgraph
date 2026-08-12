@@ -268,19 +268,27 @@ def load_worker(name: str, path: Path) -> dict[str, Any]:
 def build_worker(setup: dict[str, Any]) -> tuple[Any, dict[str, Any]]:
     """Resolve a worker client and its provenance from a setup dict (one entry of
     the workers config). No ``base_url`` means the Anthropic SDK; a ``base_url``
-    runs the worker against a chat-completions endpoint, wherever it lives. The
-    setup name is the provenance handle recorded per row — the model itself is
-    recorded separately by the runner. The judge is resolved by the caller and
-    never follows the worker through here.
+    runs the worker against a chat-completions endpoint, wherever it lives — so a
+    new provider (OpenAI, OpenRouter, a hosted endpoint) is a config entry, not
+    code. The credential is named by env var (``api_key_env``), never inline, so
+    a secret never lands in the file. The setup name is the provenance handle;
+    the model and judge are recorded/resolved elsewhere.
     """
+    if "api_key" in setup:
+        raise SystemExit(
+            "worker setup carries an inline api_key; keep the secret in the "
+            "environment and name it with api_key_env instead"
+        )
     name = setup.get("name")
     base_url = setup.get("base_url", "")
     if not base_url:
         from anthropic import Anthropic
 
         return Anthropic(), ({"worker_setup": name} if name else {})
+    key_env = setup.get("api_key_env")
     client = ChatCompletionsClient(
         base_url=base_url,
+        api_key=os.environ.get(key_env) if key_env else None,
         temperature=setup.get("temperature", 0.0),
         seed=setup.get("seed"),
         tool_choice=setup.get("tool_choice", "auto"),

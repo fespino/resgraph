@@ -311,3 +311,29 @@ def test_load_worker_rejects_an_unknown_setup(tmp_path):
     cfg.write_text("opus:\n  model: claude-opus-4-8\n")
     with pytest.raises(SystemExit, match="no worker setup 'nope'"):
         load_worker("nope", cfg)
+
+
+def test_build_worker_reads_the_key_from_the_named_env_var(monkeypatch):
+    monkeypatch.setenv("SOME_PROVIDER_KEY", "sk-from-env")
+    captured: dict[str, object] = {}
+    import resgraph.evals.providers as providers
+
+    monkeypatch.setattr(
+        providers, "ChatCompletionsClient", lambda **kw: captured.update(kw) or object()
+    )
+    build_worker(
+        {
+            "name": "hosted",
+            "model": "gpt-4o",
+            "base_url": "https://api.example.com/v1",
+            "api_key_env": "SOME_PROVIDER_KEY",
+        }
+    )
+    assert captured["api_key"] == "sk-from-env"
+
+
+def test_build_worker_refuses_an_inline_secret():
+    with pytest.raises(SystemExit, match="api_key_env"):
+        build_worker(
+            {"name": "leaky", "model": "gpt-4o", "base_url": "http://x/v1", "api_key": "sk-leak"}
+        )

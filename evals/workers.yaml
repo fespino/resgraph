@@ -12,6 +12,15 @@ opus:
 sonnet:
   model: claude-sonnet-4-6
 
+# A hosted chat-completions provider — OpenAI, OpenRouter, a cloud endpoint.
+# Same adapter as a local model: only base_url and which env var holds the key
+# change. Adding a provider is a config entry, not code. The key lives in the
+# environment; api_key_env names it — never paste the value here.
+openai:
+  model: gpt-4o
+  base_url: https://api.openai.com/v1
+  api_key_env: OPENAI_API_KEY
+
 # A self-hosted model, on localhost or a remote GPU — same setup, only the URL
 # changes. tool_choice: required forces a tool call (the constrained-decoding
 # lever); add extra_args (e.g. guided_json) if the model emits malformed calls.

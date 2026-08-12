@@ -834,6 +834,56 @@ score of exactly 3 (so an off-by-one passed). Both became tests in
 the same commit; re-run: 13/13 killed. The audit finding holes is
 what distinguishes it from a ritual.
 
+## The provider seam — local is the daily driver, Anthropic the reference arm (D29c, #192)
+
+The cluster was built to price a worker, and everything downstream of a
+run reads JSONL rows blind to what produced them — so the worker is
+pluggable and the daily iteration loop stops paying API tokens for the
+*worker*. The re-centering: a **local** worker is the daily driver;
+**Opus** becomes a periodic reference arm, compared on the same item
+set via `arms` (cost per passed triage) to answer "how much better, and
+worth it when." The daily loop is free only when it runs the
+deterministic graders (`--no-judge`) — the LLM judge stays pinned on
+Opus (the confound guardrail below), so it is a deliberate Anthropic
+cost on the reference runs and on any run that needs the narrative
+dimension graded, not an unavoidable one. Free worker, judge on demand. This generalizes the model-arms experiment
+below from Anthropic-tier arms to any worker; the barbell — own the
+small model, rent the frontier by the token — is the shape every
+serving-economics analysis lands on.
+
+The seam is an in-process client factory plus a tool-surface adapter,
+not a network gateway (that is the D30 serving front door, a different
+layer). Four disciplines make the cheap loop trustworthy rather than a
+way to lie about cost:
+
+- **Per-role resolution** — the worker resolves independently of the
+  judge (`--model` local, `--judge-model` stays Anthropic), so the
+  judge-pin is structural, not remembered. A global provider switch is
+  rejected: it lets the judge follow the worker to local and corrupts
+  every baseline.
+- **No failover** — a measured run pins its worker; local-down fails
+  loudly. A silent fallback to Opus spends unintended money and
+  confounds the comparison, so the one gateway feature that looks like
+  a convenience is dropped explicitly.
+- **Provenance in full per row** — provider + model + quant +
+  temperature + seed, so the local baseline cannot drift under the
+  reference.
+- **Constrained decoding for tool calls** — forcing valid tool-call
+  output removes "the small model emitted malformed JSON" as a failure
+  mode masquerading as a harness bug, which makes the reference run
+  dual-purpose: cost calibration AND harness calibration.
+
+**Placement (scoped 2026-08-12).** A phase-10 instrument prerequisite,
+same class as invoked-sharpening and log-coverage: cheap code, no paid
+run. It lands **before the iteration-heavy experiments** (#132, #180,
+#160) where a free loop pays for itself, and it is **off the critical
+path to the paid Anthropic arms** (#100/#101, which need no local
+worker). The tool-surface adapter and constrained decoding on an 8 GB
+box are where it can balloon, so it is time-boxed: a $0 green local
+pilot (adapter emits valid tool calls, one item runs end to end) is the
+go/no-go — no pilot, no local arm, fall back to the Anthropic arms and
+revisit the seam as its own mini-phase.
+
 ## Pre-registered experiment — model arms (runs after the harness stabilizes)
 
 Question on the record (review, 2026-08-03): does task complexity

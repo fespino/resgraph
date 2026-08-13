@@ -25,7 +25,7 @@ from .audit import DEFAULT_DB, AuditStore, parse_since
 
 app = typer.Typer(help="resgraph analyst CLI.", add_completion=False)
 
-DEFAULT_MODEL = "claude-opus-4-8"
+DEFAULT_MODEL = "claude-haiku-4-5"  # the daily driver (#100 model arms); surface-for-review
 NEIGHBORHOOD_CAP = 40
 GRANT_TTL_S = 900.0
 

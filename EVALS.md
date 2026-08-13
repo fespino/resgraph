@@ -1081,6 +1081,15 @@ count are the decision surface, not one aggregate number.**
 pressure; its thinking-heavy generation is genuinely slow, but p50/p95
 may be modestly inflated by machine contention vs the cleaner runs.)*
 
+**Operational decision (recorded in SPEC D29c, 2026-08-13):**
+`claude-haiku-4-5` becomes the **default analyst worker** (`analyst/cli.py`,
+`evals/cli.py`) — the daily driver chosen by these numbers; **Opus is a
+periodic reference arm**, not the default; **the judge stays pinned on Opus**
+(a judge that follows the worker corrupts every arm). Load-bearing caveat:
+Haiku is *surface-for-review*, not an autonomous verdict (it over-attributes
+and occasionally fabricates). Whether the change-forensics skill narrows that
+honesty gap cheaply is the next experiment (#199), run below.
+
 ## Pre-registered experiment — the paired skill arm (run pending)
 
 Does the change-forensics playbook earn its ~3.6k prefix tokens? The

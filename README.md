@@ -27,7 +27,7 @@
 | src/resgraph/evals/\_\_init\_\_.py           |        0 |        0 |    100% |           |
 | src/resgraph/evals/arms.py                   |       42 |        0 |    100% |           |
 | src/resgraph/evals/breaker.py                |       38 |        0 |    100% |           |
-| src/resgraph/evals/cli.py                    |      111 |        1 |     99% |       113 |
+| src/resgraph/evals/cli.py                    |      114 |        1 |     99% |       124 |
 | src/resgraph/evals/faults.py                 |       23 |        0 |    100% |           |
 | src/resgraph/evals/gate.py                   |      167 |        4 |     98% |152, 203, 215, 233 |
 | src/resgraph/evals/graders.py                |       67 |        2 |     97% |   76, 139 |
@@ -35,7 +35,7 @@
 | src/resgraph/evals/judge.py                  |       16 |        0 |    100% |           |
 | src/resgraph/evals/providers.py              |      130 |        4 |     97% |82, 171-173 |
 | src/resgraph/evals/report.py                 |       74 |        1 |     99% |       156 |
-| src/resgraph/evals/runner.py                 |      230 |       37 |     84% |163-168, 177-183, 190-198, 200-203, 210, 216, 234-235, 247-248, 332, 366, 398, 415, 422, 512-513 |
+| src/resgraph/evals/runner.py                 |      230 |       37 |     84% |163-168, 177-183, 190-198, 200-203, 210, 216, 234-235, 247-248, 332, 366, 399, 416, 423, 513-514 |
 | src/resgraph/evals/sanitize.py               |       45 |        2 |     96% |   38, 150 |
 | src/resgraph/evals/skillvalue.py             |       54 |        0 |    100% |           |
 | src/resgraph/gen/\_\_init\_\_.py             |        0 |        0 |    100% |           |
@@ -70,7 +70,7 @@
 | src/resgraph/tools/context.py                |        9 |        0 |    100% |           |
 | src/resgraph/tools/http.py                   |       21 |        0 |    100% |           |
 | src/resgraph/tools/registry.py               |       24 |        0 |    100% |           |
-| **TOTAL**                                    | **3894** |  **139** | **96%** |           |
+| **TOTAL**                                    | **3897** |  **139** | **96%** |           |
 
 
 ## Setup coverage badge

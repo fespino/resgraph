@@ -125,6 +125,37 @@ def report(
     print(render(aggregate(rows), base))
 
 
+@app.command()
+def verify(
+    run_path: str,
+    rows: int = 0,
+    fingerprint: str = "",
+    items: int = 0,
+    min_trials: int = 0,
+) -> None:
+    """Verify a run measured something before it is trusted or compared —
+    the docs/drills/ pre-mortem gates as a command, not an ad-hoc snippet:
+    one model, one fingerprint, every row used tools, zero fabrications
+    (the halt), and the expected shape when --rows / --fingerprint /
+    --items / --min-trials are given. Exit 1 if any gate fails."""
+    from .verify import render as render_verify
+    from .verify import verify_run
+
+    run_rows = [
+        json.loads(line) for line in Path(run_path).read_text().splitlines() if line.strip()
+    ]
+    checks, ok = verify_run(
+        run_rows,
+        expect_rows=rows or None,
+        expect_fingerprint=fingerprint or None,
+        expect_items=items or None,
+        min_trials=min_trials or None,
+    )
+    print(render_verify(checks, run_rows))
+    if not ok:
+        raise typer.Exit(1)
+
+
 def _newest_gateable(
     run_dir: Path, baseline_model: str | None = None
 ) -> tuple[Path | None, list[str]]:

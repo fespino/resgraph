@@ -95,7 +95,6 @@ def run(
         trials=trials,
         out_dir=Path(out_dir),
         max_tool_calls=max_tool_calls,
-        thinking=None,
         extra_args=worker_extra_args,
         resume_path=Path(resume) if resume else None,
         max_cost=max_cost or None,

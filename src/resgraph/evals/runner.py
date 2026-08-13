@@ -351,7 +351,6 @@ def run_eval(
     trials: int = 1,
     out_dir: Path = Path("evals/runs"),
     max_tool_calls: int = MAX_TOOL_CALLS,
-    thinking: dict[str, Any] | None = None,
     extra_args: dict[str, Any] | None = None,
     resume_path: Path | None = None,
     max_cost: float | None = None,
@@ -390,9 +389,8 @@ def run_eval(
         "git_ref": _git_ref(),
         "model": model,
         "judge_model": judge_model,
-        # the effective thinking config, wherever it came from — the explicit
-        # param (bare --model path) or the named worker's extra_args
-        "thinking": thinking if thinking is not None else (extra_args or {}).get("thinking"),
+        # the effective thinking config rides the worker's request kwargs
+        "thinking": (extra_args or {}).get("thinking"),
         "with_skill": with_skill,
         "stores": _store_images(),
         "host": _host(),
@@ -445,7 +443,6 @@ def run_eval(
                         client,
                         model=model,
                         max_tool_calls=item_max_calls,
-                        thinking=thinking,
                         extra_args=extra_args,
                         max_cost_usd=max_item_cost,
                         cost_fn=(

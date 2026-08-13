@@ -131,8 +131,6 @@ def test_named_worker_carries_its_own_thinking_in_extra_args(monkeypatch, tmp_pa
         )
         assert result.exit_code == 0, result.output
         assert captured["extra_args"].get("thinking") == expected
-        # the top-level thinking recorded per row mirrors what was actually sent
-        assert captured["thinking"] is None
 
 
 def test_bare_model_path_defaults_to_adaptive_thinking(monkeypatch, tmp_path):

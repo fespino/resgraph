@@ -211,7 +211,7 @@ def test_extra_args_are_merged_into_the_create_call():
 def test_default_run_sends_no_thinking_param():
     """The haiku-critical default: no worker request kwargs -> no thinking
     key at all, so a model that rejects the param (haiku 4.5) is never sent
-    one. An explicit thinking arg still wins when given."""
+    one. Thinking is opt-in through extra_args, nowhere else."""
     client = FakeClient([response(text(HEDGED_REPORT))])
     run_triage(PROMPT, FakeToolset(), client, model=MODEL)
     assert "thinking" not in client.requests[0]

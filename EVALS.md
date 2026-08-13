@@ -105,8 +105,10 @@ post-spend, that their question was unposable:
 | `20260811T195509Z` | deferral pilot 1 | $0.15 | agent expresses the planted gap | **No** — no recognition rule existed |
 | `20260811T203358Z` | deferral pilot 2 | $0.15 | same, rule added | **No** — item's snapshot pre-explained the alert |
 | `20260811T210106Z` | deferral pilot 3 | $0.15 | same, fair item | **No** — tools certify the truncated log as complete |
+| `20260813T010439Z` | Haiku 1-item pilot | $0.02 | seam runs a competent model end to end | Yes — passed, 0 fabrications |
+| `20260813T154547Z` | Haiku model arm (full, k=3) | $1.62 | characterize Haiku vs the harness's floor | Yes — found the floor (abstention 0.167); halt fired (2 fabrications) |
 
-Running base rate: 2 of 7 objectives met, $9.52 spent, of which $6.03
+Running base rate: 4 of 9 objectives met, $11.16 spent, of which $7.67
 measured a registered objective. The ledger exists because the
 salvage-first write-ups of the five misses read, in sequence, like a
 string of successes — and a program that cannot see its own base rate
@@ -921,6 +923,86 @@ one). Cost ~$8.50 across the three arms; the pinned judge is a
 constant across arms and is excluded from the worker-cost comparison.
 Batches with the skill arm (same analysis, skill on/off is another
 arm) and the injection set (resistance by tier reuses these runs).
+
+### First result — the Haiku arm, run `20260813T154547Z` ($1.62, 30/30, k=3)
+
+Ran standalone, not the batched three-arm sweep: #196 (per-worker
+request args) made Haiku the ergonomic cheap driver once local 7b
+proved unfittable on this host, so Haiku went first. Pre-mortem
+`docs/drills/premortem-haiku-arm.md`. Method: 30-item base suite (seed
+42), k=3, `--no-judge` (deterministic graders — pass^k here is
+found-rate + evidence, not the narrative dim), with-skill, thinking
+OFF (Haiku 4.5 has no thinking mode). git `ca06f3b`, fingerprint
+`b041069e`, laptop (macOS arm64, 8 cpus, 8.6 GB), memgraph-mage +
+redis:8 by digest. Cost from run-row tokens × published Haiku rates
+(1.0/5.0 per Mtok), not an estimate.
+
+**Halt fired — `fabrication_count = 2`.** Per the pre-mortem this is
+not reported as a certifiable arm. Both fabrications are the same
+shape: a *secondary* suspect asserting a graph edge absent at incident
+time (`lb-000002→vm-000011` on transitive-s42017; `vm-000005→
+container-000016` on ambiguous-s42018) — the temporal-edge grader
+caught both. Over-commitment to a mechanism the data does not support.
+
+| metric | Haiku |
+|---|---|
+| pass^k / pass@k | 0.633 / 0.833 |
+| **control (abstention)** | **0.167** (3/18 trials) |
+| decoy | 0.417 |
+| direct / transitive / ambiguous | 1.00 / 0.92 / 0.92 |
+| deleted_resource / noisy_window | 1.00 / 1.00 |
+| source:planted | 0.733 |
+| fabrications | **2** (halt) |
+| latency p50 / p95 | 20.1s / 28.4s |
+| worker cost | $1.62 |
+
+**The finding: Haiku finds causes but cannot tell when there isn't
+one.** It fails honesty on 15 of 18 control trials — naming
+high-confidence culprits where the honest answer is "no confident
+candidate," and in several rows setting `no_confident_candidate=true`
+*while still listing high-confidence suspects* (the flag-gaming the
+phase-8 honesty dimension exists to catch). The 2 edge fabrications are
+the same disease at the mechanism level. Yet on real causal chains it
+is strong — 0.9–1.0 on direct/transitive/ambiguous/deleted/noisy.
+
+**The structure-dominance answer, made precise:** the harness transfers
+*pathfinding* (Haiku traces the graph as well as the tools allow) but
+NOT *judgment* — calibration and abstention are the model's job, and a
+cheaper model does them worse. This is exactly the floor the
+registration expected Haiku to find ("wherever it breaks first is a
+finding"), and it is a specific, nameable axis rather than "lower
+accuracy."
+
+**Do not read the aggregate as reassuring.** pass^k 0.633 sits near the
+committed Opus baseline's 0.667 — but (a) that baseline is at the
+*stale* fingerprint `84d04e11` (drifted via #106), so it is not a valid
+comparand for these `b041069e` numbers, and (b) the aggregate masks the
+control collapse under the strong causal slices. The honest comparison
+needs an Opus arm re-run at `b041069e`; the slice breakdown, not the
+headline, is where Haiku's gap lives.
+
+**Conclusions per model (this experiment, so far):**
+
+- **`claude-haiku-4-5` — finds causes, cannot abstain. Not a drop-in
+  daily driver.** Strong causal tracing, disqualifying honesty/
+  calibration gap (control 0.167, 2 fabrications). $1.62 for the full
+  arm. The eval caught *why* the frontier is worth its cost: judgment
+  under ambiguity.
+- **`qwen2.5:1.5b` (local) — too weak to characterize.** Pilot
+  (ambiguous-s42006, k=1, $0): 4 fabricated entities, no valid report,
+  item failed; the fabrication guards fired (provider-agnostic honesty
+  check, validated). A seam smoke worker, not an analyst.
+- **`qwen2.5:7b` / `3b` (local) — not runnable on this host.** 7b needs
+  ~5.1 GiB; the 8.6 GB laptop's Docker VM caps ~3.8 GiB (OOM at load);
+  3b will not fit the un-bumped VM either. The local reference-size arm
+  needs a ≥16 GB host.
+- **`claude-opus-4-8` (reference) — pending.** The certified baseline
+  (pass^k 0.667) is at `84d04e11`; a fresh run at `b041069e` is needed
+  both to anchor the arms and to refresh the drifted baseline — one
+  spend, two jobs.
+- **`claude-sonnet-4-6` — pending.** The registered decision rule
+  (Sonnet pass^k ≥ Opus − 0.07 → flip production to Sonnet) awaits both
+  arms.
 
 ## Pre-registered experiment — the paired skill arm (run pending)
 

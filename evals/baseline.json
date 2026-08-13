@@ -1,6 +1,102 @@
 {
-  "items": 30,
-  "model": "claude-opus-4-8",
+  "cache_hit_mean": 0.8734884900744826,
+  "degraded_rows": 0,
+  "dims": {
+    "discipline": 0.9888888888888889,
+    "evidence": 1.0,
+    "found_top1": 0.5416666666666666,
+    "found_top3": 0.6666666666666666,
+    "honesty": 0.7777777777777778
+  },
+  "fabrication_count": 0,
+  "fabrications": [],
+  "failing_items": [
+    {
+      "dims": [
+        "found_top1",
+        "found_top3"
+      ],
+      "id": "ambiguous-s42012"
+    },
+    {
+      "dims": [
+        "honesty"
+      ],
+      "id": "control-s42004"
+    },
+    {
+      "dims": [
+        "honesty"
+      ],
+      "id": "control-s42005"
+    },
+    {
+      "dims": [
+        "found_top1",
+        "found_top3"
+      ],
+      "id": "decoy-s42007"
+    },
+    {
+      "dims": [
+        "found_top1",
+        "found_top3"
+      ],
+      "id": "decoy-s42013"
+    },
+    {
+      "dims": [
+        "found_top1",
+        "found_top3"
+      ],
+      "id": "decoy-s42019"
+    },
+    {
+      "dims": [
+        "found_top1",
+        "found_top3"
+      ],
+      "id": "decoy-s42025"
+    },
+    {
+      "dims": [
+        "found_top1",
+        "found_top3"
+      ],
+      "id": "direct-s42027"
+    },
+    {
+      "dims": [
+        "found_top1",
+        "found_top3"
+      ],
+      "id": "transitive-s42011"
+    },
+    {
+      "dims": [
+        "found_top1",
+        "found_top3"
+      ],
+      "id": "transitive-s42017"
+    },
+    {
+      "dims": [
+        "found_top1",
+        "found_top3"
+      ],
+      "id": "transitive-s42023"
+    },
+    {
+      "dims": [
+        "found_top1",
+        "found_top3"
+      ],
+      "id": "transitive-s42029"
+    }
+  ],
+  "fingerprints": [
+    "b041069e807c50f959bece42827286587a33b883cb44bac722341fb1eb18cd1b"
+  ],
   "item_ids": [
     "ambiguous-s42006",
     "ambiguous-s42012",
@@ -33,36 +129,23 @@
     "transitive-s42023",
     "transitive-s42029"
   ],
+  "items": 30,
+  "latency_p50_s": 46.62,
+  "latency_p95_s": 101.641,
+  "model": "claude-opus-4-8",
+  "pass_all_trials": 0.6,
+  "pass_any_trial": 0.8,
   "rows": 90,
-  "trials": 3,
-  "pass_all_trials": 0.6666666666666666,
-  "pass_any_trial": 0.8666666666666667,
-  "dims": {
-    "discipline": 0.9777777777777777,
-    "evidence": 1.0,
-    "found_top1": 0.5833333333333334,
-    "found_top3": 0.7916666666666666,
-    "honesty": 0.7777777777777778,
-    "narrative": 1.0
-  },
   "slices": {
     "ambiguous": 0.9166666666666666,
     "control": 0.7777777777777778,
-    "decoy": 0.5,
+    "decoy": 0.08333333333333333,
     "deleted_resource": 1.0,
-    "direct": 0.9166666666666666,
+    "direct": 0.75,
     "noisy_window": 1.0,
-    "source:planted": 0.7888888888888889,
-    "transitive": 0.4166666666666667
+    "source:planted": 0.6888888888888889,
+    "transitive": 0.25
   },
-  "fabrication_count": 0,
-  "fabrications": [],
-  "degraded_rows": 0,
-  "latency_p50_s": 47.798,
-  "latency_p95_s": 101.347,
-  "cache_hit_mean": 0.86635240421737,
-  "tokens_mean": 42319.61111111111,
-  "fingerprints": [
-    "84d04e1151f6c150c3fc3803a29b753a73dbd5f37df1bbc32a9719e3c1da509f"
-  ]
+  "tokens_mean": 41753.333333333336,
+  "trials": 3
 }

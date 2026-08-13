@@ -156,6 +156,22 @@ def verify(
         raise typer.Exit(1)
 
 
+@app.command()
+def baseline(
+    run_path: str,
+    out: str = "evals/baseline.json",
+) -> None:
+    """Write a run's aggregate as the D29b gate baseline (the
+    eval-baseline-refresh flow). The baseline is exactly report.aggregate of
+    the run it refreshes from, so `gate` compares future runs against the same
+    numbers this run produced. Verify the run first; overwrites --out."""
+    from .report import aggregate
+
+    rows = [json.loads(line) for line in Path(run_path).read_text().splitlines() if line.strip()]
+    Path(out).write_text(json.dumps(aggregate(rows), indent=2, sort_keys=True) + "\n")
+    print(f"wrote {out} from {run_path} ({len(rows)} rows)")
+
+
 def _newest_gateable(
     run_dir: Path, baseline_model: str | None = None
 ) -> tuple[Path | None, list[str]]:

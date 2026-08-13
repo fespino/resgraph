@@ -109,9 +109,11 @@ post-spend, that their question was unposable:
 | `20260813T154547Z` | Haiku model arm (full, k=3) | $1.62 | characterize Haiku vs the harness's floor | Yes — found the floor (abstention 0.167); halt fired (2 fabrications) |
 | `20260813T173418Z` | Opus 1-item pilot | $0.17 | current config sane at b041069e before the big spend | Yes — passed, fp b041069e |
 | `20260813T173553Z` | Opus reference arm (full, k=3) | $12.80 | anchor the arms; refresh the baseline | Yes — truncated on the org cap, resumed to 90/90; refuted the single-arm "frontier wins" read |
+| `20260813T195608Z` | Sonnet 1-item pilot | $0.12 | current config sane at b041069e | Yes — passed, fp b041069e |
+| `20260813T200050Z` | Sonnet arm (full, k=3) | $12.00 | complete the picture; the decision-rule arm | Yes — twice interrupted, resumed to 90/90; Sonnet is the dominated middle (halt fired, 7 fabrications) |
 
-Running base rate: 6 of 11 objectives met, $24.13 spent, of which
-$20.64 measured a registered objective. The ledger exists because the
+Running base rate: 8 of 13 objectives met, $36.25 spent, of which
+$32.76 measured a registered objective. The ledger exists because the
 salvage-first write-ups of the five misses read, in sequence, like a
 string of successes — and a program that cannot see its own base rate
 selects worse questions each round.
@@ -1041,9 +1043,43 @@ here.
   fabricated, no report; the guards fired).
 - **`qwen2.5:7b` / `3b` (local)** — not runnable on 8.6 GB (7b OOMs at
   load; needs a ≥16 GB host).
-- **`claude-sonnet-4-6` — pending.** The registered decision-rule arm,
-  now the most interesting question: does it get Haiku's recall with
-  Opus's honesty?
+- **`claude-sonnet-4-6`** — the **dominated middle** (run
+  `20260813T200050Z`, $12.00, k=3, verified; fabrication halt fired at
+  7). It does NOT pair Haiku's recall with Opus's honesty — it is the
+  *middle* of the axis on every dimension, and the middle is the dead
+  zone: recall 0.833 (below Haiku's 0.90), honesty 0.444 (far below
+  Opus's 0.78), and it fabricates the most (7). Lowest pass^k (0.567),
+  slowest (p50 106s, 2.3× Opus), at near-Opus cost — it wins no axis.
+
+### The completed three-way picture — the middle is a trap (2026-08-13)
+
+| arm | pass^k | $/passed | p50 lat | fab | control (honesty) | transitive (recall) |
+|---|---|---|---|---|---|---|
+| haiku | **0.63** | **$0.085** | **20s** | 2 | 0.17 | **0.92** |
+| sonnet | 0.567 | $0.706 | 106s | **7** | 0.44 | 0.50 |
+| opus | 0.60 | $0.711 | 47s | **0** | **0.78** | 0.25 |
+
+Three arms map a clean **commit↔abstain axis**: Haiku (aggressive —
+cheap, fast, high recall, low honesty) → Sonnet (mushy middle —
+expensive, slow, mediocre at both) → Opus (conservative — expensive,
+low recall, high honesty). **Sonnet is dominated** — Haiku beats it on
+recall, cost (8×), and speed; Opus beats it on honesty; it has the
+lowest pass^k, the most fabrications, and the worst latency at no cost
+saving. The rational picks are the two *ends*, chosen by which error is
+expensive: Haiku for cheap high-recall surfacing-for-review, Opus for
+honest low-false-accusation triage.
+
+**The registered decision rule misfires — and that is the finding.**
+"Sonnet pass^k ≥ Opus − 0.07 → flip production to Sonnet": 0.567 ≥ 0.53,
+so the rule says *flip to the dominated arm*. A pass^k-only rule cannot
+see the 7 fabrications, the 2.3× latency, or the absent cost saving. The
+lesson for the chapter: **a scalar decision rule is inadequate for a
+multi-axis trade-off; the slice profile + cost + latency + fabrication
+count are the decision surface, not one aggregate number.**
+
+*(Latency caveat: the Sonnet run was twice interrupted under memory
+pressure; its thinking-heavy generation is genuinely slow, but p50/p95
+may be modestly inflated by machine contention vs the cleaner runs.)*
 
 ## Pre-registered experiment — the paired skill arm (run pending)
 

@@ -101,6 +101,48 @@ def test_run_resolves_worker_and_judge_from_setups(monkeypatch, tmp_path):
     assert captured["provenance"]["judge"]["provider"] == "anthropic"
 
 
+def test_named_worker_carries_its_own_thinking_in_extra_args(monkeypatch, tmp_path):
+    """A worker owns its request kwargs: opus ships adaptive thinking, haiku
+    ships none (the model rejects the param), and --thinking at the call site
+    is ignored for a named worker."""
+    cfg = tmp_path / "w.yaml"
+    cfg.write_text(
+        "opus:\n  provider: anthropic\n  model: claude-opus-4-8\n"
+        "  extra_args:\n    thinking:\n      type: adaptive\n"
+        "haiku:\n  provider: anthropic\n  model: claude-haiku-4-5\n"
+    )
+    for name, expected in (("opus", {"type": "adaptive"}), ("haiku", None)):
+        captured = {}
+        _stub_run(monkeypatch, tmp_path, captured)
+        result = runner.invoke(
+            app,
+            [
+                "run",
+                "--worker",
+                name,
+                "--no-judge",
+                "--workers-config",
+                str(cfg),
+                "--trials",
+                "1",
+                "--thinking",
+                "adaptive",
+            ],
+        )
+        assert result.exit_code == 0, result.output
+        assert captured["extra_args"].get("thinking") == expected
+
+
+def test_bare_model_path_defaults_to_adaptive_thinking(monkeypatch, tmp_path):
+    """No named worker -> no setup to carry request kwargs, so --thinking
+    supplies the Anthropic default."""
+    captured = {}
+    _stub_run(monkeypatch, tmp_path, captured)
+    result = runner.invoke(app, ["run", "--no-judge", "--trials", "1", "--skip-preflight"])
+    assert result.exit_code == 0, result.output
+    assert captured["extra_args"]["thinking"] == {"type": "adaptive"}
+
+
 def test_run_defaults_mean_no_cost_cap_and_preflight_on(monkeypatch, tmp_path):
     captured = {}
     _stub_run(monkeypatch, tmp_path, captured)

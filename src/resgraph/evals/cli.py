@@ -45,11 +45,14 @@ def run(
     arm). Run with a project-scoped API key that carries its own spend
     cap — the key is read from the environment and never written
     anywhere. --worker NAME selects a setup from --workers-config (provider,
-    model, endpoint, and determinism knobs; the name is recorded per row and
-    is the arm label); without it the worker is --model on the Anthropic SDK.
-    --judge NAME selects the judge setup the same way (keep it constant across
-    arms); without it the judge is --judge-model on Anthropic. Token price is
-    by model (PRICES_PER_MTOK); a model with no listed price is unmetered."""
+    model, endpoint, determinism knobs, and extra_args request kwargs; the name
+    is recorded per row and is the arm label); without it the worker is --model
+    on the Anthropic SDK. A named worker carries its own thinking in extra_args
+    (e.g. haiku omits it — the model rejects a thinking param), so --thinking
+    governs only the bare --model path. --judge NAME selects the judge setup the
+    same way (keep it constant across arms); without it the judge is
+    --judge-model on Anthropic. Token price is by model (PRICES_PER_MTOK); a
+    model with no listed price is unmetered."""
     from resgraph.graph.client import get_driver
 
     from .providers import build_client, load_setup
@@ -62,6 +65,14 @@ def run(
     worker_model: str = worker_setup["model"]
     worker_client = build_client(worker_setup)
     provenance: dict[str, Any] = {"worker": worker_setup}
+
+    # Per-worker request kwargs (thinking, constrained-decoding knobs) ride the
+    # setup's extra_args, so `--worker haiku` carries "no thinking" itself
+    # rather than needing --thinking at the call site. The bare --model path has
+    # no setup, so --thinking supplies the Anthropic default there.
+    worker_extra_args: dict[str, Any] = dict(worker_setup.get("extra_args") or {})
+    if not worker and thinking == "adaptive" and "thinking" not in worker_extra_args:
+        worker_extra_args["thinking"] = {"type": "adaptive"}
 
     judge_client = None
     judge_model_resolved: str | None = None
@@ -84,7 +95,7 @@ def run(
         trials=trials,
         out_dir=Path(out_dir),
         max_tool_calls=max_tool_calls,
-        thinking={"type": "adaptive"} if thinking == "adaptive" else None,
+        extra_args=worker_extra_args,
         resume_path=Path(resume) if resume else None,
         max_cost=max_cost or None,
         skip_preflight=skip_preflight,

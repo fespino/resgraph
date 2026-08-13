@@ -1862,6 +1862,31 @@ arms to any worker. **Rejected:** silent worker substitution to cut
 cost — it changes what the numbers describe rather than measuring the
 same thing cheaper; the re-centering is explicit and by design.
 
+**Decision — the daily driver is Haiku; Opus is the periodic reference
+(amendment, chosen by the #100 arms, 2026-08-13).** D29c set "local is
+the daily driver" as the shape; the arms chose the model. Local was
+ruled out on this hardware (qwen2.5:7b OOMs on 8.6 GB), and the three
+Anthropic arms measured a genuine trade-off, not a leaderboard:
+`claude-haiku-4-5` has the highest pass^k (0.63), best recall, at 8×
+lower cost and 5× lower latency; `claude-opus-4-8` abstains far better
+(control 0.78 vs 0.17, zero fabrications) but finds hard causes worse
+and does not earn its cost on pass^k; `claude-sonnet-4-6` is the
+dominated middle. So **`claude-haiku-4-5` is the default analyst worker**
+(`analyst/cli.py`, `evals/cli.py`); **Opus is a periodic reference arm**,
+not the default. **The judge stays pinned on Opus** regardless of the
+worker (`DEFAULT_JUDGE_MODEL`) — a judge that follows the worker to a
+cheaper model corrupts every arm. **Caveat, load-bearing:** Haiku's
+output is *surface-for-review*, not an autonomous verdict — it
+over-attributes on controls and occasionally fabricates an edge, so a
+deployment must treat its suspects as candidates a human or an Opus pass
+filters, not a page-the-team verdict. Whether the change-forensics skill
+narrows that honesty gap cheaply is the open experiment (#199). Full
+evidence: EVALS.md → the model arms. **Rejected:** Sonnet as a
+middle-ground default (dominated — worse pass^k, most fabrications,
+slowest, no cost saving); and a scalar pass^k decision rule (it would
+have picked the dominated arm — the decision surface is slices × cost ×
+latency × fabrications, not one number).
+
 ## Phase contracts
 - The generator MUST emit D2 messages exactly and expose `--seed`
   for reproducibility.

@@ -8,7 +8,8 @@ import typer
 
 app = typer.Typer(help="Analyst eval harness (SPEC D24).", add_completion=False)
 
-DEFAULT_MODEL = "claude-opus-4-8"
+DEFAULT_MODEL = "claude-haiku-4-5"  # analyst worker default: the daily driver (#100 arms)
+DEFAULT_JUDGE_MODEL = "claude-opus-4-8"  # judge stays pinned (D29c) — must not follow the worker
 
 
 @app.command()
@@ -16,7 +17,7 @@ def run(
     scenarios: str = "evals/scenarios/base.jsonl",
     trials: int = 3,
     model: str = DEFAULT_MODEL,
-    judge_model: str = DEFAULT_MODEL,
+    judge_model: str = DEFAULT_JUDGE_MODEL,
     no_judge: bool = False,
     out_dir: str = "evals/runs",
     max_tool_calls: int = 15,

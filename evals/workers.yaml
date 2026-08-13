@@ -9,13 +9,27 @@
 # Secrets never live here: keys come from the environment. `api_key_env` names
 # the variable; never paste the value. Local endpoints usually need no key.
 
+# extra_args are request kwargs merged into the worker's call, so a setup
+# carries its own knobs: adaptive thinking for the models that support it,
+# and NOTHING for haiku (haiku 4.5 rejects a thinking param). `--worker NAME`
+# therefore runs correctly without a matching --thinking at the call site.
 opus:
   provider: anthropic
   model: claude-opus-4-8
+  extra_args:
+    thinking:
+      type: adaptive
 
 sonnet:
   provider: anthropic
   model: claude-sonnet-4-6
+  extra_args:
+    thinking:
+      type: adaptive
+
+haiku:
+  provider: anthropic
+  model: claude-haiku-4-5
 
 # A hosted chat-completions provider — OpenAI, OpenRouter, a cloud endpoint.
 openai:
@@ -27,9 +41,31 @@ openai:
 # A self-hosted model, on localhost or a remote GPU — same client, only the URL
 # changes. tool_choice: required forces a tool call (the constrained-decoding
 # lever); add extra_args (e.g. guided_json) if the model emits malformed calls.
-qwen-local:
+# One entry per size so the arm label names the model. The size is a RAM ladder:
+# 7b (~5 GiB) needs a ≥16 GB host; 1.5b fits a tight box but is a seam smoke
+# worker, not a credible analyst — it fabricates, and the fabrication guards fire
+# on it (#192). Only 1.5b has been run end to end here; 3b/7b await the hardware.
+qwen-local-7b:
   provider: ollama
   model: qwen2.5:7b
+  base_url: http://localhost:11434/v1
+  temperature: 0
+  seed: 7
+  quant: Q4_K_M
+  tool_choice: required
+
+qwen-local-3b:
+  provider: ollama
+  model: qwen2.5:3b
+  base_url: http://localhost:11434/v1
+  temperature: 0
+  seed: 7
+  quant: Q4_K_M
+  tool_choice: required
+
+qwen-local-1.5b:
+  provider: ollama
+  model: qwen2.5:1.5b
   base_url: http://localhost:11434/v1
   temperature: 0
   seed: 7

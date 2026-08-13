@@ -192,6 +192,31 @@ def test_no_ceilings_leaves_cutoff_reason_none():
     assert result.cutoff_reason is None and not result.degraded
 
 
+def test_extra_args_are_merged_into_the_create_call():
+    """A worker's request kwargs (thinking, constrained-decoding knobs)
+    reach messages.create — the channel that carries per-worker thinking."""
+    client = FakeClient([response(text(HEDGED_REPORT))])
+    run_triage(
+        PROMPT,
+        FakeToolset(),
+        client,
+        model=MODEL,
+        extra_args={"thinking": {"type": "adaptive"}, "guided_json": {"k": 1}},
+    )
+    kwargs = client.requests[0]
+    assert kwargs["thinking"] == {"type": "adaptive"}
+    assert kwargs["guided_json"] == {"k": 1}
+
+
+def test_default_run_sends_no_thinking_param():
+    """The haiku-critical default: no worker request kwargs -> no thinking
+    key at all, so a model that rejects the param (haiku 4.5) is never sent
+    one. An explicit thinking arg still wins when given."""
+    client = FakeClient([response(text(HEDGED_REPORT))])
+    run_triage(PROMPT, FakeToolset(), client, model=MODEL)
+    assert "thinking" not in client.requests[0]
+
+
 def test_token_ceiling_refuses_tools():
     client = FakeClient(
         [

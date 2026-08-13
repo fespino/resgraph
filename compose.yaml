@@ -58,7 +58,7 @@ services:
   ollama:
     # Local worker backend for the eval seam (D29c). Opt-in like obs/bench —
     # heavy, and only the --worker path needs it. Serves the OpenAI-compatible
-    # API on 11434; workers.yaml's qwen-local points here.
+    # API on 11434; workers.yaml's qwen-local-* workers point here.
     #   docker compose --profile local up -d
     profiles: ["local"]
     image: ollama/ollama:0.12.6@sha256:a61a8fd395dbb931cc8cb1b5da7a2510746575c87113fdc45b647ee59ef7f808
@@ -70,14 +70,15 @@ services:
       timeout: 5s
       retries: 20
   ollama-pull:
-    # One-shot: pull the model qwen-local names, then exit — so bringing the
-    # profile up leaves a ready worker instead of a manual pull step.
+    # One-shot: pull a qwen-local-* model, then exit — so bringing the profile
+    # up leaves a ready worker instead of a manual pull step. Override the size
+    # for a RAM-tight host: OLLAMA_MODEL=qwen2.5:1.5b docker compose --profile local up
     profiles: ["local"]
     image: ollama/ollama:0.12.6@sha256:a61a8fd395dbb931cc8cb1b5da7a2510746575c87113fdc45b647ee59ef7f808
     depends_on:
       ollama: {condition: service_healthy}
     environment: {OLLAMA_HOST: "ollama:11434"}
-    entrypoint: ["/bin/sh", "-c", "ollama pull qwen2.5:7b"]
+    entrypoint: ["/bin/sh", "-c", "ollama pull ${OLLAMA_MODEL:-qwen2.5:7b}"]
     restart: "no"
 
 volumes:

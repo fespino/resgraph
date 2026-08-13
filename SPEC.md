@@ -1843,6 +1843,18 @@ slice, the deferral terminal state — or "harness bug" and "the model
 cannot" are indistinguishable, which makes the reference run
 dual-purpose: cost calibration AND harness calibration.
 
+**Request kwargs are a per-worker property.** A worker owns the
+request-shaping kwargs that differ by model — thinking is the first:
+Opus and Sonnet take adaptive thinking, Haiku 4.5 rejects a thinking
+param outright (a 400). These ride the worker setup's `extra_args`,
+merged into that worker's create call, so `--worker NAME` is
+self-sufficient and cannot be mismatched by a call-site flag; the
+global `--thinking` governs only the bare `--model` path. The same
+channel carries constrained-decoding knobs for local workers.
+**Rejected:** a global per-run thinking flag — it made a per-model fact
+a call-site responsibility, so `--worker haiku` 400'd unless the caller
+remembered to disable thinking.
+
 **Relationship:** this is the adapter seam D30's gateway reuses ("one
 base-URL change"), pulled ahead so the cheap loop lands without the
 serving build. It generalizes #100 (model arms) from Anthropic-tier

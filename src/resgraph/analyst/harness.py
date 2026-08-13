@@ -223,6 +223,7 @@ def run_triage(
     max_run_tokens: int = MAX_RUN_TOKENS,
     max_tokens: int = 8_000,
     thinking: dict[str, Any] | None = None,
+    extra_args: dict[str, Any] | None = None,
     on_event: Callable[[str, dict[str, Any]], None] | None = None,
     max_cost_usd: float | None = None,
     cost_fn: Callable[[Usage], float] | None = None,
@@ -286,7 +287,9 @@ def run_triage(
                     {"role": "user", "content": [{"type": "text", "text": _CONCLUDE_NOW}]}
                 )
         _mark_transcript_breakpoint(messages)
-        kwargs: dict[str, Any] = {"thinking": thinking} if thinking is not None else {}
+        kwargs: dict[str, Any] = {**(extra_args or {})}
+        if thinking is not None:
+            kwargs["thinking"] = thinking
         llm_started = time.monotonic()
         resp = client.messages.create(
             model=model,

@@ -173,6 +173,17 @@ def _baseline_file(tmp_path, run_path):
     return f
 
 
+def test_baseline_writes_the_runs_aggregate(tmp_path):
+    from resgraph.evals.report import aggregate
+
+    run = _run_file(tmp_path, "run.jsonl")
+    out = tmp_path / "baseline.json"
+    result = runner.invoke(app, ["baseline", str(run), "--out", str(out)])
+    assert result.exit_code == 0
+    rows = [json.loads(ln) for ln in run.read_text().splitlines() if ln.strip()]
+    assert json.loads(out.read_text()) == aggregate(rows)
+
+
 def test_gate_exits_zero_when_the_run_matches_its_baseline(tmp_path):
     run_path = _run_file(tmp_path, "run.jsonl")
     base = _baseline_file(tmp_path, run_path)

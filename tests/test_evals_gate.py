@@ -13,7 +13,7 @@ from resgraph.evals.report import aggregate
 # every key the gate reads out of a report.aggregate summary
 GATE_KEYS = ("trials", "items", "item_ids", "pass_all_trials", "fabrication_count", "slices")
 
-CERTIFIED_RUN = Path("evals/runs/20260803T221121Z.jsonl")
+CERTIFIED_RUN = Path("evals/runs/20260813T173553Z.jsonl")
 BASELINE = Path("evals/baseline.json")
 
 IDS = [f"item-{i}" for i in range(30)]

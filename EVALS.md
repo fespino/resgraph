@@ -107,9 +107,11 @@ post-spend, that their question was unposable:
 | `20260811T210106Z` | deferral pilot 3 | $0.15 | same, fair item | **No** — tools certify the truncated log as complete |
 | `20260813T010439Z` | Haiku 1-item pilot | $0.02 | seam runs a competent model end to end | Yes — passed, 0 fabrications |
 | `20260813T154547Z` | Haiku model arm (full, k=3) | $1.62 | characterize Haiku vs the harness's floor | Yes — found the floor (abstention 0.167); halt fired (2 fabrications) |
+| `20260813T173418Z` | Opus 1-item pilot | $0.17 | current config sane at b041069e before the big spend | Yes — passed, fp b041069e |
+| `20260813T173553Z` | Opus reference arm (full, k=3) | $12.80 | anchor the arms; refresh the baseline | Yes — truncated on the org cap, resumed to 90/90; refuted the single-arm "frontier wins" read |
 
-Running base rate: 4 of 9 objectives met, $11.16 spent, of which $7.67
-measured a registered objective. The ledger exists because the
+Running base rate: 6 of 11 objectives met, $24.13 spent, of which
+$20.64 measured a registered objective. The ledger exists because the
 salvage-first write-ups of the five misses read, in sequence, like a
 string of successes — and a program that cannot see its own base rate
 selects worse questions each round.
@@ -965,44 +967,83 @@ phase-8 honesty dimension exists to catch). The 2 edge fabrications are
 the same disease at the mechanism level. Yet on real causal chains it
 is strong — 0.9–1.0 on direct/transitive/ambiguous/deleted/noisy.
 
-**The structure-dominance answer, made precise:** the harness transfers
-*pathfinding* (Haiku traces the graph as well as the tools allow) but
-NOT *judgment* — calibration and abstention are the model's job, and a
-cheaper model does them worse. This is exactly the floor the
-registration expected Haiku to find ("wherever it breaks first is a
-finding"), and it is a specific, nameable axis rather than "lower
-accuracy."
+**The single-arm hypothesis — later REFUTED by the Opus arm (kept on
+the record, per the runbook).** From Haiku alone this read as "the
+harness transfers *pathfinding* but NOT *judgment* — calibration is the
+model's job, a cheaper model does it worse, so the frontier earns its
+cost." The Haiku facts are real; **the conclusion was wrong.** The Opus
+reference arm (below) abstains far better but *finds causes worse* and
+scores a lower pass^k at 8× the cost. A single arm's weakness does not
+tell you the other model is strong there in a way that dominates — you
+have to run the comparand. That is the whole reason the reference arm is
+not optional.
 
-**Do not read the aggregate as reassuring.** pass^k 0.633 sits near the
-committed Opus baseline's 0.667 — but (a) that baseline is at the
-*stale* fingerprint `84d04e11` (drifted via #106), so it is not a valid
-comparand for these `b041069e` numbers, and (b) the aggregate masks the
-control collapse under the strong causal slices. The honest comparison
-needs an Opus arm re-run at `b041069e`; the slice breakdown, not the
-headline, is where Haiku's gap lives.
+**Do not read the aggregate.** pass^k 0.633 sits near the old Opus
+baseline's 0.667 — but that baseline is at the *stale* fingerprint
+`84d04e11` (drifted via #106), not a valid comparand, and the aggregate
+masks the slice structure. Both were true; the `b041069e` Opus arm below
+is the real comparand, and it makes the point sharper than expected.
 
-**Conclusions per model (this experiment, so far):**
+### The Opus reference arm — the frontier does not dominate (run `20260813T173553Z`, $12.80, k=3)
 
-- **`claude-haiku-4-5` — finds causes, cannot abstain. Not a drop-in
-  daily driver.** Strong causal tracing, disqualifying honesty/
-  calibration gap (control 0.167, 2 fabrications). $1.62 for the full
-  arm. The eval caught *why* the frontier is worth its cost: judgment
-  under ambiguity.
-- **`qwen2.5:1.5b` (local) — too weak to characterize.** Pilot
-  (ambiguous-s42006, k=1, $0): 4 fabricated entities, no valid report,
-  item failed; the fabrication guards fired (provider-agnostic honesty
-  check, validated). A seam smoke worker, not an analyst.
-- **`qwen2.5:7b` / `3b` (local) — not runnable on this host.** 7b needs
-  ~5.1 GiB; the 8.6 GB laptop's Docker VM caps ~3.8 GiB (OOM at load);
-  3b will not fit the un-bumped VM either. The local reference-size arm
-  needs a ≥16 GB host.
-- **`claude-opus-4-8` (reference) — pending.** The certified baseline
-  (pass^k 0.667) is at `84d04e11`; a fresh run at `b041069e` is needed
-  both to anchor the arms and to refresh the drifted baseline — one
-  spend, two jobs.
-- **`claude-sonnet-4-6` — pending.** The registered decision rule
-  (Sonnet pass^k ≥ Opus − 0.07 → flip production to Sonnet) awaits both
-  arms.
+Ran at `b041069e` (matching Haiku), **verified clean by `resgraph-evals
+verify`** (90 rows, one fingerprint, every row used tools, 0
+fabrications, 30 items, k=3). Truncated once on the **org spend cap —
+the pre-mortem's #1 registered risk** — and resumed to completion with
+no drift (`docs/drills/premortem-opus-reference.md`). The `verify`
+command, new this arm, caught the truncated partial (17/90) and refused
+it before it could be compared; the finished run passes.
+
+```
+arm      pass^k     Δ    cost$  $/passed   p50s   p95s  fab
+opus       0.60          12.80    0.711   46.6  101.6    0
+haiku      0.63  +0.03     1.62    0.085   20.1   28.4    2
+```
+
+**A calibration inversion, not a frontier win.** By slice (Δ = opus −
+haiku): control **+0.61** (0.778 vs 0.167), transitive **−0.67** (0.250
+vs 0.917), decoy −0.33, direct −0.25, found_top3 −0.24 (0.667 vs 0.903).
+The two models sit at opposite ends of a **commit↔abstain** axis:
+
+- **Opus under-commits.** Abstains correctly on controls (0.78, no cause
+  there) AND incorrectly on hard real causes — on depth-3 transitive
+  chains it returns `no_confident_candidate=true` rather than committing
+  to the multi-hop path (0.25). Never fabricates. **Not a cutoff
+  artifact:** zero degraded rows, no cutoffs, 6–13 tool calls (under the
+  15 cap) — a genuine reluctance to commit.
+- **Haiku over-commits.** Finds the hard causes (transitive 0.92) AND
+  over-attributes on controls (0.17) and fabricates 2 edges.
+
+**Neither dominates.** On raw pass^k Opus is *slightly worse* (0.60 vs
+0.63) at 8× the cost and 2.3× the latency. Which model wins is a
+function of the cost of the two error types: false-accusation (Opus —
+abstains, zero fabrications) vs missed-cause (Haiku — higher recall at
+1/8 the price). For incident triage, where paging the wrong team or
+acting on a false cause is expensive, Opus's abstention buys something
+the pass^k does not show; for a surface-candidates-for-a-human tool,
+Haiku's recall at $0.085/passed is compelling. "Better" is not scalar
+here.
+
+**Conclusions per model:**
+
+- **`claude-opus-4-8`** — conservative calibration: abstains well
+  (control 0.78), zero fabrications, but under-commits on hard causes
+  (transitive 0.25 — mostly `no_confident_candidate` on real 2–3 hop
+  chains, not a cutoff; **investigate #198**, possibly prompt-tunable)
+  and does **not** earn its 8× cost on pass^k here (0.60 < 0.63). The
+  reference arm; this run refreshes the baseline to `b041069e`.
+- **`claude-haiku-4-5`** — aggressive calibration: best recall
+  (found_top3 0.90, transitive 0.92) at **$0.085/passed**, but
+  over-attributes on controls (0.17) and fabricates (2). Not a drop-in
+  for a *trust-the-output* pipeline; strong as a *surface-for-review*
+  one.
+- **`qwen2.5:1.5b` (local)** — too weak to characterize (pilot:
+  fabricated, no report; the guards fired).
+- **`qwen2.5:7b` / `3b` (local)** — not runnable on 8.6 GB (7b OOMs at
+  load; needs a ≥16 GB host).
+- **`claude-sonnet-4-6` — pending.** The registered decision-rule arm,
+  now the most interesting question: does it get Haiku's recall with
+  Opus's honesty?
 
 ## Pre-registered experiment — the paired skill arm (run pending)
 

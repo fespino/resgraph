@@ -63,7 +63,7 @@ class GenerateIn(BaseModel):
     model: str | None = None
     pin: str | None = None
     stream: bool = False
-    no_cache: bool = False
+    cache_responses: bool = True
 
 
 class UsageOut(BaseModel):
@@ -370,7 +370,7 @@ def create_app(
         # sampled response replayed as the answer would be a quiet lie, so
         # anything else is a pass-through — and a hit says cached=true.
         key = None
-        if not req.no_cache and gw.setups[decision.model].get("temperature") == 0:
+        if req.cache_responses and gw.setups[decision.model].get("temperature") == 0:
             key = cache_key(decision.model, _request_kwargs(gw, decision.model, req))
             hit = gw.cache.get(key)
             if hit is not None:
@@ -387,7 +387,7 @@ def create_app(
             latency_s=latency,
             usage=usage,
         )
-        if not req.no_cache and gw.setups[alias].get("temperature") == 0:
+        if req.cache_responses and gw.setups[alias].get("temperature") == 0:
             served_key = (
                 key
                 if alias == decision.model and key is not None

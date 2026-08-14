@@ -114,6 +114,10 @@ GATEWAY_CACHE_HITS = _meter.create_counter(
     "gateway_cache_hits_total",
     description="cache hits by layer (gateway response / provider prefix)",
 )
+GATEWAY_CACHE_MISSES = _meter.create_counter(
+    "gateway_cache_misses_total",
+    description="cache misses by layer — hits alone flatter the meter",
+)
 GATEWAY_CACHE_TOKENS_SAVED = _meter.create_counter(
     "gateway_cache_tokens_saved", description="tokens the gateway response cache did not spend"
 )
@@ -256,7 +260,8 @@ def _refresh_instruments() -> None:
     global BATCH_SECONDS, API_SECONDS
     global ANALYST_RUN_SECONDS, ANALYST_RUN_COST, ANALYST_RUNS
     global GATEWAY_TTFT, GATEWAY_TOKENS_PER_S, GATEWAY_REQUESTS, GATEWAY_FALLBACK_CHAIN
-    global GATEWAY_STREAM_ERRORS, GATEWAY_CACHE_HITS, GATEWAY_CACHE_TOKENS_SAVED, GATEWAY_COST
+    global GATEWAY_STREAM_ERRORS, GATEWAY_CACHE_HITS, GATEWAY_CACHE_MISSES
+    global GATEWAY_CACHE_TOKENS_SAVED, GATEWAY_COST
     _meter = otel_metrics.get_meter("resgraph")
     READ = _meter.create_counter("ingest_read", description="entries read from the stream")
     APPLIED = _meter.create_counter("ingest_applied", description="messages applied")
@@ -300,6 +305,10 @@ def _refresh_instruments() -> None:
     GATEWAY_CACHE_HITS = _meter.create_counter(
         "gateway_cache_hits_total",
         description="cache hits by layer (gateway response / provider prefix)",
+    )
+    GATEWAY_CACHE_MISSES = _meter.create_counter(
+        "gateway_cache_misses_total",
+        description="cache misses by layer — hits alone flatter the meter",
     )
     GATEWAY_CACHE_TOKENS_SAVED = _meter.create_counter(
         "gateway_cache_tokens_saved", description="tokens the gateway response cache did not spend"

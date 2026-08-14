@@ -33,6 +33,7 @@ from pydantic import BaseModel
 
 from resgraph.evals.providers import build_client
 from resgraph.gateway.accounting import StreamAccount
+from resgraph.gateway.cache import ResponseCache, cache_key
 from resgraph.gateway.dispatch import Backend, ProbeResult, QueueFull, choose
 from resgraph.gateway.relay import StreamEvent, StreamFactory, parse_chat_sse, relay
 from resgraph.gateway.router import (
@@ -79,6 +80,7 @@ class GenerateOut(BaseModel):
     fallback_chain: list[str]
     latency_s: float
     usage: UsageOut
+    cached: bool = False
 
 
 @dataclass
@@ -90,6 +92,7 @@ class Gateway:
     registry: Mapping[TaskClass, ClassRoute] = field(default_factory=lambda: DEFAULT_REGISTRY)
     clients: dict[str, Any] = field(default_factory=dict)
     backends: dict[str, Backend] = field(default_factory=dict)
+    cache: ResponseCache = field(default_factory=ResponseCache)
 
     def client(self, alias: str) -> Any:
         if alias not in self.clients:
@@ -361,10 +364,20 @@ def create_app(
                 media_type="text/event-stream",
             )
 
+        # The response cache answers only byte-identical repeats of
+        # deterministic requests: a temperature-0 setup, non-streamed. A
+        # sampled response replayed as the answer would be a quiet lie, so
+        # anything else is a pass-through — and a hit says cached=true.
+        key = None
+        if gw.setups[decision.model].get("temperature") == 0:
+            key = cache_key(decision.model, _request_kwargs(gw, decision.model, req))
+            hit = gw.cache.get(key)
+            if hit is not None:
+                return hit.model_copy(update={"cached": True})
         (content, usage, latency), alias, chain = _serve_with_walk(
             gw, decision, lambda a: _call(gw, a, req)
         )
-        return GenerateOut(
+        out = GenerateOut(
             content=content,
             model=alias,
             source=decision.source,
@@ -373,5 +386,13 @@ def create_app(
             latency_s=latency,
             usage=usage,
         )
+        if gw.setups[alias].get("temperature") == 0:
+            served_key = (
+                key
+                if alias == decision.model and key is not None
+                else cache_key(alias, _request_kwargs(gw, alias, req))
+            )
+            gw.cache.put(served_key, out, usage.input_tokens + usage.output_tokens)
+        return out
 
     return app

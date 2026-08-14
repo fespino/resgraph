@@ -319,6 +319,12 @@ def run_triage(
                 "tokens": (getattr(resp.usage, "input_tokens", 0) or 0)
                 + (getattr(resp.usage, "output_tokens", 0) or 0),
             }
+            if (route_source := getattr(resp, "source", None)) is not None:
+                # served through the gateway: the winning routing source,
+                # backend, and cache state land in the trail per call
+                event["source"] = route_source
+                event["backend"] = getattr(resp, "backend", None)
+                event["cached"] = getattr(resp, "cached", False)
             if reasoning:
                 event["thinking"] = "\n\n".join(reasoning)
             on_event("llm_call", event)

@@ -201,3 +201,19 @@ def test_parse_since():
     assert parse_since("30m") == timedelta(minutes=30)
     with pytest.raises(ValueError, match="--since"):
         parse_since("7 days")
+
+
+def test_llm_call_records_the_routing_source_when_served_through_the_gateway(store):
+    first = response(tool_use("t1", "fetch_resource", {"resource_id": "host-000001"}))
+    second = response(text(VALID_REPORT))
+    for r in (first, second):
+        r.source = "pin"
+        r.backend = "anthropic"
+        r.cached = False
+    run_triage(
+        PROMPT, FakeToolset(), FakeClient([first, second]), model=MODEL, on_event=store.sink("r1")
+    )
+    llm = [e for e in store.timeline("r1") if e["kind"] == "llm_call"]
+    assert [e["payload"]["source"] for e in llm] == ["pin", "pin"]
+    assert llm[0]["payload"]["backend"] == "anthropic"
+    assert llm[0]["payload"]["cached"] is False

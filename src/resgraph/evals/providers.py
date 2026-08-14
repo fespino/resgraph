@@ -43,6 +43,14 @@ class ToolUseBlock:
 class Usage:
     input_tokens: int = 0
     output_tokens: int = 0
+    cache_read_input_tokens: int = 0
+    cache_creation_input_tokens: int = 0
+
+
+@dataclass
+class ThinkingBlock:
+    thinking: str
+    type: str = "thinking"
 
 
 @dataclass
@@ -50,6 +58,9 @@ class Response:
     content: list[Any]
     usage: Usage
     stop_reason: str = "end_turn"
+    source: str | None = None
+    backend: str | None = None
+    cached: bool = False
 
 
 _STOP = {"stop": "end_turn", "tool_calls": "tool_use", "length": "max_tokens"}
@@ -311,6 +322,96 @@ class ChatCompletionsClient:
         )
 
 
+class GatewayClient:
+    """An Anthropic-shaped client that serves through the gateway.
+
+    Routing belongs to the SETUP (``pin`` / ``task_class`` / ``alias``),
+    resolved by the gateway's registry — the harness's ``model`` kwarg is a
+    raw provider id the gateway does not accept, so it is ignored here and
+    the setup's own routing decides. A measured run's setup pins and sets
+    ``cache_responses: false`` (the instrument bypass). The winning source,
+    serving backend, and cache state ride back on the Response."""
+
+    def __init__(
+        self,
+        *,
+        base_url: str,
+        pin: str | None = None,
+        task_class: str | None = None,
+        alias: str | None = None,
+        cache_responses: bool = True,
+        transport: Transport | None = None,
+    ) -> None:
+        self._url = base_url.rstrip("/") + "/v1/generate"
+        self._pin = pin
+        self._task_class = task_class
+        self._alias = alias
+        self._cache_responses = cache_responses
+        self._transport = transport or _httpx_transport
+        self.messages = self
+
+    def create(
+        self,
+        *,
+        max_tokens: int,
+        messages: list[dict[str, Any]],
+        system: str | list[dict[str, Any]] | None = None,
+        tools: list[dict[str, Any]] | None = None,
+        **_ignored: Any,
+    ) -> Response:
+        body: dict[str, Any] = {"messages": messages, "max_tokens": max_tokens}
+        if system is not None:
+            body["system"] = system
+        if tools is not None:
+            body["tools"] = tools
+        if self._pin is not None:
+            body["pin"] = self._pin
+        if self._task_class is not None:
+            body["task_class"] = self._task_class
+        if self._alias is not None:
+            body["model"] = self._alias
+        if not self._cache_responses:
+            body["cache_responses"] = False
+        data = self._transport(self._url, body, {})
+        blocks: list[Any] = []
+        for block in data["content"]:
+            kind = block.get("type")
+            if kind == "tool_use":
+                blocks.append(
+                    ToolUseBlock(id=block["id"], name=block["name"], input=block["input"])
+                )
+            elif kind == "thinking":
+                blocks.append(ThinkingBlock(thinking=block.get("thinking", "")))
+            else:
+                blocks.append(TextBlock(text=block.get("text", "")))
+        u = data["usage"]
+        return Response(
+            content=blocks,
+            usage=Usage(
+                input_tokens=u.get("input_tokens", 0),
+                output_tokens=u.get("output_tokens", 0),
+                cache_read_input_tokens=u.get("cache_read_tokens", 0),
+                cache_creation_input_tokens=u.get("cache_creation_tokens", 0),
+            ),
+            source=data.get("source"),
+            backend=data.get("backend"),
+            cached=data.get("cached", False),
+        )
+
+
+def _build_gateway(setup: dict[str, Any]) -> Any:
+    base_url = setup.get("base_url")
+    if not base_url:
+        raise SystemExit(f"setup {setup.get('name')!r} (provider gateway) needs a base_url")
+    return GatewayClient(
+        base_url=base_url,
+        pin=setup.get("pin"),
+        task_class=setup.get("task_class"),
+        alias=setup.get("alias"),
+        cache_responses=setup.get("cache_responses", True),
+    )
+
+
 def load_setup(name: str, path: Path) -> dict[str, Any]:
     """Read a named client setup from the YAML config. Secrets are never here —
     keys come from the environment (``api_key_env`` names the variable); the file
@@ -346,7 +447,10 @@ def _build_chat_completions(setup: dict[str, Any]) -> Any:
 
 # Only Anthropic needs its own entry — its messages API carries caching and
 # thinking the harness uses; every other provider falls through to chat-completions.
-CLIENTS: dict[str, Callable[[dict[str, Any]], Any]] = {"anthropic": _build_anthropic}
+CLIENTS: dict[str, Callable[[dict[str, Any]], Any]] = {
+    "anthropic": _build_anthropic,
+    "gateway": _build_gateway,
+}
 
 
 def build_client(setup: dict[str, Any]) -> Any:

@@ -146,3 +146,66 @@ def test_probe_classifies_slow(harness, monkeypatch):
     client, _, _ = harness
     monkeypatch.setattr(server, "PROBE_SLOW_S", 0.0)
     assert probe(client.app.state.gateway, "haiku") == "slow"
+
+
+def test_object_blocks_translate_to_wire_dicts(harness, monkeypatch):
+    from resgraph.evals.providers import TextBlock, ToolUseBlock
+
+    client, _, _ = harness
+
+    def create(**kwargs):
+        return SimpleNamespace(
+            content=[
+                TextBlock(text="thinking done"),
+                ToolUseBlock(id="t1", name="fetch_resource", input={"id": "srv-1"}),
+            ],
+            usage=SimpleNamespace(input_tokens=1, output_tokens=2),
+        )
+
+    gw = client.app.state.gateway
+    monkeypatch.setattr(gw.client("haiku"), "create", create)
+    r = _gen(client, task_class="judgment")
+    assert r.status_code == 200
+    assert r.json()["content"] == [
+        {"type": "text", "text": "thinking done"},
+        {"type": "tool_use", "id": "t1", "name": "fetch_resource", "input": {"id": "srv-1"}},
+    ]
+
+
+def test_system_and_tools_ride_the_create_call(harness):
+    client, _, calls = harness
+    tools = [{"name": "fetch_resource", "input_schema": {}}]
+    r = _gen(client, task_class="judgment", system="be brief", tools=tools)
+    assert r.status_code == 200
+    _, kwargs = calls[0]
+    assert kwargs["system"] == "be brief"
+    assert kwargs["tools"] == tools
+
+
+def test_fallback_reaches_a_provider_outside_the_registry(tmp_path):
+    from resgraph.gateway.router import ClassRoute
+
+    path = tmp_path / "models.yaml"
+    path.write_text(
+        yaml.safe_dump(
+            {
+                "haiku": {"provider": "anthropic", "model": "claude-haiku-4-5"},
+                "gpt": {"provider": "openai", "model": "gpt-4o"},
+            }
+        )
+    )
+    calls: list[tuple[str, dict]] = []
+    behaviors = {"haiku": "boom"}
+    app = create_app(
+        models_path=path,
+        client_factory=lambda setup: FakeClient(setup["name"], behaviors, calls),
+        registry={"judgment": ClassRoute("haiku", "the only routed class")},
+    )
+    client = TestClient(app)
+    r = _gen(client, task_class="judgment")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["model"] == "gpt"
+    assert body["backend"] == "openai"
+    assert body["fallback_chain"] == ["anthropic:haiku"]
+    assert app.state.gateway.alias_for_backend("nowhere") is None

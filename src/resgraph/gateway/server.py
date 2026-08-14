@@ -233,7 +233,7 @@ def _record_hop(gw: Gateway, alias: str, exc: Exception, chain: list[str]) -> No
 
 
 def _serve_with_walk[T](
-    gw: Gateway, decision: Any, attempt: Callable[[str], T]
+    gw: Gateway, decision: Any, attempt: Callable[[str], T], task_class: str
 ) -> tuple[T, str, list[str]]:
     """Drive the init-failure walk for any attempt shape (a full call or a
     stream open): pins fail loudly, other traffic hops until served or
@@ -245,7 +245,13 @@ def _serve_with_walk[T](
             return attempt(alias), alias, chain
         except QueueFull as exc:
             obs.GATEWAY_REQUESTS.add(
-                1, {"backend": exc.backend, "outcome": "rejected_429", "source": decision.source}
+                1,
+                {
+                    "backend": exc.backend,
+                    "outcome": "rejected_429",
+                    "source": decision.source,
+                    "task_class": task_class,
+                },
             )
             raise HTTPException(
                 429, detail=str(exc), headers={"Retry-After": str(exc.retry_after_s)}
@@ -260,6 +266,7 @@ def _serve_with_walk[T](
                         "backend": gw.backend(alias).name,
                         "outcome": "pin_failed_502",
                         "source": decision.source,
+                        "task_class": task_class,
                     },
                 )
                 raise HTTPException(
@@ -269,7 +276,13 @@ def _serve_with_walk[T](
             alias = _next_alias(gw, chain)
     log.error("[gateway:exhausted] chain=%s", chain)
     obs.GATEWAY_REQUESTS.add(
-        1, {"backend": "none", "outcome": "exhausted_503", "source": decision.source}
+        1,
+        {
+            "backend": "none",
+            "outcome": "exhausted_503",
+            "source": decision.source,
+            "task_class": task_class,
+        },
     )
     raise HTTPException(503, detail=f"no backend could serve; chain={chain}")
 
@@ -385,7 +398,7 @@ def create_app(
 
         if req.stream:
             (backend, events), alias, chain = _serve_with_walk(
-                gw, decision, lambda a: _open_stream(gw, a, req, factory)
+                gw, decision, lambda a: _open_stream(gw, a, req, factory), req.task_class or "none"
             )
 
             def reopen(chain2: list[str]) -> tuple[str, Backend, Iterator[StreamEvent]] | None:
@@ -432,6 +445,16 @@ def create_app(
                             gw.setups[payload["model"]]["model"],
                         ),
                         labels,
+                    )
+                elif payload["type"] == "disconnect":
+                    obs.GATEWAY_REQUESTS.add(
+                        1,
+                        {
+                            "backend": payload["backend"],
+                            "outcome": "client_disconnected",
+                            "source": decision.source,
+                            "task_class": task_label,
+                        },
                     )
                 else:
                     obs.GATEWAY_STREAM_ERRORS.add(
@@ -483,7 +506,7 @@ def create_app(
                 )
                 return hit.model_copy(update={"cached": True})
         (content, usage, latency), alias, chain = _serve_with_walk(
-            gw, decision, lambda a: _call(gw, a, req)
+            gw, decision, lambda a: _call(gw, a, req), req.task_class or "none"
         )
         out = GenerateOut(
             content=content,

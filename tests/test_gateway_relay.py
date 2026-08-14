@@ -208,3 +208,21 @@ def test_parse_chat_sse_refuses_tool_call_deltas_loudly():
     ]
     with pytest.raises(NotImplementedError, match="streamed tool calls"):
         list(parse_chat_sse(iter(lines)))
+
+
+def test_a_client_disconnect_is_observed_as_an_outcome():
+    backend = admitted("ollama")
+    seen: list[dict] = []
+    gen = relay(
+        alias="qwen-local-1.5b",
+        backend=backend,
+        events=iter([("content", "a"), ("content", "b")]),
+        source="override",
+        fallback_chain=[],
+        reopen=no_reopen,
+        clock=make_clock(),
+        observe=seen.append,
+    )
+    next(gen)
+    gen.close()
+    assert seen == [{"type": "disconnect", "backend": "ollama"}]

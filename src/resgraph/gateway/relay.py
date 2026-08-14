@@ -78,6 +78,7 @@ def relay(
     backend slot is released on every exit, including a client disconnect
     closing the generator mid-stream."""
     owned = True
+    completed = False
     try:
         while True:
             account = StreamAccount(backend=backend.name, started_at=clock())
@@ -106,6 +107,7 @@ def relay(
                     "reason": death.reason,
                     "tokens_emitted": death.tokens_emitted,
                 }
+                completed = True
                 observe(error_payload)
                 yield sse(error_payload)
                 return
@@ -127,9 +129,14 @@ def relay(
                 "tokens_per_s": account.tokens_per_second,
                 "reconciliation_ok": reconciliation.within_tolerance,
             }
+            completed = True
             observe(end_payload)
             yield sse(end_payload)
             return
     finally:
         if owned:
             backend.release()
+        if not completed:
+            # A hung-up client is an outcome, not a silence: without this
+            # the request class vanishes from the request counter entirely.
+            observe({"type": "disconnect", "backend": backend.name})

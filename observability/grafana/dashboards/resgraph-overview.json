@@ -414,6 +414,118 @@
      "legendFormat": "degraded"
     }
    ]
+  },
+  {
+   "id": 13,
+   "type": "timeseries",
+   "title": "Gateway TTFT p95 (5m) \u2014 objective from capacity.md after the load test",
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 0,
+    "y": 48
+   },
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "s"
+    },
+    "overrides": []
+   },
+   "targets": [
+    {
+     "expr": "slo:gateway_ttft:p95_5m",
+     "refId": "A",
+     "legendFormat": "{{backend}}"
+    }
+   ]
+  },
+  {
+   "id": 14,
+   "type": "timeseries",
+   "title": "Gateway availability (5m) \u2014 successful or honestly failed",
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 12,
+    "y": 48
+   },
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "percentunit"
+    },
+    "overrides": []
+   },
+   "targets": [
+    {
+     "expr": "slo:gateway_availability:ratio_5m",
+     "refId": "A",
+     "legendFormat": "availability"
+    }
+   ]
+  },
+  {
+   "id": 15,
+   "type": "timeseries",
+   "title": "Gateway queue depth \u2014 the leading pressure signal",
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 0,
+    "y": 56
+   },
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "none"
+    },
+    "overrides": []
+   },
+   "targets": [
+    {
+     "expr": "max by (backend) (gateway_queue_depth)",
+     "refId": "A",
+     "legendFormat": "{{backend}}"
+    }
+   ]
+  },
+  {
+   "id": 16,
+   "type": "timeseries",
+   "title": "Gateway cost per task p95 (1h) \u2014 the money SLO",
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 12,
+    "y": 56
+   },
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "currencyUSD"
+    },
+    "overrides": []
+   },
+   "targets": [
+    {
+     "expr": "slo:gateway_cost_per_task:p95_1h",
+     "refId": "A",
+     "legendFormat": "{{task_class}}"
+    }
+   ]
   }
  ],
  "templating": {

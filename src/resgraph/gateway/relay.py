@@ -69,6 +69,7 @@ def relay(
     fallback_chain: list[str],
     reopen: Reopen,
     clock: Clock = time.monotonic,
+    observe: Callable[[dict[str, Any]], None] = lambda payload: None,
 ) -> Iterator[str]:
     """Relay one opened stream to SSE. A zero-token death restarts silently
     via ``reopen`` (which walks like an init failure and returns the next
@@ -99,14 +100,14 @@ def relay(
                         alias, backend, events = reopened
                         owned = True
                         continue
-                yield sse(
-                    {
-                        "type": "stream_error",
-                        "backend": death.backend,
-                        "reason": death.reason,
-                        "tokens_emitted": death.tokens_emitted,
-                    }
-                )
+                error_payload = {
+                    "type": "stream_error",
+                    "backend": death.backend,
+                    "reason": death.reason,
+                    "tokens_emitted": death.tokens_emitted,
+                }
+                observe(error_payload)
+                yield sse(error_payload)
                 return
             reconciliation = account.finish(
                 at=clock(), reported_output_tokens=usage["output_tokens"]
@@ -115,19 +116,19 @@ def relay(
                 backend.ttft_ewma.update(account.ttft)
             owned = False
             backend.release()
-            yield sse(
-                {
-                    "type": "end",
-                    "model": alias,
-                    "source": source,
-                    "backend": backend.name,
-                    "fallback_chain": fallback_chain,
-                    "usage": usage,
-                    "ttft_s": account.ttft,
-                    "tokens_per_s": account.tokens_per_second,
-                    "reconciliation_ok": reconciliation.within_tolerance,
-                }
-            )
+            end_payload = {
+                "type": "end",
+                "model": alias,
+                "source": source,
+                "backend": backend.name,
+                "fallback_chain": fallback_chain,
+                "usage": usage,
+                "ttft_s": account.ttft,
+                "tokens_per_s": account.tokens_per_second,
+                "reconciliation_ok": reconciliation.within_tolerance,
+            }
+            observe(end_payload)
+            yield sse(end_payload)
             return
     finally:
         if owned:

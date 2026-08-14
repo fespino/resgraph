@@ -29,8 +29,11 @@ from typing import Any
 import yaml
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
+from prometheus_client import make_asgi_app
 from pydantic import BaseModel
 
+from resgraph import obs
+from resgraph.evals.pricing import estimate_cost
 from resgraph.evals.providers import build_client
 from resgraph.gateway.accounting import StreamAccount
 from resgraph.gateway.cache import ResponseCache, cache_key
@@ -132,6 +135,32 @@ def _wire(block: Any) -> dict[str, Any]:
     return {"type": kind, "text": getattr(block, "text", "")}
 
 
+def _cost_of(gw: Gateway, alias: str, usage: UsageOut) -> float:
+    return estimate_cost(
+        {
+            "input": usage.input_tokens,
+            "output": usage.output_tokens,
+            "cache_read": usage.cache_read_tokens,
+            "cache_creation": usage.cache_creation_tokens,
+        },
+        gw.setups[alias]["model"],
+    )
+
+
+def _observe_served(
+    gw: Gateway, alias: str, out: GenerateOut, task_class: str, outcome: str
+) -> None:
+    labels = {"backend": out.backend, "source": out.source, "task_class": task_class}
+    obs.GATEWAY_REQUESTS.add(1, {**labels, "outcome": outcome})
+    obs.GATEWAY_FALLBACK_CHAIN.record(len(out.fallback_chain))
+    if outcome == "ok":
+        cached_label = "true" if out.usage.cache_read_tokens > 0 else "false"
+        obs.GATEWAY_TTFT.record(out.latency_s, {"backend": out.backend, "cached": cached_label})
+        obs.GATEWAY_COST.record(_cost_of(gw, alias, out.usage), labels)
+        if out.usage.cache_read_tokens > 0:
+            obs.GATEWAY_CACHE_HITS.add(1, {"layer": "provider"})
+
+
 def _request_kwargs(gw: Gateway, alias: str, req: GenerateIn) -> dict[str, Any]:
     setup = gw.setups[alias]
     kwargs: dict[str, Any] = {
@@ -215,6 +244,9 @@ def _serve_with_walk[T](
         try:
             return attempt(alias), alias, chain
         except QueueFull as exc:
+            obs.GATEWAY_REQUESTS.add(
+                1, {"backend": exc.backend, "outcome": "rejected_429", "source": decision.source}
+            )
             raise HTTPException(
                 429, detail=str(exc), headers={"Retry-After": str(exc.retry_after_s)}
             ) from exc
@@ -222,12 +254,23 @@ def _serve_with_walk[T](
             raise
         except Exception as exc:
             if not decision.fallback_allowed:
+                obs.GATEWAY_REQUESTS.add(
+                    1,
+                    {
+                        "backend": gw.backend(alias).name,
+                        "outcome": "pin_failed_502",
+                        "source": decision.source,
+                    },
+                )
                 raise HTTPException(
                     502, detail=f"pinned {alias!r} failed on {gw.backend(alias).name}: {exc}"
                 ) from exc
             _record_hop(gw, alias, exc, chain)
             alias = _next_alias(gw, chain)
     log.error("[gateway:exhausted] chain=%s", chain)
+    obs.GATEWAY_REQUESTS.add(
+        1, {"backend": "none", "outcome": "exhausted_503", "source": decision.source}
+    )
     raise HTTPException(503, detail=f"no backend could serve; chain={chain}")
 
 
@@ -328,6 +371,11 @@ def create_app(
 
     app = FastAPI(title="resgraph-gateway", version="0.1.0", lifespan=lifespan)
     app.state.gateway = gw
+    obs.init_metrics()
+    app.mount("/metrics", make_asgi_app())
+    obs.register_gateway_depth_reader(
+        lambda: [(name, b.in_flight) for name, b in gw.backends.items()]
+    )
 
     @app.post("/v1/generate", response_model=GenerateOut)  # registration is the use
     def generate(req: GenerateIn) -> GenerateOut | StreamingResponse:  # pyright: ignore[reportUnusedFunction]
@@ -353,6 +401,53 @@ def create_app(
                         nxt = _next_alias(gw, chain2)
                 return None
 
+            task_label = req.task_class or "none"
+
+            def observe_stream(payload: dict[str, Any]) -> None:
+                if payload["type"] == "end":
+                    labels = {
+                        "backend": payload["backend"],
+                        "source": payload["source"],
+                        "task_class": task_label,
+                    }
+                    obs.GATEWAY_REQUESTS.add(1, {**labels, "outcome": "stream_ok"})
+                    obs.GATEWAY_FALLBACK_CHAIN.record(len(payload["fallback_chain"]))
+                    if payload["ttft_s"] is not None:
+                        obs.GATEWAY_TTFT.record(
+                            payload["ttft_s"], {"backend": payload["backend"], "cached": "false"}
+                        )
+                    if payload["tokens_per_s"] is not None:
+                        obs.GATEWAY_TOKENS_PER_S.record(
+                            payload["tokens_per_s"], {"backend": payload["backend"]}
+                        )
+                    u = payload["usage"]
+                    obs.GATEWAY_COST.record(
+                        estimate_cost(
+                            {
+                                "input": u.get("input_tokens", 0),
+                                "output": u.get("output_tokens", 0),
+                                "cache_read": 0,
+                                "cache_creation": 0,
+                            },
+                            gw.setups[payload["model"]]["model"],
+                        ),
+                        labels,
+                    )
+                else:
+                    obs.GATEWAY_STREAM_ERRORS.add(
+                        1,
+                        {"tokens_bucket": "zero" if payload["tokens_emitted"] == 0 else "nonzero"},
+                    )
+                    obs.GATEWAY_REQUESTS.add(
+                        1,
+                        {
+                            "backend": payload["backend"],
+                            "outcome": "stream_error",
+                            "source": decision.source,
+                            "task_class": task_label,
+                        },
+                    )
+
             return StreamingResponse(
                 relay(
                     alias=alias,
@@ -361,6 +456,7 @@ def create_app(
                     source=decision.source,
                     fallback_chain=chain,
                     reopen=reopen,
+                    observe=observe_stream,
                 ),
                 media_type="text/event-stream",
             )
@@ -374,6 +470,17 @@ def create_app(
             key = cache_key(decision.model, _request_kwargs(gw, decision.model, req))
             hit = gw.cache.get(key)
             if hit is not None:
+                obs.GATEWAY_CACHE_HITS.add(1, {"layer": "gateway"})
+                obs.GATEWAY_CACHE_TOKENS_SAVED.add(hit.usage.input_tokens + hit.usage.output_tokens)
+                obs.GATEWAY_REQUESTS.add(
+                    1,
+                    {
+                        "backend": hit.backend,
+                        "outcome": "cached",
+                        "source": decision.source,
+                        "task_class": req.task_class or "none",
+                    },
+                )
                 return hit.model_copy(update={"cached": True})
         (content, usage, latency), alias, chain = _serve_with_walk(
             gw, decision, lambda a: _call(gw, a, req)
@@ -394,6 +501,7 @@ def create_app(
                 else cache_key(alias, _request_kwargs(gw, alias, req))
             )
             gw.cache.put(served_key, out, usage.input_tokens + usage.output_tokens)
+        _observe_served(gw, alias, out, req.task_class or "none", "ok")
         return out
 
     return app

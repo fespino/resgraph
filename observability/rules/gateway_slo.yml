@@ -1,0 +1,58 @@
+# Gateway token-path SLO rules (D33). Hard objectives (TTFT p95 per
+# backend, tokens/sec floor) are calibrated from the load test's measured
+# baseline x 1.5 per D18 and land in capacity.md — until then the rules
+# record the ratios and quantiles the objectives will bind to, plus the
+# two alerts that need no baseline: silent degradation (fallback chains
+# longer than one hop) and dishonest failure (outcomes outside the
+# honest vocabulary). Availability counts successful-or-honestly-failed:
+# a surfaced stream_error or an explicit 429/502/503 is honest; only an
+# outcome outside the vocabulary would not be.
+groups:
+  - name: gateway_slo
+    interval: 15s
+    rules:
+      - record: slo:gateway_availability:ratio_5m
+        expr: >
+          sum(rate(gateway_requests_total{outcome=~"ok|cached|stream_ok|stream_error|rejected_429|pin_failed_502|exhausted_503"}[5m]))
+          /
+          sum(rate(gateway_requests_total[5m]))
+      - record: slo:gateway_ttft:p95_5m
+        expr: >
+          histogram_quantile(0.95,
+            sum by (backend, le) (rate(gateway_ttft_seconds_bucket[5m])))
+      - record: slo:gateway_tokens_per_second:p50_5m
+        expr: >
+          histogram_quantile(0.50,
+            sum by (backend, le) (rate(gateway_tokens_per_second_bucket[5m])))
+      - record: slo:gateway_cost_per_task:p95_1h
+        expr: >
+          histogram_quantile(0.95,
+            sum by (task_class, le) (rate(gateway_cost_usd_bucket[1h])))
+      - record: slo:gateway_cache_hit:ratio_5m
+        expr: >
+          sum by (layer) (rate(gateway_cache_hits_total[5m]))
+          /
+          ignoring(layer) group_left
+          sum(rate(gateway_requests_total[5m]))
+      - alert: GatewayDegradedChains
+        expr: >
+          sum(rate(gateway_fallback_chain_length_bucket{le="+Inf"}[5m]))
+          -
+          sum(rate(gateway_fallback_chain_length_bucket{le="1.0"}[5m]))
+          > 0
+        for: 1m
+        labels:
+          slo: gateway-degraded
+        annotations:
+          summary: >-
+            Gateway fallback chains longer than one hop: the system is
+            degrading through multiple backends per request.
+      - alert: GatewayQueuePressure
+        expr: max by (backend) (gateway_queue_depth) >= 4
+        for: 2m
+        labels:
+          slo: gateway-queue
+        annotations:
+          summary: >-
+            Gateway queue depth at or above the local bound — the leading
+            pressure signal; latency follows if this holds.

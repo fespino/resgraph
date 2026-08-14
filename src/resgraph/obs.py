@@ -35,6 +35,10 @@ BATCH_BUCKETS = (0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0)
 # is counted, never interpolated (D18).
 ANALYST_RUN_BUCKETS = (10.0, 30.0, 60.0, 120.0, 152.0, 240.0, 480.0)
 ANALYST_COST_BUCKETS = (0.02, 0.05, 0.1, 0.2, 0.3, 0.5, 1.0)
+GATEWAY_TTFT_BUCKETS = (0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0)
+GATEWAY_TPS_BUCKETS = (1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0)
+GATEWAY_CHAIN_BUCKETS = (0.0, 1.0, 2.0)
+GATEWAY_COST_BUCKETS = (0.0005, 0.001, 0.005, 0.01, 0.02, 0.05, 0.1, 0.3)
 
 
 class EventSink:
@@ -89,6 +93,34 @@ ANALYST_RUNS = _meter.create_counter(
     "analyst_runs_total", description="triage runs, labeled by degraded + cutoff reason"
 )
 
+# Gateway token-path metrics (the serving decisions' names). Instrument-
+# before-subject, like the analyst set: SLO rules wire against these now.
+GATEWAY_TTFT = _meter.create_histogram(
+    "gateway_ttft_seconds", description="first-content-token wait, by backend and cache state"
+)
+GATEWAY_TOKENS_PER_S = _meter.create_histogram(
+    "gateway_tokens_per_second", description="generation rate over the emission window"
+)
+GATEWAY_REQUESTS = _meter.create_counter(
+    "gateway_requests_total", description="requests by backend, outcome, source, task class"
+)
+GATEWAY_FALLBACK_CHAIN = _meter.create_histogram(
+    "gateway_fallback_chain_length", description="hops walked before a request was served"
+)
+GATEWAY_STREAM_ERRORS = _meter.create_counter(
+    "gateway_stream_errors_total", description="mid-stream deaths, zero vs nonzero tokens emitted"
+)
+GATEWAY_CACHE_HITS = _meter.create_counter(
+    "gateway_cache_hits_total",
+    description="cache hits by layer (gateway response / provider prefix)",
+)
+GATEWAY_CACHE_TOKENS_SAVED = _meter.create_counter(
+    "gateway_cache_tokens_saved", description="tokens the gateway response cache did not spend"
+)
+GATEWAY_COST = _meter.create_histogram(
+    "gateway_cost_usd", description="estimated cost per request, by task class, backend, source"
+)
+
 # ingest_lag readers, registered per consumer; the gauge callback runs
 # at scrape time so the reading is as fresh as the scrape.
 _lag_readers: dict[str, Callable[[], int | None]] = {}
@@ -105,6 +137,31 @@ def unregister_lag_reader(worker: str) -> None:
         _lag_readers.pop(worker, None)
 
 
+_gateway_depth_reader: Callable[[], list[tuple[str, int]]] | None = None
+_gateway_depth_lock = threading.Lock()
+
+
+def register_gateway_depth_reader(fn: Callable[[], list[tuple[str, int]]]) -> None:
+    """One reader per process: the gateway registers a callback returning
+    (backend, in-flight depth) pairs; the gauge reads it at scrape time."""
+    global _gateway_depth_reader
+    with _gateway_depth_lock:
+        _gateway_depth_reader = fn
+
+
+def _observe_gateway_depth(options: CallbackOptions):
+    with _gateway_depth_lock:
+        fn = _gateway_depth_reader
+    if fn is None:
+        return
+    try:
+        depths = fn()
+    except Exception:
+        return  # a broken reader must not kill the scrape
+    for backend, depth in depths:
+        yield Observation(depth, {"backend": backend})
+
+
 def _observe_lag(options: CallbackOptions):
     with _lag_lock:
         readers = dict(_lag_readers)
@@ -117,6 +174,11 @@ def _observe_lag(options: CallbackOptions):
             yield Observation(lag, {"worker": worker})
 
 
+_meter.create_observable_gauge(
+    "gateway_queue_depth",
+    callbacks=[_observe_gateway_depth],
+    description="in-flight requests per backend — the leading pressure signal",
+)
 _meter.create_observable_gauge(
     "ingest_lag",
     callbacks=[_observe_lag],
@@ -156,6 +218,22 @@ def init_metrics(port: int | None = None) -> None:
             instrument_name="analyst_run_cost_usd",
             aggregation=ExplicitBucketHistogramAggregation(ANALYST_COST_BUCKETS),
         ),
+        View(
+            instrument_name="gateway_ttft_seconds",
+            aggregation=ExplicitBucketHistogramAggregation(GATEWAY_TTFT_BUCKETS),
+        ),
+        View(
+            instrument_name="gateway_tokens_per_second",
+            aggregation=ExplicitBucketHistogramAggregation(GATEWAY_TPS_BUCKETS),
+        ),
+        View(
+            instrument_name="gateway_fallback_chain_length",
+            aggregation=ExplicitBucketHistogramAggregation(GATEWAY_CHAIN_BUCKETS),
+        ),
+        View(
+            instrument_name="gateway_cost_usd",
+            aggregation=ExplicitBucketHistogramAggregation(GATEWAY_COST_BUCKETS),
+        ),
     ]
     otel_metrics.set_meter_provider(
         MeterProvider(metric_readers=[PrometheusMetricReader()], views=views)
@@ -177,6 +255,8 @@ def _refresh_instruments() -> None:
     global _meter, READ, APPLIED, SKIPPED, INVALID, DLQ, PHANTOMS_CREATED
     global BATCH_SECONDS, API_SECONDS
     global ANALYST_RUN_SECONDS, ANALYST_RUN_COST, ANALYST_RUNS
+    global GATEWAY_TTFT, GATEWAY_TOKENS_PER_S, GATEWAY_REQUESTS, GATEWAY_FALLBACK_CHAIN
+    global GATEWAY_STREAM_ERRORS, GATEWAY_CACHE_HITS, GATEWAY_CACHE_TOKENS_SAVED, GATEWAY_COST
     _meter = otel_metrics.get_meter("resgraph")
     READ = _meter.create_counter("ingest_read", description="entries read from the stream")
     APPLIED = _meter.create_counter("ingest_applied", description="messages applied")
@@ -200,6 +280,37 @@ def _refresh_instruments() -> None:
     )
     ANALYST_RUNS = _meter.create_counter(
         "analyst_runs_total", description="triage runs, labeled by degraded + cutoff reason"
+    )
+    GATEWAY_TTFT = _meter.create_histogram(
+        "gateway_ttft_seconds", description="first-content-token wait, by backend and cache state"
+    )
+    GATEWAY_TOKENS_PER_S = _meter.create_histogram(
+        "gateway_tokens_per_second", description="generation rate over the emission window"
+    )
+    GATEWAY_REQUESTS = _meter.create_counter(
+        "gateway_requests_total", description="requests by backend, outcome, source, task class"
+    )
+    GATEWAY_FALLBACK_CHAIN = _meter.create_histogram(
+        "gateway_fallback_chain_length", description="hops walked before a request was served"
+    )
+    GATEWAY_STREAM_ERRORS = _meter.create_counter(
+        "gateway_stream_errors_total",
+        description="mid-stream deaths, zero vs nonzero tokens emitted",
+    )
+    GATEWAY_CACHE_HITS = _meter.create_counter(
+        "gateway_cache_hits_total",
+        description="cache hits by layer (gateway response / provider prefix)",
+    )
+    GATEWAY_CACHE_TOKENS_SAVED = _meter.create_counter(
+        "gateway_cache_tokens_saved", description="tokens the gateway response cache did not spend"
+    )
+    GATEWAY_COST = _meter.create_histogram(
+        "gateway_cost_usd", description="estimated cost per request, by task class, backend, source"
+    )
+    _meter.create_observable_gauge(
+        "gateway_queue_depth",
+        callbacks=[_observe_gateway_depth],
+        description="in-flight requests per backend — the leading pressure signal",
     )
     _meter.create_observable_gauge(
         "ingest_lag",

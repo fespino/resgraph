@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from resgraph.gateway import (
+from resgraph.gateway.router import (
     CLASSIFICATION,
     DEFAULT_REGISTRY,
     GLOBAL_DEFAULT,

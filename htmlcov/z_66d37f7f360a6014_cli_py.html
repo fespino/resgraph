@@ -65,7 +65,7 @@
             <a id="nextFileLink" class="nav" href="z_66d37f7f360a6014_faults_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.15.4">coverage.py v7.15.4</a>,
-            created at 2026-08-14 01:49 +0000
+            created at 2026-08-14 10:06 +0000
         </p>
         <aside class="hidden">
             <button type="button" class="button_next_chunk" data-shortcut="j"></button>
@@ -113,7 +113,7 @@
     <p class="run run2"><span class="n"><a id="t31" href="#t31">31</a></span><span class="t">    <span class="nam">no_skill</span><span class="op">:</span> <span class="nam">bool</span> <span class="op">=</span> <span class="key">False</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
     <p class="run run2"><span class="n"><a id="t32" href="#t32">32</a></span><span class="t">    <span class="nam">worker</span><span class="op">:</span> <span class="nam">str</span> <span class="op">=</span> <span class="str">&quot;&quot;</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
     <p class="run run2"><span class="n"><a id="t33" href="#t33">33</a></span><span class="t">    <span class="nam">judge</span><span class="op">:</span> <span class="nam">str</span> <span class="op">=</span> <span class="str">&quot;&quot;</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run run2"><span class="n"><a id="t34" href="#t34">34</a></span><span class="t">    <span class="nam">workers_config</span><span class="op">:</span> <span class="nam">str</span> <span class="op">=</span> <span class="str">&quot;evals/workers.yaml&quot;</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t34" href="#t34">34</a></span><span class="t">    <span class="nam">models_config</span><span class="op">:</span> <span class="nam">str</span> <span class="op">=</span> <span class="str">&quot;evals/models.yaml&quot;</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
     <p class="run run2"><span class="n"><a id="t35" href="#t35">35</a></span><span class="t"><span class="op">)</span> <span class="op">-&gt;</span> <span class="key">None</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t36" href="#t36">36</a></span><span class="t">    <span class="str">&quot;&quot;&quot;Run every scenario x trials against docker stores + the API;</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t37" href="#t37">37</a></span><span class="t"><span class="str">    one JSONL row per (item, trial) lands in out_dir. --resume PATH</span>&nbsp;</span><span class="r"></span></p>
@@ -127,7 +127,7 @@
     <p class="pln"><span class="n"><a id="t45" href="#t45">45</a></span><span class="t"><span class="str">    playbook from the prefix (a labeled fingerprint change, the skill</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t46" href="#t46">46</a></span><span class="t"><span class="str">    arm). Run with a project-scoped API key that carries its own spend</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t47" href="#t47">47</a></span><span class="t"><span class="str">    cap &#8212; the key is read from the environment and never written</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t48" href="#t48">48</a></span><span class="t"><span class="str">    anywhere. --worker NAME selects a setup from --workers-config (provider,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t48" href="#t48">48</a></span><span class="t"><span class="str">    anywhere. --worker NAME selects a setup from --models-config (provider,</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t49" href="#t49">49</a></span><span class="t"><span class="str">    model, endpoint, determinism knobs, and extra_args request kwargs; the name</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t50" href="#t50">50</a></span><span class="t"><span class="str">    is recorded per row and is the arm label); without it the worker is --model</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t51" href="#t51">51</a></span><span class="t"><span class="str">    on the Anthropic SDK. A named worker carries its own thinking in extra_args</span>&nbsp;</span><span class="r"></span></p>
@@ -141,7 +141,7 @@
     <p class="run"><span class="n"><a id="t59" href="#t59">59</a></span><span class="t">    <span class="key">from</span> <span class="op">.</span><span class="nam">providers</span> <span class="key">import</span> <span class="nam">build_client</span><span class="op">,</span> <span class="nam">load_setup</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t60" href="#t60">60</a></span><span class="t">    <span class="key">from</span> <span class="op">.</span><span class="nam">runner</span> <span class="key">import</span> <span class="nam">load_scenarios</span><span class="op">,</span> <span class="nam">run_eval</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t61" href="#t61">61</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t62" href="#t62">62</a></span><span class="t">    <span class="nam">cfg</span> <span class="op">=</span> <span class="nam">Path</span><span class="op">(</span><span class="nam">workers_config</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t62" href="#t62">62</a></span><span class="t">    <span class="nam">cfg</span> <span class="op">=</span> <span class="nam">Path</span><span class="op">(</span><span class="nam">models_config</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t63" href="#t63">63</a></span><span class="t">    <span class="nam">worker_setup</span><span class="op">:</span> <span class="nam">dict</span><span class="op">[</span><span class="nam">str</span><span class="op">,</span> <span class="nam">Any</span><span class="op">]</span> <span class="op">=</span> <span class="op">(</span>&nbsp;</span><span class="r"></span></p>
     <p class="run run2"><span class="n"><a id="t64" href="#t64">64</a></span><span class="t">        <span class="nam">load_setup</span><span class="op">(</span><span class="nam">worker</span><span class="op">,</span> <span class="nam">cfg</span><span class="op">)</span> <span class="key">if</span> <span class="nam">worker</span> <span class="key">else</span> <span class="op">{</span><span class="str">&quot;provider&quot;</span><span class="op">:</span> <span class="str">&quot;anthropic&quot;</span><span class="op">,</span> <span class="str">&quot;model&quot;</span><span class="op">:</span> <span class="nam">model</span><span class="op">}</span>&nbsp;</span><span class="r"></span></p>
     <p class="run run2"><span class="n"><a id="t65" href="#t65">65</a></span><span class="t">    <span class="op">)</span>&nbsp;</span><span class="r"></span></p>
@@ -397,7 +397,7 @@
             <a class="nav" href="z_66d37f7f360a6014_faults_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.15.4">coverage.py v7.15.4</a>,
-            created at 2026-08-14 01:49 +0000
+            created at 2026-08-14 10:06 +0000
         </p>
     </div>
 </footer>

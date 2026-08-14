@@ -201,3 +201,77 @@ def test_the_stream_observer_maps_every_terminal_payload(tmp_path, monkeypatch):
 def test_the_depth_gauge_is_quiet_before_any_gateway_registers(monkeypatch):
     monkeypatch.setattr(obs, "_gateway_depth_reader", None)
     assert list(obs._observe_gateway_depth(None)) == []
+
+
+def test_both_cache_layers_emit_hits_and_misses(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    from fastapi.testclient import TestClient
+
+    from resgraph.gateway import server as gwserver
+    from resgraph.gateway.server import create_app
+
+    recorded: list[tuple[str, object, dict]] = []
+
+    class Rec:
+        def __init__(self, name: str):
+            self.name = name
+
+        def add(self, value, labels=None):
+            recorded.append((self.name, value, labels or {}))
+
+        def record(self, value, labels=None):
+            recorded.append((self.name, value, labels or {}))
+
+    path = tmp_path / "models.yaml"
+    path.write_text(
+        "haiku:\n  provider: anthropic\n  model: claude-haiku-4-5\n"
+        "qwen-local-1.5b:\n  provider: ollama\n  model: qwen2.5:1.5b\n"
+        "  base_url: http://localhost:11434/v1\n  temperature: 0\n"
+    )
+
+    class Fake:
+        def __init__(self):
+            self.messages = self
+            self.warm = False
+
+        def create(self, **kwargs):
+            read = 800 if self.warm else 0
+            creation = 0 if self.warm else 800
+            self.warm = True
+            return SimpleNamespace(
+                content=[{"type": "text", "text": "ok"}],
+                usage=SimpleNamespace(
+                    input_tokens=10,
+                    output_tokens=5,
+                    cache_read_input_tokens=read,
+                    cache_creation_input_tokens=creation,
+                ),
+            )
+
+    client = TestClient(create_app(models_path=path, client_factory=lambda s: Fake()))
+    # patch AFTER create_app: init_metrics rebinds the instrument globals
+    # on first install, which would clobber fakes patched before it.
+    for name in ("GATEWAY_CACHE_HITS", "GATEWAY_CACHE_MISSES", "GATEWAY_TTFT"):
+        monkeypatch.setattr(gwserver.obs, name, Rec(name))
+    body = {"messages": [{"role": "user", "content": "hi"}]}
+
+    # provider layer: cold write then warm read on anthropic
+    client.post("/v1/generate", json={**body, "task_class": "judgment"})
+    client.post("/v1/generate", json={**body, "task_class": "judgment"})
+    provider = [(n, la) for n, v, la in recorded if la.get("layer") == "provider"]
+    assert provider == [
+        ("GATEWAY_CACHE_MISSES", {"layer": "provider"}),
+        ("GATEWAY_CACHE_HITS", {"layer": "provider"}),
+    ]
+    warm_ttft = [la for n, v, la in recorded if n == "GATEWAY_TTFT"][-1]
+    assert warm_ttft["cached"] == "true"
+
+    # gateway layer: eligible miss then hit on the deterministic setup
+    client.post("/v1/generate", json={**body, "model": "qwen-local-1.5b"})
+    client.post("/v1/generate", json={**body, "model": "qwen-local-1.5b"})
+    gateway = [(n, la) for n, v, la in recorded if la.get("layer") == "gateway"]
+    assert gateway == [
+        ("GATEWAY_CACHE_MISSES", {"layer": "gateway"}),
+        ("GATEWAY_CACHE_HITS", {"layer": "gateway"}),
+    ]

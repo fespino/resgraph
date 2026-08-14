@@ -32,8 +32,8 @@ groups:
         expr: >
           sum by (layer) (rate(gateway_cache_hits_total[5m]))
           /
-          ignoring(layer) group_left
-          sum(rate(gateway_requests_total[5m]))
+          (sum by (layer) (rate(gateway_cache_hits_total[5m]))
+           + sum by (layer) (rate(gateway_cache_misses_total[5m])))
       - alert: GatewayDegradedChains
         expr: >
           sum(rate(gateway_fallback_chain_length_bucket{le="+Inf"}[5m]))

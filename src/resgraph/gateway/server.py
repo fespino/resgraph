@@ -159,6 +159,8 @@ def _observe_served(
         obs.GATEWAY_COST.record(_cost_of(gw, alias, out.usage), labels)
         if out.usage.cache_read_tokens > 0:
             obs.GATEWAY_CACHE_HITS.add(1, {"layer": "provider"})
+        elif gw.setups[alias].get("provider") == "anthropic":
+            obs.GATEWAY_CACHE_MISSES.add(1, {"layer": "provider"})
 
 
 def _request_kwargs(gw: Gateway, alias: str, req: GenerateIn) -> dict[str, Any]:
@@ -499,6 +501,8 @@ def create_app(
         if req.cache_responses and gw.setups[decision.model].get("temperature") == 0:
             key = cache_key(decision.model, _request_kwargs(gw, decision.model, req))
             hit = gw.cache.get(key)
+            if hit is None:
+                obs.GATEWAY_CACHE_MISSES.add(1, {"layer": "gateway"})
             if hit is not None:
                 obs.GATEWAY_CACHE_HITS.add(1, {"layer": "gateway"})
                 obs.GATEWAY_CACHE_TOKENS_SAVED.add(hit.usage.input_tokens + hit.usage.output_tokens)

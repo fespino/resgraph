@@ -73,3 +73,10 @@ def test_death_after_tokens_must_surface_not_restart():
     assert d.tokens_emitted == 500
     assert d.backend == "local"
     assert d.reason == "backend died"
+
+
+def test_a_single_chunk_stream_has_no_measurable_rate():
+    a = StreamAccount(backend="local", started_at=0.0)
+    a.content(at=1.0, tokens=40)
+    a.finish(at=1.0, reported_output_tokens=40)
+    assert a.tokens_per_second is None

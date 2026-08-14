@@ -5,7 +5,7 @@ task-class default → global default — and the winning ``source`` rides the
 decision so cost questions are answered by a field, not a hunt.
 
 ``model`` values are served-model ALIASES — the setup names in
-workers.yaml — never raw provider ids: where an alias runs is its setup's
+models.yaml — never raw provider ids: where an alias runs is its setup's
 provider and base_url, so local vs remote stays transparent here. Backend
 concerns — which queue, which adapter, health/EWMA tie-breaking — are
 resolved from the setup at dispatch, never inferred from the name."""

@@ -58,7 +58,7 @@ services:
   ollama:
     # Local worker backend for the eval seam (D29c). Opt-in like obs/bench —
     # heavy, and only the --worker path needs it. Serves the OpenAI-compatible
-    # API on 11434; workers.yaml's qwen-local-* workers point here.
+    # API on 11434; models.yaml's qwen-local-* setups point here.
     #   docker compose --profile local up -d
     profiles: ["local"]
     image: ollama/ollama:0.12.6@sha256:a61a8fd395dbb931cc8cb1b5da7a2510746575c87113fdc45b647ee59ef7f808

@@ -1,6 +1,6 @@
 """The precedence table, exercised offline: pin > override > task-class >
 global, the recorded source vocabulary, and pin's no-fallback semantics.
-``model`` values are served-model aliases — the workers.yaml setup names —
+``model`` values are served-model aliases — the models.yaml setup names —
 so local vs remote stays a setup property, invisible here."""
 
 from pathlib import Path
@@ -71,8 +71,8 @@ def test_source_vocabulary_is_the_recorded_contract():
     )
 
 
-def test_every_routed_alias_is_a_workers_yaml_setup():
-    setups = yaml.safe_load(Path("evals/workers.yaml").read_text())
+def test_every_routed_alias_is_a_models_yaml_setup():
+    setups = yaml.safe_load(Path("evals/models.yaml").read_text())
     routed = {r.model for r in DEFAULT_REGISTRY.values()} | {GLOBAL_DEFAULT_MODEL.model}
     missing = routed - set(setups)
     assert not missing, f"registry routes to aliases with no setup: {sorted(missing)}"

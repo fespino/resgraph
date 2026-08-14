@@ -35,7 +35,14 @@ from resgraph.evals.providers import build_client
 from resgraph.gateway.accounting import StreamAccount
 from resgraph.gateway.dispatch import Backend, ProbeResult, QueueFull, choose
 from resgraph.gateway.relay import StreamEvent, StreamFactory, parse_chat_sse, relay
-from resgraph.gateway.router import DEFAULT_REGISTRY, ClassRoute, Source, TaskClass, resolve
+from resgraph.gateway.router import (
+    DEFAULT_REGISTRY,
+    GLOBAL_DEFAULT_MODEL,
+    ClassRoute,
+    Source,
+    TaskClass,
+    resolve,
+)
 
 log = logging.getLogger("resgraph.gateway")
 
@@ -94,16 +101,20 @@ class Gateway:
             self.backends[provider] = Backend(provider, concurrency, queue_max)
         return self.backends[provider]
 
+    def routed(self) -> dict[str, str]:
+        """provider → serving alias, from the registry plus the global
+        default. The registry is the gateway's serving authority; a setup it
+        does not route is a catalog entry (an eval arm), never a backend to
+        serve, walk to, or probe — an unrouted provider must not be spent on."""
+        out: dict[str, str] = {}
+        for route in [*self.registry.values(), GLOBAL_DEFAULT_MODEL]:
+            setup = self.setups.get(route.model)
+            if setup is not None:
+                out.setdefault(setup.get("provider", "default"), route.model)
+        return out
+
     def alias_for_backend(self, provider: str) -> str | None:
-        """The setup a fallback hop serves on a given backend — the first
-        registry route living there, else any setup that does."""
-        for route in self.registry.values():
-            if self.setups.get(route.model, {}).get("provider", "default") == provider:
-                return route.model
-        for alias, setup in self.setups.items():
-            if setup.get("provider", "default") == provider:
-                return alias
-        return None
+        return self.routed().get(provider)
 
 
 def _wire(block: Any) -> dict[str, Any]:
@@ -155,13 +166,12 @@ def _call(gw: Gateway, alias: str, req: GenerateIn) -> tuple[list[dict[str, Any]
 def _next_alias(gw: Gateway, chain: list[str]) -> str | None:
     """The next hop of the walk: an untried, not-down backend's serving
     alias, chosen by health then latency; None when the walk is exhausted.
-    Candidates derive from the setups — the data — never from whichever
-    backends happen to be instantiated."""
+    Candidates come from the routed providers only — the registry is the
+    serving authority, and an unrouted catalog setup is never a hop."""
     tried = {c.split(":", 1)[0] for c in chain}
     candidates = []
-    for provider in {s.get("provider", "default") for s in gw.setups.values()}:
-        fallback = gw.alias_for_backend(provider)
-        if provider in tried or fallback is None:
+    for provider, fallback in gw.routed().items():
+        if provider in tried:
             continue
         backend = gw.backend(fallback)
         if backend.health.state != "down":
@@ -258,10 +268,7 @@ def run_probe_round(gw: Gateway) -> dict[str, ProbeResult]:
     State transitions are logged — recovery is gradual by the health rules,
     so the readmission path is visible in the log, not inferred."""
     results: dict[str, ProbeResult] = {}
-    for provider in sorted({s.get("provider", "default") for s in gw.setups.values()}):
-        alias = gw.alias_for_backend(provider)
-        if alias is None:
-            continue
+    for provider, alias in sorted(gw.routed().items()):
         result = probe(gw, alias)
         backend = gw.backend(alias)
         was = backend.health.state

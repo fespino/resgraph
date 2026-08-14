@@ -47,5 +47,7 @@
   single source of truth, budgets, refs+fetch shaping, HTTP projection
 - src/resgraph/mcp/ — MCP server over the registry (stdio), server card,
   skills-as-prompts loader (D21)
+- src/resgraph/gateway/ — serving gateway (D30–D33): precedence router with
+  recorded source; queues, streaming accounting, caches to follow
 - skills/ — investigation playbooks (SKILL.md, validated at startup)
 - .mcp.json — Claude Code/Desktop wiring for the resgraph MCP server

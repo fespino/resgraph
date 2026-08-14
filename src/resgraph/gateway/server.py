@@ -18,8 +18,10 @@ where a stream adapter exists (the chat-completions backends); an
 anthropic-setup stream answers 501 until its adapter lands."""
 
 import logging
+import threading
 import time
 from collections.abc import Callable, Iterator, Mapping
+from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -251,11 +253,38 @@ def probe(gw: Gateway, alias: str) -> ProbeResult:
     return "slow" if time.monotonic() - started > PROBE_SLOW_S else "ok"
 
 
+def run_probe_round(gw: Gateway) -> dict[str, ProbeResult]:
+    """One probe pass over every backend, feeding the health machine.
+    State transitions are logged — recovery is gradual by the health rules,
+    so the readmission path is visible in the log, not inferred."""
+    results: dict[str, ProbeResult] = {}
+    for provider in sorted({s.get("provider", "default") for s in gw.setups.values()}):
+        alias = gw.alias_for_backend(provider)
+        if alias is None:
+            continue
+        result = probe(gw, alias)
+        backend = gw.backend(alias)
+        was = backend.health.state
+        now = backend.health.observe(result)
+        results[provider] = result
+        if now != was:
+            log.warning(
+                "[gateway:health] backend=%s state=%s was=%s probe=%s", provider, now, was, result
+            )
+    return results
+
+
+def _probe_loop(gw: Gateway, interval_s: float, stop: threading.Event) -> None:
+    while not stop.wait(interval_s):
+        run_probe_round(gw)
+
+
 def create_app(
     models_path: Path = MODELS_PATH,
     client_factory: Callable[[dict[str, Any]], Any] = build_client,
     registry: Mapping[TaskClass, ClassRoute] | None = None,
     stream_factory: StreamFactory | None = None,
+    probe_interval_s: float | None = None,
 ) -> FastAPI:
     setups = yaml.safe_load(models_path.read_text()) or {}
     gw = Gateway(
@@ -264,7 +293,24 @@ def create_app(
         registry=DEFAULT_REGISTRY if registry is None else registry,
     )
     factory = _default_stream_factory(gw) if stream_factory is None else stream_factory
-    app = FastAPI(title="resgraph-gateway", version="0.1.0")
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        stop = threading.Event()
+        worker: threading.Thread | None = None
+        if probe_interval_s is not None:
+            worker = threading.Thread(
+                target=_probe_loop, args=(gw, probe_interval_s, stop), daemon=True
+            )
+            worker.start()
+        try:
+            yield
+        finally:
+            stop.set()
+            if worker is not None:
+                worker.join(timeout=5.0)
+
+    app = FastAPI(title="resgraph-gateway", version="0.1.0", lifespan=lifespan)
     app.state.gateway = gw
 
     @app.post("/v1/generate", response_model=GenerateOut)  # registration is the use

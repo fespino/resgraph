@@ -406,3 +406,61 @@ def test_both_request_shapes_feed_the_same_ttft_series(tmp_path, monkeypatch):
     # non-streamed traffic on one recency-weighted view per backend.
     assert len(samples) == 2
     assert ewma.value is not None
+
+
+def test_a_probe_round_feeds_every_backend_and_logs_transitions(harness, caplog):
+    import logging as _logging
+
+    from resgraph.gateway.server import run_probe_round
+
+    client, behaviors, _ = harness
+    gw = client.app.state.gateway
+    with caplog.at_level(_logging.WARNING, logger="resgraph.gateway"):
+        results = run_probe_round(gw)
+    assert results == {"anthropic": "ok", "ollama": "ok"}
+    assert not caplog.records
+
+    behaviors["haiku"] = "boom"
+    with caplog.at_level(_logging.WARNING, logger="resgraph.gateway"):
+        results = run_probe_round(gw)
+    assert results["anthropic"] == "fail"
+    assert gw.backend("haiku").health.state == "down"
+    assert any("[gateway:health]" in r.message for r in caplog.records)
+
+
+def test_probe_rounds_readmit_gradually(harness):
+    from resgraph.gateway.server import run_probe_round
+
+    client, behaviors, _ = harness
+    gw = client.app.state.gateway
+    behaviors["haiku"] = "boom"
+    run_probe_round(gw)
+    assert gw.backend("haiku").health.state == "down"
+    del behaviors["haiku"]
+    run_probe_round(gw)
+    run_probe_round(gw)
+    assert gw.backend("haiku").health.state == "down"
+    run_probe_round(gw)
+    assert gw.backend("haiku").health.state == "healthy"
+
+
+def test_the_lifespan_probe_thread_runs_and_stops(tmp_path):
+    import time as _time
+
+    path = tmp_path / "models.yaml"
+    path.write_text(yaml.safe_dump(SETUPS))
+    behaviors = {"haiku": "boom", "qwen-local-1.5b": "boom"}
+    app = create_app(
+        models_path=path,
+        client_factory=lambda setup: FakeClient(setup["name"], behaviors, []),
+        probe_interval_s=0.01,
+    )
+    with TestClient(app) as client:
+        gw = client.app.state.gateway
+        deadline = _time.monotonic() + 2.0
+        while _time.monotonic() < deadline:
+            states = {b.health.state for b in gw.backends.values()}
+            if states == {"down"}:
+                break
+            _time.sleep(0.02)
+        assert {b.health.state for b in gw.backends.values()} == {"down"}

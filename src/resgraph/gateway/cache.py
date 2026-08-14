@@ -63,6 +63,3 @@ class ResponseCache:
         self._entries.move_to_end(key)
         while len(self._entries) > self.max_entries:
             self._entries.popitem(last=False)
-
-    def __len__(self) -> int:
-        return len(self._entries)

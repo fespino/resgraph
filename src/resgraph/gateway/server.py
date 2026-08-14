@@ -132,6 +132,10 @@ def _wire(block: Any) -> dict[str, Any]:
     kind = getattr(block, "type", "text")
     if kind == "tool_use":
         return {"type": kind, "id": block.id, "name": block.name, "input": block.input}
+    if kind == "thinking":
+        # a thinking block carries .thinking, not .text — flattening it to
+        # text would read as elided reasoning in the audit downstream
+        return {"type": kind, "thinking": getattr(block, "thinking", "") or ""}
     return {"type": kind, "text": getattr(block, "text", "")}
 
 

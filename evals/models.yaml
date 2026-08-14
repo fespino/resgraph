@@ -71,3 +71,13 @@ qwen-local-1.5b:
   seed: 7
   quant: Q4_K_M
   tool_choice: required
+
+# Through the gateway: the seam's client POSTs /v1/generate and the
+# gateway's registry resolves the serving model. Routing belongs to the
+# setup (pin / task_class), not the caller; a measured run pins and
+# disables the response cache — the instrument bypass.
+haiku-via-gateway:
+  provider: gateway
+  base_url: http://localhost:8080
+  pin: haiku
+  cache_responses: false

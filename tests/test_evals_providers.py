@@ -358,3 +358,12 @@ def test_stream_lines_shares_the_payload_builder_with_create():
     assert payload["guided_json"] == {"type": "object"}
     assert payload["tools"][0]["function"]["name"] == "fetch_resource"
     assert "thinking" not in payload
+
+
+def test_a_block_list_system_flattens_to_text_for_the_chat_shape():
+    system = [
+        {"type": "text", "text": "prefix ", "cache_control": {"type": "ephemeral"}},
+        {"type": "text", "text": "and rules"},
+    ]
+    out = to_chat_messages(system, [{"role": "user", "content": "q"}])
+    assert out[0] == {"role": "system", "content": "prefix and rules"}

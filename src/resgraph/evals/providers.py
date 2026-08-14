@@ -133,9 +133,16 @@ def _user_messages(content: Any) -> list[dict[str, Any]]:
     return out
 
 
-def to_chat_messages(system: str | None, messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def to_chat_messages(
+    system: str | list[Any] | None, messages: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     if system:
+        if isinstance(system, list):
+            # Anthropic block-list system (cache_control riding the blocks)
+            # flattens to text: the chat shape has no block system and no
+            # provider-side prefix cache for the marks to address.
+            system = "".join(_field(b, "text") or "" for b in system)
         out.append({"role": "system", "content": system})
     for m in messages:
         if m["role"] == "assistant":

@@ -71,7 +71,12 @@ def test_task_class_serves_and_records_source_and_backend(harness):
     assert body["source"] == "task_class_default"
     assert body["backend"] == "anthropic"
     assert body["fallback_chain"] == []
-    assert body["usage"] == {"input_tokens": 10, "output_tokens": 5}
+    assert body["usage"] == {
+        "input_tokens": 10,
+        "output_tokens": 5,
+        "cache_read_tokens": 0,
+        "cache_creation_tokens": 0,
+    }
 
 
 def test_a_pin_fails_loudly_and_never_substitutes(harness):
@@ -475,3 +480,84 @@ def test_a_probe_is_a_minimal_generation_without_caller_extra_args(harness):
     assert name == "opus"
     assert kwargs["max_tokens"] == 5
     assert "thinking" not in kwargs
+
+
+class CachingFakeClient:
+    """Answers like a provider with a prefix cache: a byte-identical request
+    seen before reads from cache; anything mutated, reordered, or stripped
+    in between writes instead. This encodes the provider's semantics, so the
+    test below is 'byte-identical prefix in, cache_read out' — not just
+    structural equality."""
+
+    def __init__(self, seen: dict[str, int], received: list[dict]):
+        self.seen = seen
+        self.received = received
+        self.messages = self
+
+    def create(self, **kwargs: Any) -> Any:
+        import json
+
+        self.received.append(kwargs)
+        key = json.dumps(kwargs, sort_keys=True)
+        hit = self.seen.get(key, 0)
+        self.seen[key] = hit + 1
+        return SimpleNamespace(
+            content=[{"type": "text", "text": "ok"}],
+            usage=SimpleNamespace(
+                input_tokens=3,
+                output_tokens=1,
+                cache_read_input_tokens=900 if hit else 0,
+                cache_creation_input_tokens=0 if hit else 900,
+            ),
+        )
+
+
+ANALYST_SHAPED_BODY = {
+    "system": [
+        {"type": "text", "text": "the playbook prefix", "cache_control": {"type": "ephemeral"}}
+    ],
+    "messages": [
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": "triage this", "cache_control": {"type": "ephemeral"}}
+            ],
+        }
+    ],
+    "tools": [{"name": "fetch_resource", "input_schema": {"type": "object"}}],
+    "pin": "haiku",
+}
+
+
+def caching_harness(tmp_path):
+    path = tmp_path / "models.yaml"
+    path.write_text(yaml.safe_dump(SETUPS))
+    seen: dict[str, int] = {}
+    received: list[dict] = []
+    app = create_app(
+        models_path=path, client_factory=lambda setup: CachingFakeClient(seen, received)
+    )
+    return TestClient(app), received
+
+
+def test_a_byte_identical_request_reads_the_prefix_cache_through_the_hop(tmp_path):
+    client, received = caching_harness(tmp_path)
+    first = client.post(
+        "/v1/generate", json=dict(ANALYST_SHAPED_BODY, messages=ANALYST_SHAPED_BODY["messages"])
+    )
+    second = client.post("/v1/generate", json=dict(ANALYST_SHAPED_BODY))
+    assert first.status_code == second.status_code == 200
+    assert first.json()["usage"]["cache_read_tokens"] == 0
+    assert first.json()["usage"]["cache_creation_tokens"] == 900
+    assert second.json()["usage"]["cache_read_tokens"] == 900
+    assert received[0] == received[1]
+
+
+def test_cache_control_marks_survive_the_hop_untouched(tmp_path):
+    client, received = caching_harness(tmp_path)
+    assert client.post("/v1/generate", json=dict(ANALYST_SHAPED_BODY)).status_code == 200
+    kwargs = received[0]
+    assert kwargs["system"] == ANALYST_SHAPED_BODY["system"]
+    assert kwargs["messages"] == ANALYST_SHAPED_BODY["messages"]
+    assert kwargs["system"][0]["cache_control"] == {"type": "ephemeral"}
+    assert kwargs["messages"][0]["content"][0]["cache_control"] == {"type": "ephemeral"}

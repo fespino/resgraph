@@ -482,32 +482,24 @@ def test_a_probe_is_a_minimal_generation_without_caller_extra_args(harness):
     assert "thinking" not in kwargs
 
 
-class CachingFakeClient:
-    """Answers like a provider with a prefix cache: a byte-identical request
-    seen before reads from cache; anything mutated, reordered, or stripped
-    in between writes instead. This encodes the provider's semantics, so the
-    test below is 'byte-identical prefix in, cache_read out' — not just
-    structural equality."""
+class CacheUsageFake:
+    """Dumb on purpose: fixed cache usage, every request recorded. The
+    assertions carry the proof — a fake smart enough to be wrong would
+    need tests of its own."""
 
-    def __init__(self, seen: dict[str, int], received: list[dict]):
-        self.seen = seen
+    def __init__(self, received: list[dict]):
         self.received = received
         self.messages = self
 
     def create(self, **kwargs: Any) -> Any:
-        import json
-
         self.received.append(kwargs)
-        key = json.dumps(kwargs, sort_keys=True)
-        hit = self.seen.get(key, 0)
-        self.seen[key] = hit + 1
         return SimpleNamespace(
             content=[{"type": "text", "text": "ok"}],
             usage=SimpleNamespace(
                 input_tokens=3,
                 output_tokens=1,
-                cache_read_input_tokens=900 if hit else 0,
-                cache_creation_input_tokens=0 if hit else 900,
+                cache_read_input_tokens=900,
+                cache_creation_input_tokens=25,
             ),
         )
 
@@ -532,24 +524,23 @@ ANALYST_SHAPED_BODY = {
 def caching_harness(tmp_path):
     path = tmp_path / "models.yaml"
     path.write_text(yaml.safe_dump(SETUPS))
-    seen: dict[str, int] = {}
     received: list[dict] = []
-    app = create_app(
-        models_path=path, client_factory=lambda setup: CachingFakeClient(seen, received)
-    )
+    app = create_app(models_path=path, client_factory=lambda setup: CacheUsageFake(received))
     return TestClient(app), received
 
 
-def test_a_byte_identical_request_reads_the_prefix_cache_through_the_hop(tmp_path):
+def test_cache_usage_fields_pass_through_the_hop(tmp_path):
+    client, _ = caching_harness(tmp_path)
+    r = client.post("/v1/generate", json=dict(ANALYST_SHAPED_BODY))
+    assert r.status_code == 200
+    assert r.json()["usage"]["cache_read_tokens"] == 900
+    assert r.json()["usage"]["cache_creation_tokens"] == 25
+
+
+def test_identical_requests_are_forwarded_byte_identically(tmp_path):
     client, received = caching_harness(tmp_path)
-    first = client.post(
-        "/v1/generate", json=dict(ANALYST_SHAPED_BODY, messages=ANALYST_SHAPED_BODY["messages"])
-    )
-    second = client.post("/v1/generate", json=dict(ANALYST_SHAPED_BODY))
-    assert first.status_code == second.status_code == 200
-    assert first.json()["usage"]["cache_read_tokens"] == 0
-    assert first.json()["usage"]["cache_creation_tokens"] == 900
-    assert second.json()["usage"]["cache_read_tokens"] == 900
+    assert client.post("/v1/generate", json=dict(ANALYST_SHAPED_BODY)).status_code == 200
+    assert client.post("/v1/generate", json=dict(ANALYST_SHAPED_BODY)).status_code == 200
     assert received[0] == received[1]
 
 

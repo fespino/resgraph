@@ -351,6 +351,70 @@ def _probe_loop(gw: Gateway, interval_s: float, stop: threading.Event) -> None:
         run_probe_round(gw)
 
 
+def _stream_observer(gw: Gateway, source: str, task_label: str) -> Callable[[dict[str, Any]], None]:
+    """The relay's terminal payloads mapped to metrics — a module function
+    so every branch (end, stream_error, disconnect) tests directly; the
+    endpoint's closure was unreachable by TestClient, which buffers
+    streams to completion."""
+
+    def observe_stream(payload: dict[str, Any]) -> None:
+        if payload["type"] == "end":
+            labels = {
+                "backend": payload["backend"],
+                "source": payload["source"],
+                "task_class": task_label,
+            }
+            obs.GATEWAY_REQUESTS.add(1, {**labels, "outcome": "stream_ok"})
+            obs.GATEWAY_FALLBACK_CHAIN.record(len(payload["fallback_chain"]))
+            if payload["ttft_s"] is not None:
+                obs.GATEWAY_TTFT.record(
+                    payload["ttft_s"], {"backend": payload["backend"], "cached": "false"}
+                )
+            if payload["tokens_per_s"] is not None:
+                obs.GATEWAY_TOKENS_PER_S.record(
+                    payload["tokens_per_s"], {"backend": payload["backend"]}
+                )
+            u = payload["usage"]
+            obs.GATEWAY_COST.record(
+                estimate_cost(
+                    {
+                        "input": u.get("input_tokens", 0),
+                        "output": u.get("output_tokens", 0),
+                        "cache_read": 0,
+                        "cache_creation": 0,
+                    },
+                    gw.setups[payload["model"]]["model"],
+                ),
+                labels,
+            )
+        elif payload["type"] == "disconnect":
+            obs.GATEWAY_REQUESTS.add(
+                1,
+                {
+                    "backend": payload["backend"],
+                    "outcome": "client_disconnected",
+                    "source": source,
+                    "task_class": task_label,
+                },
+            )
+        else:
+            obs.GATEWAY_STREAM_ERRORS.add(
+                1,
+                {"tokens_bucket": "zero" if payload["tokens_emitted"] == 0 else "nonzero"},
+            )
+            obs.GATEWAY_REQUESTS.add(
+                1,
+                {
+                    "backend": payload["backend"],
+                    "outcome": "stream_error",
+                    "source": source,
+                    "task_class": task_label,
+                },
+            )
+
+    return observe_stream
+
+
 def create_app(
     models_path: Path = MODELS_PATH,
     client_factory: Callable[[dict[str, Any]], Any] = build_client,
@@ -414,63 +478,6 @@ def create_app(
                         nxt = _next_alias(gw, chain2)
                 return None
 
-            task_label = req.task_class or "none"
-
-            def observe_stream(payload: dict[str, Any]) -> None:
-                if payload["type"] == "end":
-                    labels = {
-                        "backend": payload["backend"],
-                        "source": payload["source"],
-                        "task_class": task_label,
-                    }
-                    obs.GATEWAY_REQUESTS.add(1, {**labels, "outcome": "stream_ok"})
-                    obs.GATEWAY_FALLBACK_CHAIN.record(len(payload["fallback_chain"]))
-                    if payload["ttft_s"] is not None:
-                        obs.GATEWAY_TTFT.record(
-                            payload["ttft_s"], {"backend": payload["backend"], "cached": "false"}
-                        )
-                    if payload["tokens_per_s"] is not None:
-                        obs.GATEWAY_TOKENS_PER_S.record(
-                            payload["tokens_per_s"], {"backend": payload["backend"]}
-                        )
-                    u = payload["usage"]
-                    obs.GATEWAY_COST.record(
-                        estimate_cost(
-                            {
-                                "input": u.get("input_tokens", 0),
-                                "output": u.get("output_tokens", 0),
-                                "cache_read": 0,
-                                "cache_creation": 0,
-                            },
-                            gw.setups[payload["model"]]["model"],
-                        ),
-                        labels,
-                    )
-                elif payload["type"] == "disconnect":
-                    obs.GATEWAY_REQUESTS.add(
-                        1,
-                        {
-                            "backend": payload["backend"],
-                            "outcome": "client_disconnected",
-                            "source": decision.source,
-                            "task_class": task_label,
-                        },
-                    )
-                else:
-                    obs.GATEWAY_STREAM_ERRORS.add(
-                        1,
-                        {"tokens_bucket": "zero" if payload["tokens_emitted"] == 0 else "nonzero"},
-                    )
-                    obs.GATEWAY_REQUESTS.add(
-                        1,
-                        {
-                            "backend": payload["backend"],
-                            "outcome": "stream_error",
-                            "source": decision.source,
-                            "task_class": task_label,
-                        },
-                    )
-
             return StreamingResponse(
                 relay(
                     alias=alias,
@@ -479,7 +486,7 @@ def create_app(
                     source=decision.source,
                     fallback_chain=chain,
                     reopen=reopen,
-                    observe=observe_stream,
+                    observe=_stream_observer(gw, decision.source, req.task_class or "none"),
                 ),
                 media_type="text/event-stream",
             )

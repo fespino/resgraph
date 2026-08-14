@@ -135,3 +135,69 @@ def test_the_server_records_outcomes_costs_and_cache_hits(tmp_path, monkeypatch)
         la for n, v, la in recorded if n == "GATEWAY_REQUESTS" and la.get("outcome") == "cached"
     ]
     assert len(cached_outcomes) == 1
+
+
+def test_the_stream_observer_maps_every_terminal_payload(tmp_path, monkeypatch):
+    from resgraph.gateway import server as gwserver
+    from resgraph.gateway.server import Gateway, _stream_observer
+
+    recorded: list[tuple[str, object, dict]] = []
+
+    class Rec:
+        def __init__(self, name: str):
+            self.name = name
+
+        def add(self, value, labels=None):
+            recorded.append((self.name, value, labels or {}))
+
+        def record(self, value, labels=None):
+            recorded.append((self.name, value, labels or {}))
+
+    for name in (
+        "GATEWAY_TTFT",
+        "GATEWAY_TOKENS_PER_S",
+        "GATEWAY_REQUESTS",
+        "GATEWAY_FALLBACK_CHAIN",
+        "GATEWAY_COST",
+        "GATEWAY_STREAM_ERRORS",
+    ):
+        monkeypatch.setattr(gwserver.obs, name, Rec(name))
+
+    gw = Gateway(
+        setups={"qwen-local-1.5b": {"provider": "ollama", "model": "qwen2.5:1.5b"}},
+        client_factory=lambda s: None,
+    )
+    observe = _stream_observer(gw, "override", "workhorse")
+
+    observe(
+        {
+            "type": "end",
+            "model": "qwen-local-1.5b",
+            "source": "override",
+            "backend": "ollama",
+            "fallback_chain": [],
+            "usage": {"input_tokens": 5, "output_tokens": 3},
+            "ttft_s": 0.2,
+            "tokens_per_s": 15.0,
+            "reconciliation_ok": True,
+        }
+    )
+    observe({"type": "stream_error", "backend": "ollama", "reason": "died", "tokens_emitted": 4})
+    observe({"type": "disconnect", "backend": "ollama"})
+
+    outcomes = [la["outcome"] for n, v, la in recorded if n == "GATEWAY_REQUESTS"]
+    assert outcomes == ["stream_ok", "stream_error", "client_disconnected"]
+    disconnect = [la for n, v, la in recorded if n == "GATEWAY_REQUESTS"][-1]
+    assert disconnect == {
+        "backend": "ollama",
+        "outcome": "client_disconnected",
+        "source": "override",
+        "task_class": "workhorse",
+    }
+    errors = [(v, la) for n, v, la in recorded if n == "GATEWAY_STREAM_ERRORS"]
+    assert errors == [(1, {"tokens_bucket": "nonzero"})]
+
+
+def test_the_depth_gauge_is_quiet_before_any_gateway_registers(monkeypatch):
+    monkeypatch.setattr(obs, "_gateway_depth_reader", None)
+    assert list(obs._observe_gateway_depth(None)) == []

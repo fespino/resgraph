@@ -1,38 +1,39 @@
 """The precedence table, exercised offline: pin > override > task-class >
-global, the recorded source vocabulary, and pin's no-fallback semantics."""
+global, the recorded source vocabulary, and pin's no-fallback semantics.
+The router speaks worker names — the workers.yaml vocabulary — so local vs
+remote stays a setup property, invisible here."""
+
+from pathlib import Path
 
 import pytest
+import yaml
 
 from resgraph.gateway import (
-    ANTHROPIC,
     CLASSIFICATION,
     DEFAULT_REGISTRY,
     GLOBAL_DEFAULT,
+    GLOBAL_DEFAULT_WORKER,
     JUDGMENT,
-    LOCAL,
     OVERRIDE,
     PIN,
     TASK_CLASS_DEFAULT,
     WORKHORSE,
     ClassRoute,
-    backend_of,
     resolve,
 )
 
 
 def test_pin_wins_over_everything_and_never_falls_back():
-    d = resolve(pin="claude-opus-4-8", model="claude-haiku-4-5", task_class=JUDGMENT)
+    d = resolve(pin="opus", worker="haiku", task_class=JUDGMENT)
     assert d.source == PIN
-    assert d.model == "claude-opus-4-8"
-    assert d.backend == ANTHROPIC
+    assert d.worker == "opus"
     assert d.fallback_allowed is False
 
 
 def test_override_beats_task_class_and_allows_fallback():
-    d = resolve(model="qwen2.5:1.5b", task_class=JUDGMENT)
+    d = resolve(worker="qwen-local-1.5b", task_class=JUDGMENT)
     assert d.source == OVERRIDE
-    assert d.model == "qwen2.5:1.5b"
-    assert d.backend == LOCAL
+    assert d.worker == "qwen-local-1.5b"
     assert d.fallback_allowed is True
 
 
@@ -40,20 +41,20 @@ def test_task_class_defaults_match_the_registry():
     for cls, route in DEFAULT_REGISTRY.items():
         d = resolve(task_class=cls)
         assert d.source == TASK_CLASS_DEFAULT
-        assert (d.backend, d.model) == (route.backend, route.model)
+        assert d.worker == route.worker
         assert d.rationale == route.rationale
 
 
-def test_judgment_is_anthropic_workhorse_and_classification_local():
-    assert resolve(task_class=JUDGMENT).backend == ANTHROPIC
-    assert resolve(task_class=WORKHORSE).backend == LOCAL
-    assert resolve(task_class=CLASSIFICATION).backend == LOCAL
+def test_judgment_is_the_daily_driver_and_the_light_classes_run_local():
+    assert resolve(task_class=JUDGMENT).worker == "haiku"
+    assert resolve(task_class=WORKHORSE).worker == "qwen-local-1.5b"
+    assert resolve(task_class=CLASSIFICATION).worker == "qwen-local-1.5b"
 
 
 def test_global_default_fails_cheap():
     d = resolve()
     assert d.source == GLOBAL_DEFAULT
-    assert d.backend == LOCAL
+    assert d.worker == GLOBAL_DEFAULT_WORKER.worker
 
 
 def test_unknown_task_class_raises_instead_of_routing_somewhere_plausible():
@@ -70,13 +71,15 @@ def test_source_vocabulary_is_the_recorded_contract():
     )
 
 
-def test_backend_of_names_the_backend_from_the_model_id():
-    assert backend_of("claude-haiku-4-5") == ANTHROPIC
-    assert backend_of("qwen2.5:1.5b") == LOCAL
+def test_every_registry_worker_is_a_workers_yaml_setup():
+    setups = yaml.safe_load(Path("evals/workers.yaml").read_text())
+    routed = {r.worker for r in DEFAULT_REGISTRY.values()} | {GLOBAL_DEFAULT_WORKER.worker}
+    missing = routed - set(setups)
+    assert not missing, f"registry routes to workers with no setup: {sorted(missing)}"
 
 
 def test_a_custom_registry_is_data_not_code():
-    table = {"batch": ClassRoute(LOCAL, "qwen2.5:1.5b", "test entry")}
+    table = {"batch": ClassRoute("qwen-local-1.5b", "test entry")}
     d = resolve(task_class="batch", registry=table)
     assert d.source == TASK_CLASS_DEFAULT
     assert d.rationale == "test entry"

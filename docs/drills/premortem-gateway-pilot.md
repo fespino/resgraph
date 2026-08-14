@@ -48,9 +48,8 @@ for the diff-on-miss rule. Fail → STOP and diff before any second spend.
 ## The commands (after review, on go)
 
 ```
-uv run resgraph-gateway serve &          # probes on; anthropic key in env
-# two identical analyst-shaped calls through the seam client, pin=haiku,
-# cache_responses=false, the real ~3.6k-token prefix; print both usages
+uv run resgraph-gateway &                # probes on; anthropic key in env
+uv run python scripts/gateway-pilot.py pilot_results.json
 ```
 
 ## Outcome (2026-08-15, two attempts, ~$0.015)

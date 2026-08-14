@@ -368,3 +368,4 @@ a 1k world and a 100k one.
 Latency note: the canonical layer adds shaping + validation over the
 phase-5 query path; measured overhead is sub-millisecond against the
 2.5 ms live endpoint p50 above — not separately tabled.
+- Gateway serving capacity (knee, TTFT, admission behavior): docs/capacity.md — method + hardware there; laptop-scale only.

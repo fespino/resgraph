@@ -102,11 +102,6 @@ def test_an_exhausted_walk_is_a_clean_503(harness):
     assert r.status_code == 503
 
 
-def test_streaming_is_not_yet_served(harness):
-    client, _, _ = harness
-    assert _gen(client, task_class="judgment", stream=True).status_code == 501
-
-
 def test_an_unknown_alias_is_a_400(harness):
     client, _, _ = harness
     assert _gen(client, model="nope").status_code == 400
@@ -344,3 +339,47 @@ def test_the_default_stream_factory_routes_through_the_seam(tmp_path):
     assert captured["payload"]["model"] == "qwen2.5:1.5b"
     assert captured["payload"]["guided_json"] == {"type": "object"}
     assert captured["url"].endswith("/chat/completions")
+
+
+def test_a_pinned_stream_never_restarts_after_a_zero_token_death(tmp_path):
+    opened: list[str] = []
+
+    def factory(alias: str, kwargs: Any):
+        opened.append(alias)
+
+        def gen():
+            raise ConnectionError("died at zero tokens")
+            yield  # pragma: no cover
+
+        return gen()
+
+    client = stream_harness(tmp_path, factory)
+    r = _gen(client, pin="qwen-local-1.5b", stream=True)
+    assert r.status_code == 200
+    events = sse_events(r.text)
+    assert [e["type"] for e in events] == ["stream_error"]
+    assert events[0]["tokens_emitted"] == 0
+    assert opened == ["qwen-local-1.5b"]
+
+
+def test_a_failed_reopen_walks_on_and_exhausts_honestly(tmp_path):
+    opened: list[str] = []
+
+    def factory(alias: str, kwargs: Any):
+        opened.append(alias)
+        if alias == "qwen-local-1.5b":
+
+            def gen():
+                raise ConnectionError("zero-token death")
+                yield  # pragma: no cover
+
+            return gen()
+        raise ConnectionError("open refused")
+
+    client = stream_harness(tmp_path, factory)
+    r = _gen(client, task_class="workhorse", stream=True)
+    assert r.status_code == 200
+    events = sse_events(r.text)
+    assert [e["type"] for e in events] == ["stream_error"]
+    assert events[0]["tokens_emitted"] == 0
+    assert opened == ["qwen-local-1.5b", "haiku"]

@@ -144,3 +144,17 @@ def test_a_stream_is_never_served_from_cache(tmp_path):
     r = _gen(client, model="qwen-local-1.5b", stream=True)
     assert r.status_code == 200
     assert opened == ["qwen-local-1.5b"]
+
+
+def test_no_cache_bypasses_read_and_write(tmp_path):
+    # A measured run must see the distribution, not a replay: k identical
+    # trials served from cache would silently collapse pass^k into pass@1.
+    client, calls = cached_harness(tmp_path)
+    first = _gen(client, model="qwen-local-1.5b", no_cache=True)
+    second = _gen(client, model="qwen-local-1.5b", no_cache=True)
+    assert first.json()["cached"] is False
+    assert second.json()["cached"] is False
+    assert len(calls) == 2
+    third = _gen(client, model="qwen-local-1.5b")
+    assert third.json()["cached"] is False
+    assert len(calls) == 3

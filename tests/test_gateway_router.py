@@ -54,7 +54,7 @@ def test_global_default_fails_cheap():
 
 def test_unknown_task_class_raises_instead_of_routing_somewhere_plausible():
     with pytest.raises(ValueError, match="unknown task_class"):
-        resolve(task_class=cast("TaskClass", "mystery"))
+        resolve(task_class=cast(TaskClass, "mystery"))
 
 
 def test_every_routed_alias_is_a_models_yaml_setup():

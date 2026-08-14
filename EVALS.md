@@ -113,6 +113,8 @@ post-spend, that their question was unposable:
 | `20260813T200050Z` | Sonnet arm (full, k=3) | $12.00 | complete the picture; the decision-rule arm | Yes — twice interrupted, resumed to 90/90; Sonnet is the dominated middle (halt fired, 7 fabrications) |
 | `20260813T235513Z` | skill-arm pilot (--no-skill) | $0.02 | the fingerprint moves (skill dropped) | Yes — fp 4faa1f4f ≠ b041069e |
 | `20260813T235556Z` | Haiku no-skill arm (full, k=3) | $1.62 | does the skill narrow Haiku's honesty gap? (#199) | Yes — answered: no. The skill is a recall tool (+0.067 pass^k), not an honesty tool (control −0.11) |
+| gateway pilot, attempt 1 (2026-08-15) | gateway pilot: prefix-cache receipt | $0.007 | provider cache written through the running gateway | **No** — cache_creation 0: the ~3.6k system prefix alone sits under haiku's 4096-token cacheable minimum; the pre-mortem's registered guard fired |
+| gateway pilot, attempt 2 (2026-08-15) | same, full analyst shape (+ tool blocks, ~4.4k prefix) | $0.008 | byte-identical prefix in → cache_read out through the hop; source in the trail | Yes — creation 4800 → read 4800, both `cached: false`, `source: pin`, `backend: anthropic` end to end |
 
 Running base rate: 10 of 15 objectives met, $37.89 spent, of which
 $34.38 measured a registered objective. The ledger exists because the

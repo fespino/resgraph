@@ -52,3 +52,17 @@ uv run resgraph-gateway serve &          # probes on; anthropic key in env
 # two identical analyst-shaped calls through the seam client, pin=haiku,
 # cache_responses=false, the real ~3.6k-token prefix; print both usages
 ```
+
+## Outcome (2026-08-15, two attempts, ~$0.015)
+
+Attempt 1 **failed exactly through registered mode #2**: the system prefix
+alone (3,611 tokens) sits under haiku's 4096-token cacheable minimum —
+`cache_creation = 0`, the guard fired, no conclusion drawn from the miss.
+The premise "~3.6k is over the minimum" was wrong; the real analyst clears
+it because the tool schemas serialize into the prefix. Attempt 2, full
+analyst shape (+ the registry's tool blocks, ~4.4k prefix): call 1
+`cache_creation 4800`, call 2 `cache_read 4800`, both `cached: false`,
+`source: pin` / `backend: anthropic` on both responses and in the per-call
+trail. The gateway preserves the provider prefix cache through a real
+serving hop — the phase-exit receipt behind the offline byte-identical
+tests. Ledger: EVALS.md.

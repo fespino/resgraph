@@ -4,6 +4,7 @@ global, the recorded source vocabulary, and pin's no-fallback semantics.
 so local vs remote stays a setup property, invisible here."""
 
 from pathlib import Path
+from typing import cast
 
 import pytest
 import yaml
@@ -19,6 +20,7 @@ from resgraph.gateway.router import (
     TASK_CLASS_DEFAULT,
     WORKHORSE,
     ClassRoute,
+    TaskClass,
     resolve,
 )
 
@@ -59,7 +61,7 @@ def test_global_default_fails_cheap():
 
 def test_unknown_task_class_raises_instead_of_routing_somewhere_plausible():
     with pytest.raises(ValueError, match="unknown task_class"):
-        resolve(task_class="mystery")
+        resolve(task_class=cast("TaskClass", "mystery"))
 
 
 def test_source_vocabulary_is_the_recorded_contract():
@@ -78,8 +80,9 @@ def test_every_routed_alias_is_a_models_yaml_setup():
     assert not missing, f"registry routes to aliases with no setup: {sorted(missing)}"
 
 
-def test_a_custom_registry_is_data_not_code():
-    table = {"batch": ClassRoute("qwen-local-1.5b", "test entry")}
-    d = resolve(task_class="batch", registry=table)
+def test_a_custom_registry_remaps_a_class_without_touching_code():
+    table = {JUDGMENT: ClassRoute("qwen-local-1.5b", "remapped for a drill")}
+    d = resolve(task_class=JUDGMENT, registry=table)
     assert d.source == TASK_CLASS_DEFAULT
-    assert d.rationale == "test entry"
+    assert d.model == "qwen-local-1.5b"
+    assert d.rationale == "remapped for a drill"

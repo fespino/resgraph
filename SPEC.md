@@ -1892,6 +1892,46 @@ slowest, no cost saving); and a scalar pass^k decision rule (it would
 have picked the dominated arm — the decision surface is slices × cost ×
 latency × fabrications, not one number).
 
+## D30 — Gateway shape: two backends, task-class routing, recorded source (phase 10)
+
+`resgraph-gateway` (FastAPI, one process) fronts two backends — `local` (Ollama) and `anthropic` (API, the second "region") — behind an OpenAI-compatible-ish `/v1/generate` taking `{messages, stream, task_class?, model?, pin?}`. It reuses D29c's client factory + tool-surface adapter and adds only the serving plumbing D29c excluded. This is the [Building Effective Agents](https://www.anthropic.com/research/building-effective-agents) **Routing** pattern applied to model selection, not prompt selection. Charter: [#162](https://github.com/fespino/resgraph/issues/162).
+
+Selection resolves by precedence, and the WINNING TIER is recorded on every response + metric — `source ∈ {pin, override, task_class_default, global_default}` — so "why did this call cost 40×" is a field, not a hunt:
+
+1. `pin` — exact model, no fallback, no substitution. Exists for the D29c judge: a pinned judge that silently reroutes is a corrupted baseline; a pin fails loudly instead of degrading.
+2. `model` override — explicit model id, fallback allowed.
+3. `task_class` default — JUDGMENT → anthropic (triage reasoning), WORKHORSE → local (bulk/replay), CLASSIFICATION → local (graders' light calls). Registry data with per-entry rationale, refined by eval evidence, not vibes.
+4. Global default — local (fail cheap).
+
+Within an eligible tier, health- and latency-aware choice (EWMA of TTFT + health state). **Rejected:** round-robin — the two backends differ 10× in latency and ∞× in cost; symmetric balancing is a category error (with 2 heterogeneous backends this is failover with telemetry, not load balancing — the structure generalizes, the balancing claim would not).
+
+**Backend reality on this host (amendment, 2026-08-14).** A real local triage model does not fit 8.6 GB (qwen2.5:7b OOMs — D29c), so the `local` backend is **qwen2.5:1.5b** — adequate for WORKHORSE/CLASSIFICATION serving-shape duty and as the *killable* region for the failover drill, not for JUDGMENT (which routes to anthropic, where Haiku is the daily-driver model per the D29c amendment). The gateway measures serving reliability shapes at laptop scale, not triage quality, so the local model's weakness is irrelevant to what the gate asserts; numbers are labeled laptop-scale per BENCHMARKS.md, no fleet extrapolation. The measured-run invariant holds and is a gateway *setting*: an eval arm pins its worker with **failover disabled** (D29c), because a silent fallback both spends unintended money and confounds the arms comparison.
+
+## D31 — Streaming + failure semantics: the init vs mid-stream split (phase 10)
+
+SSE pass-through, per-token accounting at the gateway. TTFT is stamped at the first CONTENT token (not headers, not role deltas — measure what the user waits for); totals reconcile against the provider's usage fields at stream end (drift > 2% fails a test).
+
+- **Admission/init failures** (connect refused, auth, unknown model, 429 before the first token): transparent failover to the next eligible backend. Every hop appends to `fallback_chain`, riding a `[gateway:fallback]` structured log + metric; **alert when chain length > 1** — the system degraded silently and the operator must know. Exhausted chain → `[gateway:exhausted]` + a clean 503, never a stack trace.
+- **Mid-stream death** (backend dies at token 500): NO transparent retry — tokens already reached the client, and a replay can diverge into a spliced answer. The gateway emits a structured `stream_error` SSE event (tokens_emitted, backend, reason) and the CLIENT decides; the analyst treats it like a budget cutoff (degraded, honest). Exception: zero tokens emitted → one silent restart on the other backend (observably identical to an init failure).
+
+**Rejected:** transparent mid-stream resume ("continue from token 500" on backend B) — splices two models' outputs and fabricates a completion no model produced; the streaming version of the eval suite's fabrication rule, disqualifying not a trade-off. Enforced **by construction**: no resume path exists to misuse.
+
+## D32 — Two cache layers, named and measured separately (phase 10)
+
+- **Provider prefix cache** (Anthropic-side, D23 discipline): the gateway PRESERVES it — routing must not reorder/rewrite messages, and per-request `cache_read` passes through to metrics. Proven by test: byte-identical prefix in → `cache_read` > 0 back. A gateway that busts its upstream's cache is a net negative.
+- **Gateway response cache:** full-request hash (model + messages + params) → completed response, TTL 15m, LRU-bounded, ONLY for temperature-0 non-streamed calls (graders, judge, repeated scenario replays). Hit = zero backend tokens. Measured on REPLAYED REAL TRAFFIC — the D27 audit store already holds every analyst LLM call, and `scripts/replay-traffic.py` re-issues a recorded run through the gateway. Hit rates reported per traffic class, not one flattering aggregate; uniform synthetic prompts lie about hit rates in whichever direction you wanted.
+
+The two layers solve different problems — provider cache: shared PREFIX across different requests; gateway cache: IDENTICAL full requests — and get separate metrics. Conflating them is the most common cache error.
+
+## D33 — Serving SLOs + capacity honesty (phase 10)
+
+- **TTFT p95 ≤ objective per backend** (measured baseline × 1.5, D18 discipline) and a **completion-throughput floor (tokens/sec p50)** as SEPARATE SLOs — a stream can start fast and starve.
+- **Availability** = successful-or-honestly-failed / total (a D31 `stream_error` surfaced counts as honest; a spliced retry would count as success and be a lie).
+- Queue depth per backend is the leading indicator (alert before latency, not after). Bounded per-backend queues with admission control: request cost is unknown at admission (output length isn't in the request), so a full queue returns 429 + `Retry-After` rather than scaling the pool. Health is a tiny synthetic *generation* probe (5-token completion), not a TCP ping — a server can 200 its health endpoint while generation has collapsed; readmission after recovery is gradual (3 consecutive healthy probes).
+- Capacity writeup (`docs/capacity.md`) from the load test: hardware, model, quantization, method, the knee point, the TTFT-vs-throughput trade curve, and the cost math; no extrapolation — the throughput lever lives in the model server, not the gateway. The failover drill is **INC-004** (INC-003 is the cold-store drill, #158).
+
+**Rejected across D30–D33:** resume-a-dead-stream-on-another-backend (fabrication); symmetric load balancing (category error — heterogeneous latency/cost); a global provider switch the judge would follow (corrupts the baseline — D29c). **Exit gate:** the seven items in #162 / chapter 10 — `source` recorded per call; prefix-cache preserved; mid-stream-kill honesty; pinned-judge zero substitutions; load-test knee with method+hardware; per-class replay cache table (both layers); INC-004 with the TTFT curve and $/hour delta. The shadow/canary rollout layer (D79–D80) is a later addendum, out of this phase's gate.
+
 ## Phase contracts
 - The generator MUST emit D2 messages exactly and expose `--seed`
   for reproducibility.

@@ -561,3 +561,14 @@ def test_cache_control_marks_survive_the_hop_untouched(tmp_path):
     assert kwargs["messages"] == ANALYST_SHAPED_BODY["messages"]
     assert kwargs["system"][0]["cache_control"] == {"type": "ephemeral"}
     assert kwargs["messages"][0]["content"][0]["cache_control"] == {"type": "ephemeral"}
+
+
+def test_the_analysts_block_system_is_accepted_not_422d(harness):
+    client, _, calls = harness
+    system = [
+        {"type": "text", "text": "the playbook prefix", "cache_control": {"type": "ephemeral"}}
+    ]
+    r = _gen(client, task_class="judgment", system=system)
+    assert r.status_code == 200
+    _, kwargs = calls[0]
+    assert kwargs["system"] == system

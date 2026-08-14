@@ -1,7 +1,7 @@
 """The precedence table, exercised offline: pin > override > task-class >
 global, the recorded source vocabulary, and pin's no-fallback semantics.
-The router speaks worker names — the workers.yaml vocabulary — so local vs
-remote stays a setup property, invisible here."""
+``model`` values are served-model aliases — the workers.yaml setup names —
+so local vs remote stays a setup property, invisible here."""
 
 from pathlib import Path
 
@@ -12,7 +12,7 @@ from resgraph.gateway import (
     CLASSIFICATION,
     DEFAULT_REGISTRY,
     GLOBAL_DEFAULT,
-    GLOBAL_DEFAULT_WORKER,
+    GLOBAL_DEFAULT_MODEL,
     JUDGMENT,
     OVERRIDE,
     PIN,
@@ -24,16 +24,16 @@ from resgraph.gateway import (
 
 
 def test_pin_wins_over_everything_and_never_falls_back():
-    d = resolve(pin="opus", worker="haiku", task_class=JUDGMENT)
+    d = resolve(pin="opus", model="haiku", task_class=JUDGMENT)
     assert d.source == PIN
-    assert d.worker == "opus"
+    assert d.model == "opus"
     assert d.fallback_allowed is False
 
 
 def test_override_beats_task_class_and_allows_fallback():
-    d = resolve(worker="qwen-local-1.5b", task_class=JUDGMENT)
+    d = resolve(model="qwen-local-1.5b", task_class=JUDGMENT)
     assert d.source == OVERRIDE
-    assert d.worker == "qwen-local-1.5b"
+    assert d.model == "qwen-local-1.5b"
     assert d.fallback_allowed is True
 
 
@@ -41,20 +41,20 @@ def test_task_class_defaults_match_the_registry():
     for cls, route in DEFAULT_REGISTRY.items():
         d = resolve(task_class=cls)
         assert d.source == TASK_CLASS_DEFAULT
-        assert d.worker == route.worker
+        assert d.model == route.model
         assert d.rationale == route.rationale
 
 
 def test_judgment_is_the_daily_driver_and_the_light_classes_run_local():
-    assert resolve(task_class=JUDGMENT).worker == "haiku"
-    assert resolve(task_class=WORKHORSE).worker == "qwen-local-1.5b"
-    assert resolve(task_class=CLASSIFICATION).worker == "qwen-local-1.5b"
+    assert resolve(task_class=JUDGMENT).model == "haiku"
+    assert resolve(task_class=WORKHORSE).model == "qwen-local-1.5b"
+    assert resolve(task_class=CLASSIFICATION).model == "qwen-local-1.5b"
 
 
 def test_global_default_fails_cheap():
     d = resolve()
     assert d.source == GLOBAL_DEFAULT
-    assert d.worker == GLOBAL_DEFAULT_WORKER.worker
+    assert d.model == GLOBAL_DEFAULT_MODEL.model
 
 
 def test_unknown_task_class_raises_instead_of_routing_somewhere_plausible():
@@ -71,11 +71,11 @@ def test_source_vocabulary_is_the_recorded_contract():
     )
 
 
-def test_every_registry_worker_is_a_workers_yaml_setup():
+def test_every_routed_alias_is_a_workers_yaml_setup():
     setups = yaml.safe_load(Path("evals/workers.yaml").read_text())
-    routed = {r.worker for r in DEFAULT_REGISTRY.values()} | {GLOBAL_DEFAULT_WORKER.worker}
+    routed = {r.model for r in DEFAULT_REGISTRY.values()} | {GLOBAL_DEFAULT_MODEL.model}
     missing = routed - set(setups)
-    assert not missing, f"registry routes to workers with no setup: {sorted(missing)}"
+    assert not missing, f"registry routes to aliases with no setup: {sorted(missing)}"
 
 
 def test_a_custom_registry_is_data_not_code():

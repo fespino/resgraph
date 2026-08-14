@@ -1894,16 +1894,16 @@ latency × fabrications, not one number).
 
 ## D30 — Gateway shape: two backends, task-class routing, recorded source (phase 10)
 
-`resgraph-gateway` (FastAPI, one process) fronts two backends — `local` (Ollama) and `anthropic` (API, the second "region") — behind an OpenAI-compatible-ish `/v1/generate` taking `{messages, stream, task_class?, worker?, pin?}`. It reuses D29c's client factory + tool-surface adapter and adds only the serving plumbing D29c excluded. This is the [Building Effective Agents](https://www.anthropic.com/research/building-effective-agents) **Routing** pattern applied to model selection, not prompt selection. Charter: [#162](https://github.com/fespino/resgraph/issues/162).
+`resgraph-gateway` (FastAPI, one process) fronts two backends — `local` (Ollama) and `anthropic` (API, the second "region") — behind an OpenAI-compatible-ish `/v1/generate` taking `{messages, stream, task_class?, model?, pin?}`. It reuses D29c's client factory + tool-surface adapter and adds only the serving plumbing D29c excluded. This is the [Building Effective Agents](https://www.anthropic.com/research/building-effective-agents) **Routing** pattern applied to model selection, not prompt selection. Charter: [#162](https://github.com/fespino/resgraph/issues/162).
 
-**The router speaks worker names — the D29c `workers.yaml` vocabulary — never raw model ids.** Where a worker runs (provider, base_url, model, request kwargs) is its setup's property, resolved through the seam at dispatch; the local-vs-remote distinction stays transparent to routing, and a name is never sniffed for its backend. **Rejected:** a parallel registry of model ids with backend inference from the id shape — a second naming vocabulary drifts from the setups, and prefix-sniffing lies the moment a hosted chat-completions model or a proxied Anthropic model appears.
+**`model` and `pin` carry served-model ALIASES — the D29c `workers.yaml` setup names — never raw provider ids.** The field is named `model` because that is the wire-protocol word every OpenAI-compatible client sends; its value is an alias the seam resolves. Where an alias runs (provider, base_url, real model id, request kwargs) is its setup's property, resolved at dispatch; the local-vs-remote distinction stays transparent to routing, and a name is never sniffed for its backend. "Worker" remains the *eval role* (worker vs judge, D29c) — the gateway is roleless and does not borrow it. **Rejected:** raw provider model ids with backend inference from the id shape — a second naming vocabulary drifts from the setups, and prefix-sniffing lies the moment a hosted chat-completions model or a proxied Anthropic model appears.
 
 Selection resolves by precedence, and the WINNING TIER is recorded on every response + metric — `source ∈ {pin, override, task_class_default, global_default}` — so "why did this call cost 40×" is a field, not a hunt:
 
-1. `pin` — exact worker, no fallback, no substitution. Exists for the D29c judge: a pinned judge that silently reroutes is a corrupted baseline; a pin fails loudly instead of degrading.
-2. `worker` override — explicit setup name, fallback allowed.
-3. `task_class` default — JUDGMENT → the daily-driver worker (triage reasoning; `haiku` per the D29c amendment), WORKHORSE → the local worker (bulk/replay), CLASSIFICATION → the local worker (graders' light calls). Registry data with per-entry rationale, refined by eval evidence, not vibes; every routed name must exist as a setup (tested).
-4. Global default — the local worker (fail cheap).
+1. `pin` — exact alias, no fallback, no substitution. Exists for the D29c judge: a pinned judge that silently reroutes is a corrupted baseline; a pin fails loudly instead of degrading.
+2. `model` override — explicit alias, fallback allowed.
+3. `task_class` default — JUDGMENT → the daily-driver setup (triage reasoning; `haiku` per the D29c amendment), WORKHORSE → the local setup (bulk/replay), CLASSIFICATION → the local setup (graders' light calls). Registry data with per-entry rationale, refined by eval evidence, not vibes; every routed alias must exist as a setup (tested).
+4. Global default — the local setup (fail cheap).
 
 Within an eligible tier, health- and latency-aware choice (EWMA of TTFT + health state). **Rejected:** round-robin — the two backends differ 10× in latency and ∞× in cost; symmetric balancing is a category error (with 2 heterogeneous backends this is failover with telemetry, not load balancing — the structure generalizes, the balancing claim would not).
 

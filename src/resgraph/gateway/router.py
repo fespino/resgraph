@@ -1,14 +1,14 @@
-"""Precedence router: which worker serves a request, and why.
+"""Precedence router: which model serves a request, and why.
 
 Resolution is pure and total over the request shape — pin → override →
 task-class default → global default — and the winning ``source`` rides the
 decision so cost questions are answered by a field, not a hunt.
 
-The router speaks worker NAMES (the setups in workers.yaml), the same
-vocabulary as ``--worker``: where a worker runs is its setup's provider and
-base_url, so local vs remote stays transparent here. Backend concerns —
-which queue, which adapter, health/EWMA tie-breaking — are resolved from
-the setup at dispatch, never inferred from the name."""
+``model`` values are served-model ALIASES — the setup names in
+workers.yaml — never raw provider ids: where an alias runs is its setup's
+provider and base_url, so local vs remote stays transparent here. Backend
+concerns — which queue, which adapter, health/EWMA tie-breaking — are
+resolved from the setup at dispatch, never inferred from the name."""
 
 from dataclasses import dataclass
 
@@ -26,18 +26,18 @@ CLASSIFICATION = "classification"
 class ClassRoute:
     """A task-class default: registry data with its rationale, not code."""
 
-    worker: str
+    model: str
     rationale: str
 
 
 DEFAULT_REGISTRY: dict[str, ClassRoute] = {
     JUDGMENT: ClassRoute(
         "haiku",
-        "triage reasoning; the daily-driver worker chosen by the model arms",
+        "triage reasoning; the daily-driver setup chosen by the model arms",
     ),
     WORKHORSE: ClassRoute(
         "qwen-local-1.5b",
-        "bulk/replay serving-shape traffic; the worker that fits this host",
+        "bulk/replay serving-shape traffic; the setup that fits this host",
     ),
     CLASSIFICATION: ClassRoute(
         "qwen-local-1.5b",
@@ -45,12 +45,12 @@ DEFAULT_REGISTRY: dict[str, ClassRoute] = {
     ),
 }
 
-GLOBAL_DEFAULT_WORKER = ClassRoute("qwen-local-1.5b", "no signal from the request: fail cheap")
+GLOBAL_DEFAULT_MODEL = ClassRoute("qwen-local-1.5b", "no signal from the request: fail cheap")
 
 
 @dataclass(frozen=True)
 class RouteDecision:
-    worker: str
+    model: str
     source: str
     fallback_allowed: bool
     rationale: str
@@ -59,7 +59,7 @@ class RouteDecision:
 def resolve(
     *,
     pin: str | None = None,
-    worker: str | None = None,
+    model: str | None = None,
     task_class: str | None = None,
     registry: dict[str, ClassRoute] | None = None,
 ) -> RouteDecision:
@@ -70,31 +70,31 @@ def resolve(
     table = DEFAULT_REGISTRY if registry is None else registry
     if pin:
         return RouteDecision(
-            worker=pin,
+            model=pin,
             source=PIN,
             fallback_allowed=False,
-            rationale="pinned: exact worker, no fallback, no substitution",
+            rationale="pinned: exact model, no fallback, no substitution",
         )
-    if worker:
+    if model:
         return RouteDecision(
-            worker=worker,
+            model=model,
             source=OVERRIDE,
             fallback_allowed=True,
-            rationale="explicit worker override",
+            rationale="explicit model override",
         )
     if task_class is not None:
         route = table.get(task_class)
         if route is None:
             raise ValueError(f"unknown task_class {task_class!r}; have: {sorted(table)}")
         return RouteDecision(
-            worker=route.worker,
+            model=route.model,
             source=TASK_CLASS_DEFAULT,
             fallback_allowed=True,
             rationale=route.rationale,
         )
-    g = GLOBAL_DEFAULT_WORKER
+    g = GLOBAL_DEFAULT_MODEL
     return RouteDecision(
-        worker=g.worker,
+        model=g.model,
         source=GLOBAL_DEFAULT,
         fallback_allowed=True,
         rationale=g.rationale,

@@ -32,6 +32,7 @@ from resgraph.analyst.prompts import WorldSummary, build_prompt
 from resgraph.analyst.tools import RegistryToolset
 from resgraph.cold import queries as cold_queries
 from resgraph.cold import store as cold_store
+from resgraph.evals.pricing import PRICES_PER_MTOK, estimate_cost
 from resgraph.gen.scenarios import GeneratedScenario, Scenario, log_state, rebuild
 from resgraph.graph.ingest import apply_batch
 from resgraph.graph.loader import load_snapshot
@@ -65,11 +66,6 @@ JUDGE_DAILY_CAP_USD = 10.0
 
 # USD per 1M tokens (input, output), checked 2026-08-05; cache read
 # bills at 0.1x input, cache write at 1.25x input.
-PRICES_PER_MTOK: dict[str, tuple[float, float]] = {
-    "claude-opus-4-8": (5.0, 25.0),
-    "claude-sonnet-4-6": (3.0, 15.0),
-    "claude-haiku-4-5": (1.0, 5.0),
-}
 
 
 def load_scenarios(path: Path) -> list[Scenario]:
@@ -270,21 +266,6 @@ def preflight_store(driver: Any, *, cap: int = PREFLIGHT_NODE_CAP) -> None:
             "that looks like real data, not an eval scratch store. Wipe it "
             "yourself or point the runner elsewhere; --skip-preflight overrides."
         )
-
-
-def estimate_cost(tokens: dict[str, int], model: str) -> float:
-    """Worker-side estimate from a row's token block. The judge's own
-    calls are not in it, so this undercounts slightly: the guard is a
-    brake, not a bill — the ledger still comes from the console."""
-    if model not in PRICES_PER_MTOK:
-        return 0.0  # no price on file — an unmetered model, wherever it runs
-    input_rate, output_rate = PRICES_PER_MTOK[model]
-    return (
-        tokens["input"] * input_rate
-        + tokens["output"] * output_rate
-        + tokens["cache_read"] * input_rate * 0.1
-        + tokens["cache_creation"] * input_rate * 1.25
-    ) / 1_000_000
 
 
 def _usage_tokens(usage: Any) -> dict[str, int]:

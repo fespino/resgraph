@@ -177,32 +177,20 @@ def test_system_and_tools_ride_the_create_call(harness):
     assert kwargs["tools"] == tools
 
 
-def test_fallback_reaches_a_provider_outside_the_registry(tmp_path):
-    from resgraph.gateway.router import ClassRoute
-
+def test_the_walk_never_reaches_an_unrouted_catalog_setup(tmp_path):
     path = tmp_path / "models.yaml"
-    path.write_text(
-        yaml.safe_dump(
-            {
-                "haiku": {"provider": "anthropic", "model": "claude-haiku-4-5"},
-                "gpt": {"provider": "openai", "model": "gpt-4o"},
-            }
-        )
-    )
+    path.write_text(yaml.safe_dump({**SETUPS, "gpt": {"provider": "openai", "model": "gpt-4o"}}))
     calls: list[tuple[str, dict]] = []
-    behaviors = {"haiku": "boom"}
+    behaviors = {"haiku": "boom", "qwen-local-1.5b": "boom"}
     app = create_app(
         models_path=path,
         client_factory=lambda setup: FakeClient(setup["name"], behaviors, calls),
-        registry={"judgment": ClassRoute("haiku", "the only routed class")},
     )
     client = TestClient(app)
     r = _gen(client, task_class="judgment")
-    assert r.status_code == 200
-    body = r.json()
-    assert body["model"] == "gpt"
-    assert body["backend"] == "openai"
-    assert body["fallback_chain"] == ["anthropic:haiku"]
+    assert r.status_code == 503
+    assert "gpt" not in [name for name, _ in calls]
+    assert app.state.gateway.alias_for_backend("openai") is None
     assert app.state.gateway.alias_for_backend("nowhere") is None
 
 
@@ -464,3 +452,26 @@ def test_the_lifespan_probe_thread_runs_and_stops(tmp_path):
                 break
             _time.sleep(0.02)
         assert {b.health.state for b in gw.backends.values()} == {"down"}
+
+
+def test_probe_rounds_never_touch_an_unrouted_catalog_setup(tmp_path):
+    from resgraph.gateway.server import run_probe_round
+
+    path = tmp_path / "models.yaml"
+    path.write_text(yaml.safe_dump({**SETUPS, "gpt": {"provider": "openai", "model": "gpt-4o"}}))
+    calls: list[tuple[str, dict]] = []
+    app = create_app(
+        models_path=path, client_factory=lambda setup: FakeClient(setup["name"], {}, calls)
+    )
+    results = run_probe_round(TestClient(app).app.state.gateway)
+    assert sorted(results) == ["anthropic", "ollama"]
+    assert "gpt" not in [name for name, _ in calls]
+
+
+def test_a_probe_is_a_minimal_generation_without_caller_extra_args(harness):
+    client, _, calls = harness
+    assert probe(client.app.state.gateway, "opus") == "ok"
+    name, kwargs = calls[-1]
+    assert name == "opus"
+    assert kwargs["max_tokens"] == 5
+    assert "thinking" not in kwargs

@@ -209,3 +209,129 @@ def test_fallback_reaches_a_provider_outside_the_registry(tmp_path):
     assert body["backend"] == "openai"
     assert body["fallback_chain"] == ["anthropic:haiku"]
     assert app.state.gateway.alias_for_backend("nowhere") is None
+
+
+def sse_events(text: str) -> list[dict]:
+    import json
+
+    return [
+        json.loads(line[len("data:") :]) for line in text.splitlines() if line.startswith("data:")
+    ]
+
+
+def ok_stream(alias: str, kwargs: Any):
+    return iter(
+        [
+            ("content", f"from {alias}"),
+            ("usage", {"input_tokens": 2, "output_tokens": 1}),
+        ]
+    )
+
+
+def stream_harness(tmp_path, factory):
+    path = tmp_path / "models.yaml"
+    path.write_text(yaml.safe_dump(SETUPS))
+    calls: list[tuple[str, dict]] = []
+    behaviors: dict[str, str] = {}
+    app = create_app(
+        models_path=path,
+        client_factory=lambda setup: FakeClient(setup["name"], behaviors, calls),
+        stream_factory=factory,
+    )
+    return TestClient(app)
+
+
+def test_a_stream_serves_end_to_end(tmp_path):
+    client = stream_harness(tmp_path, ok_stream)
+    r = _gen(client, model="qwen-local-1.5b", stream=True)
+    assert r.status_code == 200
+    events = sse_events(r.text)
+    assert [e["type"] for e in events] == ["content", "end"]
+    end = events[-1]
+    assert end["model"] == "qwen-local-1.5b"
+    assert end["source"] == "override"
+    assert end["backend"] == "ollama"
+    assert end["reconciliation_ok"] is True
+
+
+def test_a_stream_open_failure_walks_like_an_init_failure(tmp_path):
+    def factory(alias: str, kwargs: Any):
+        if alias == "qwen-local-1.5b":
+            raise ConnectionError("backend unreachable")
+        return ok_stream(alias, kwargs)
+
+    client = stream_harness(tmp_path, factory)
+    r = _gen(client, task_class="workhorse", stream=True)
+    assert r.status_code == 200
+    end = sse_events(r.text)[-1]
+    assert end["backend"] == "anthropic"
+    assert end["fallback_chain"] == ["ollama:qwen-local-1.5b"]
+
+
+def test_a_zero_token_stream_death_restarts_on_the_other_backend(tmp_path):
+    def immediately_dying(alias: str, kwargs: Any):
+        def gen():
+            raise ConnectionError("died before any token")
+            yield  # pragma: no cover
+
+        return gen()
+
+    def factory(alias: str, kwargs: Any):
+        if alias == "qwen-local-1.5b":
+            return immediately_dying(alias, kwargs)
+        return ok_stream(alias, kwargs)
+
+    client = stream_harness(tmp_path, factory)
+    r = _gen(client, task_class="workhorse", stream=True)
+    assert r.status_code == 200
+    events = sse_events(r.text)
+    assert [e["type"] for e in events] == ["content", "end"]
+    assert events[-1]["fallback_chain"] == ["ollama:qwen-local-1.5b"]
+    assert events[-1]["backend"] == "anthropic"
+
+
+def test_a_pinned_stream_open_failure_is_a_loud_502(tmp_path):
+    def factory(alias: str, kwargs: Any):
+        raise ConnectionError("backend unreachable")
+
+    client = stream_harness(tmp_path, factory)
+    r = _gen(client, pin="qwen-local-1.5b", stream=True)
+    assert r.status_code == 502
+
+
+def test_a_full_queue_rejects_a_stream_with_retry_after(tmp_path):
+    client = stream_harness(tmp_path, ok_stream)
+    client.app.state.gateway.backend("qwen-local-1.5b").in_flight = 4
+    r = _gen(client, pin="qwen-local-1.5b", stream=True)
+    assert r.status_code == 429
+    assert int(r.headers["Retry-After"]) >= 1
+
+
+def test_anthropic_streaming_answers_501_until_its_adapter_lands(harness):
+    client, _, _ = harness
+    r = _gen(client, task_class="judgment", stream=True)
+    assert r.status_code == 501
+
+
+def test_the_default_chat_stream_builds_the_streaming_payload(tmp_path, monkeypatch):
+    captured: dict[str, Any] = {}
+
+    def fake_lines(url: str, payload: dict, headers: dict):
+        captured.update(url=url, payload=payload, headers=headers)
+        yield 'data: {"choices": [{"delta": {"content": "pong"}}]}'
+        yield 'data: {"choices": [], "usage": {"prompt_tokens": 1, "completion_tokens": 1}}'
+        yield "data: [DONE]"
+
+    monkeypatch.setattr(server, "_chat_lines", fake_lines)
+    path = tmp_path / "models.yaml"
+    path.write_text(yaml.safe_dump(SETUPS))
+    app = create_app(models_path=path, client_factory=lambda setup: None)
+    client = TestClient(app)
+    r = _gen(client, model="qwen-local-1.5b", stream=True)
+    assert r.status_code == 200
+    events = sse_events(r.text)
+    assert [e["type"] for e in events] == ["content", "end"]
+    assert captured["payload"]["stream"] is True
+    assert captured["payload"]["stream_options"] == {"include_usage": True}
+    assert captured["payload"]["model"] == "qwen2.5:1.5b"
+    assert captured["url"].endswith("/chat/completions")

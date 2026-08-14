@@ -31,7 +31,7 @@ def run(
     no_skill: bool = False,
     worker: str = "",
     judge: str = "",
-    workers_config: str = "evals/workers.yaml",
+    models_config: str = "evals/models.yaml",
 ) -> None:
     """Run every scenario x trials against docker stores + the API;
     one JSONL row per (item, trial) lands in out_dir. --resume PATH
@@ -45,7 +45,7 @@ def run(
     playbook from the prefix (a labeled fingerprint change, the skill
     arm). Run with a project-scoped API key that carries its own spend
     cap — the key is read from the environment and never written
-    anywhere. --worker NAME selects a setup from --workers-config (provider,
+    anywhere. --worker NAME selects a setup from --models-config (provider,
     model, endpoint, determinism knobs, and extra_args request kwargs; the name
     is recorded per row and is the arm label); without it the worker is --model
     on the Anthropic SDK. A named worker carries its own thinking in extra_args
@@ -59,7 +59,7 @@ def run(
     from .providers import build_client, load_setup
     from .runner import load_scenarios, run_eval
 
-    cfg = Path(workers_config)
+    cfg = Path(models_config)
     worker_setup: dict[str, Any] = (
         load_setup(worker, cfg) if worker else {"provider": "anthropic", "model": model}
     )

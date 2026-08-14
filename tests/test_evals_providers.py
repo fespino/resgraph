@@ -280,7 +280,7 @@ def test_chat_provider_without_a_base_url_is_rejected():
 
 
 def test_load_setup_reads_a_named_setup(tmp_path):
-    cfg = tmp_path / "workers.yaml"
+    cfg = tmp_path / "models.yaml"
     cfg.write_text("qwen:\n  provider: ollama\n  model: qwen2.5:7b\n  base_url: http://x/v1\n")
     assert load_setup("qwen", cfg) == {
         "name": "qwen",
@@ -291,7 +291,7 @@ def test_load_setup_reads_a_named_setup(tmp_path):
 
 
 def test_load_setup_rejects_an_unknown_name(tmp_path):
-    cfg = tmp_path / "workers.yaml"
+    cfg = tmp_path / "models.yaml"
     cfg.write_text("opus:\n  provider: anthropic\n  model: claude-opus-4-8\n")
     with pytest.raises(SystemExit, match="no setup 'nope'"):
         load_setup("nope", cfg)

@@ -326,3 +326,35 @@ def test_build_client_refuses_an_inline_secret():
                 "api_key": "sk-leak",
             }
         )
+
+
+def test_stream_lines_shares_the_payload_builder_with_create():
+    seen: dict = {}
+
+    def lines(url, payload, headers):
+        seen.update(url=url, payload=payload, headers=headers)
+        yield "data: [DONE]"
+
+    client = ChatCompletionsClient(
+        base_url="http://localhost:1/v1",
+        seed=7,
+        extra_args={"guided_json": {"type": "object"}},
+        line_transport=lines,
+    )
+    out = list(
+        client.messages.stream_lines(
+            model="qwen2.5:1.5b",
+            max_tokens=64,
+            messages=[{"role": "user", "content": "q"}],
+            tools=[{"name": "fetch_resource", "input_schema": {}}],
+            thinking={"type": "adaptive"},
+        )
+    )
+    assert out == ["data: [DONE]"]
+    payload = seen["payload"]
+    assert payload["stream"] is True
+    assert payload["stream_options"] == {"include_usage": True}
+    assert payload["seed"] == 7
+    assert payload["guided_json"] == {"type": "object"}
+    assert payload["tools"][0]["function"]["name"] == "fetch_resource"
+    assert "thinking" not in payload

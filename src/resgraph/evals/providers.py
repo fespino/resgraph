@@ -13,7 +13,7 @@ adapter is exercised offline against fixtures.
 
 import json
 import os
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -22,6 +22,7 @@ import httpx
 import yaml
 
 Transport = Callable[[str, dict[str, Any], dict[str, str]], dict[str, Any]]
+LineTransport = Callable[[str, dict[str, Any], dict[str, str]], Iterator[str]]
 
 
 @dataclass
@@ -173,6 +174,14 @@ def _httpx_transport(url: str, payload: dict[str, Any], headers: dict[str, str])
     return resp.json()
 
 
+def _httpx_line_transport(
+    url: str, payload: dict[str, Any], headers: dict[str, str]
+) -> Iterator[str]:
+    with httpx.stream("POST", url, json=payload, headers=headers, timeout=600.0) as resp:
+        resp.raise_for_status()
+        yield from resp.iter_lines()
+
+
 class _Messages:
     """Exposes ``.create`` so the client mimics ``anthropic.Anthropic().messages``.
 
@@ -190,6 +199,7 @@ class _Messages:
         tool_choice: str,
         extra_args: dict[str, Any],
         transport: Transport,
+        line_transport: LineTransport,
     ) -> None:
         self._url = url
         self._api_key = api_key
@@ -198,22 +208,20 @@ class _Messages:
         self._tool_choice = tool_choice
         self._extra_args = extra_args
         self._transport = transport
+        self._line_transport = line_transport
 
-    def create(
+    def _payload(
         self,
         *,
         model: str,
         max_tokens: int,
         messages: list[dict[str, Any]],
-        system: str | None = None,
-        tools: list[dict[str, Any]] | None = None,
-        **_ignored: Any,
-    ) -> Response:
+        system: str | None,
+        tools: list[dict[str, Any]] | None,
+    ) -> dict[str, Any]:
         # Provider-specific FORWARD args (e.g. constrained/grammar decoding for
         # tool calls) travel through extra_args, merged last so they can set or
-        # override request fields. _ignored drops Anthropic-only kwargs (e.g.
-        # thinking) the shared harness may still pass, which this backend has no
-        # equivalent for.
+        # override request fields.
         payload: dict[str, Any] = {
             "model": model,
             "max_tokens": max_tokens,
@@ -226,8 +234,47 @@ class _Messages:
             payload["tools"] = to_chat_tools(tools)
             payload["tool_choice"] = self._tool_choice
         payload.update(self._extra_args)
-        headers = {"Authorization": f"Bearer {self._api_key}"} if self._api_key else {}
-        return from_chat_response(self._transport(self._url, payload, headers))
+        return payload
+
+    def _headers(self) -> dict[str, str]:
+        return {"Authorization": f"Bearer {self._api_key}"} if self._api_key else {}
+
+    def create(
+        self,
+        *,
+        model: str,
+        max_tokens: int,
+        messages: list[dict[str, Any]],
+        system: str | None = None,
+        tools: list[dict[str, Any]] | None = None,
+        **_ignored: Any,
+    ) -> Response:
+        # _ignored drops Anthropic-only kwargs (e.g. thinking) the shared
+        # harness may still pass, which this backend has no equivalent for.
+        payload = self._payload(
+            model=model, max_tokens=max_tokens, messages=messages, system=system, tools=tools
+        )
+        return from_chat_response(self._transport(self._url, payload, self._headers()))
+
+    def stream_lines(
+        self,
+        *,
+        model: str,
+        max_tokens: int,
+        messages: list[dict[str, Any]],
+        system: str | None = None,
+        tools: list[dict[str, Any]] | None = None,
+        **_ignored: Any,
+    ) -> Iterator[str]:
+        """The same request as ``create``, streamed: raw SSE lines out. One
+        payload builder serves both, so streamed calls keep every setup knob
+        (extra_args above all — the constrained-decoding channel)."""
+        payload = self._payload(
+            model=model, max_tokens=max_tokens, messages=messages, system=system, tools=tools
+        )
+        payload["stream"] = True
+        payload["stream_options"] = {"include_usage": True}
+        return self._line_transport(self._url, payload, self._headers())
 
 
 class ChatCompletionsClient:
@@ -243,6 +290,7 @@ class ChatCompletionsClient:
         tool_choice: str = "auto",
         extra_args: dict[str, Any] | None = None,
         transport: Transport | None = None,
+        line_transport: LineTransport | None = None,
     ) -> None:
         self.messages = _Messages(
             url=base_url.rstrip("/") + "/chat/completions",
@@ -252,6 +300,7 @@ class ChatCompletionsClient:
             tool_choice=tool_choice,
             extra_args=extra_args or {},
             transport=transport or _httpx_transport,
+            line_transport=line_transport or _httpx_line_transport,
         )
 
 

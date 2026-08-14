@@ -18,20 +18,18 @@ where a stream adapter exists (the chat-completions backends); an
 anthropic-setup stream answers 501 until its adapter lands."""
 
 import logging
-import os
 import time
 from collections.abc import Callable, Iterator, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-import httpx
 import yaml
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from resgraph.evals.providers import build_client, to_chat_messages, to_chat_tools
+from resgraph.evals.providers import build_client
 from resgraph.gateway.accounting import StreamAccount
 from resgraph.gateway.dispatch import Backend, ProbeResult, QueueFull, choose
 from resgraph.gateway.relay import StreamEvent, StreamFactory, parse_chat_sse, relay
@@ -224,41 +222,17 @@ def _open_stream(
         raise
 
 
-def _chat_lines(url: str, payload: dict[str, Any], headers: dict[str, str]) -> Iterator[str]:
-    with httpx.stream("POST", url, json=payload, headers=headers, timeout=600.0) as resp:
-        resp.raise_for_status()
-        yield from resp.iter_lines()
-
-
-def _chat_stream(setup: dict[str, Any], kwargs: dict[str, Any]) -> Iterator[StreamEvent]:
-    payload: dict[str, Any] = {
-        "model": kwargs["model"],
-        "max_tokens": kwargs["max_tokens"],
-        "temperature": setup.get("temperature", 0.0),
-        "messages": to_chat_messages(kwargs.get("system"), kwargs["messages"]),
-        "stream": True,
-        "stream_options": {"include_usage": True},
-    }
-    if setup.get("seed") is not None:
-        payload["seed"] = setup["seed"]
-    if kwargs.get("tools"):
-        payload["tools"] = to_chat_tools(kwargs["tools"])
-        payload["tool_choice"] = setup.get("tool_choice", "auto")
-    key_env = setup.get("api_key_env")
-    api_key = os.environ.get(key_env, "") if key_env else ""
-    headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
-    url = setup["base_url"].rstrip("/") + "/chat/completions"
-    return parse_chat_sse(_chat_lines(url, payload, headers))
-
-
 def _default_stream_factory(gw: Gateway) -> StreamFactory:
+    """Streams go through the seam's client — one payload builder for
+    streamed and non-streamed calls, so a streamed request keeps every
+    setup knob (extra_args above all, the constrained-decoding channel)."""
+
     def open_stream(alias: str, kwargs: dict[str, Any]) -> Iterator[StreamEvent]:
-        setup = gw.setups[alias]
-        if setup.get("provider") == "anthropic":
+        if gw.setups[alias].get("provider") == "anthropic":
             raise HTTPException(
                 501, detail="anthropic streaming lands with its adapter; send stream=false"
             )
-        return _chat_stream(setup, kwargs)
+        return parse_chat_sse(gw.client(alias).messages.stream_lines(**kwargs))
 
     return open_stream
 

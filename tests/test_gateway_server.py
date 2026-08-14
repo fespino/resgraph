@@ -313,7 +313,9 @@ def test_anthropic_streaming_answers_501_until_its_adapter_lands(harness):
     assert r.status_code == 501
 
 
-def test_the_default_chat_stream_builds_the_streaming_payload(tmp_path, monkeypatch):
+def test_the_default_stream_factory_routes_through_the_seam(tmp_path):
+    from resgraph.evals.providers import ChatCompletionsClient
+
     captured: dict[str, Any] = {}
 
     def fake_lines(url: str, payload: dict, headers: dict):
@@ -322,10 +324,16 @@ def test_the_default_chat_stream_builds_the_streaming_payload(tmp_path, monkeypa
         yield 'data: {"choices": [], "usage": {"prompt_tokens": 1, "completion_tokens": 1}}'
         yield "data: [DONE]"
 
-    monkeypatch.setattr(server, "_chat_lines", fake_lines)
+    def factory(setup: dict[str, Any]) -> ChatCompletionsClient:
+        return ChatCompletionsClient(
+            base_url=setup["base_url"],
+            extra_args={"guided_json": {"type": "object"}},
+            line_transport=fake_lines,
+        )
+
     path = tmp_path / "models.yaml"
     path.write_text(yaml.safe_dump(SETUPS))
-    app = create_app(models_path=path, client_factory=lambda setup: None)
+    app = create_app(models_path=path, client_factory=factory)
     client = TestClient(app)
     r = _gen(client, model="qwen-local-1.5b", stream=True)
     assert r.status_code == 200
@@ -334,4 +342,5 @@ def test_the_default_chat_stream_builds_the_streaming_payload(tmp_path, monkeypa
     assert captured["payload"]["stream"] is True
     assert captured["payload"]["stream_options"] == {"include_usage": True}
     assert captured["payload"]["model"] == "qwen2.5:1.5b"
+    assert captured["payload"]["guided_json"] == {"type": "object"}
     assert captured["url"].endswith("/chat/completions")

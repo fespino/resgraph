@@ -123,3 +123,28 @@ def test_build_client_resolves_the_gateway_provider():
         }
     )
     assert isinstance(client, GatewayClient)
+
+
+def test_an_alias_setup_routes_as_a_model_override():
+    seen: dict[str, Any] = {}
+
+    def transport(url, payload, headers):
+        seen.update(payload=payload)
+        return {
+            "content": [{"type": "text", "text": "ok"}],
+            "usage": {"input_tokens": 1, "output_tokens": 1},
+            "source": "override",
+            "backend": "ollama",
+        }
+
+    client = GatewayClient(base_url="http://gw:8080", alias="qwen-local-1.5b", transport=transport)
+    resp = client.messages.create(max_tokens=8, messages=[{"role": "user", "content": "hi"}])
+    assert seen["payload"]["model"] == "qwen-local-1.5b"
+    assert resp.source == "override"
+
+
+def test_a_gateway_setup_without_a_base_url_fails_loudly():
+    import pytest
+
+    with pytest.raises(SystemExit, match="needs a base_url"):
+        build_client({"name": "broken", "provider": "gateway"})

@@ -156,6 +156,7 @@ def test_object_blocks_translate_to_wire_dicts(harness, monkeypatch):
     def create(**kwargs):
         return SimpleNamespace(
             content=[
+                SimpleNamespace(type="thinking", thinking="weighing the config change"),
                 TextBlock(text="thinking done"),
                 ToolUseBlock(id="t1", name="fetch_resource", input={"id": "srv-1"}),
             ],
@@ -167,6 +168,7 @@ def test_object_blocks_translate_to_wire_dicts(harness, monkeypatch):
     r = _gen(client, task_class="judgment")
     assert r.status_code == 200
     assert r.json()["content"] == [
+        {"type": "thinking", "thinking": "weighing the config change"},
         {"type": "text", "text": "thinking done"},
         {"type": "tool_use", "id": "t1", "name": "fetch_resource", "input": {"id": "srv-1"}},
     ]

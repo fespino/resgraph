@@ -42,9 +42,13 @@ def parse_chat_sse(lines: Iterator[str]) -> Iterator[StreamEvent]:
             return
         chunk = json.loads(data)
         for choice in chunk.get("choices") or []:
-            text = (choice.get("delta") or {}).get("content")
-            if text:
-                yield ("content", text)
+            delta = choice.get("delta") or {}
+            if delta.get("tool_calls"):
+                # Dropping a tool call silently would make the model look like
+                # it chose not to act. Loud until streamed tool assembly lands.
+                raise NotImplementedError("streamed tool calls are not assembled yet")
+            if delta.get("content"):
+                yield ("content", delta["content"])
         usage = chunk.get("usage")
         if usage:
             yield (

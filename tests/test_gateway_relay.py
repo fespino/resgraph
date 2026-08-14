@@ -200,3 +200,11 @@ def test_parse_chat_sse_yields_deltas_and_usage_then_stops_at_done():
         ("content", "lo"),
         ("usage", {"input_tokens": 7, "output_tokens": 2}),
     ]
+
+
+def test_parse_chat_sse_refuses_tool_call_deltas_loudly():
+    lines = [
+        'data: {"choices": [{"delta": {"tool_calls": [{"id": "t1"}]}}]}',
+    ]
+    with pytest.raises(NotImplementedError, match="streamed tool calls"):
+        list(parse_chat_sse(iter(lines)))

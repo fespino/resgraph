@@ -33,7 +33,7 @@ from resgraph.evals.providers import build_client
 from resgraph.gateway.accounting import StreamAccount
 from resgraph.gateway.dispatch import Backend, ProbeResult, QueueFull, choose
 from resgraph.gateway.relay import StreamEvent, StreamFactory, parse_chat_sse, relay
-from resgraph.gateway.router import DEFAULT_REGISTRY, ClassRoute, TaskClass, resolve
+from resgraph.gateway.router import DEFAULT_REGISTRY, ClassRoute, Source, TaskClass, resolve
 
 log = logging.getLogger("resgraph.gateway")
 
@@ -63,7 +63,7 @@ class UsageOut(BaseModel):
 class GenerateOut(BaseModel):
     content: list[dict[str, Any]]
     model: str
-    source: str
+    source: Source
     backend: str
     fallback_chain: list[str]
     latency_s: float

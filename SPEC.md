@@ -1879,8 +1879,13 @@ cheaper model corrupts every arm. **Caveat, load-bearing:** Haiku's
 output is *surface-for-review*, not an autonomous verdict — it
 over-attributes on controls and occasionally fabricates an edge, so a
 deployment must treat its suspects as candidates a human or an Opus pass
-filters, not a page-the-team verdict. Whether the change-forensics skill
-narrows that honesty gap cheaply is the open experiment (#199). Full
+filters, not a page-the-team verdict. The change-forensics skill does
+NOT close that gap — #199 measured it and found the opposite: the
+playbook is a recall tool (pass^k +0.067, ambiguous recall +0.25, it
+flips 3 items fail→pass) that makes Haiku a more aggressive investigator,
+which slightly *widens* the honesty gap (control −0.11, one more
+fabrication). So the caveat is a hard property, not a prompt bug: the
+skill is kept for recall, its honesty cost accepted, not fixed. Full
 evidence: EVALS.md → the model arms. **Rejected:** Sonnet as a
 middle-ground default (dominated — worse pass^k, most fabrications,
 slowest, no cost saving); and a scalar pass^k decision rule (it would

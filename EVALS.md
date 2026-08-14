@@ -111,9 +111,11 @@ post-spend, that their question was unposable:
 | `20260813T173553Z` | Opus reference arm (full, k=3) | $12.80 | anchor the arms; refresh the baseline | Yes — truncated on the org cap, resumed to 90/90; refuted the single-arm "frontier wins" read |
 | `20260813T195608Z` | Sonnet 1-item pilot | $0.12 | current config sane at b041069e | Yes — passed, fp b041069e |
 | `20260813T200050Z` | Sonnet arm (full, k=3) | $12.00 | complete the picture; the decision-rule arm | Yes — twice interrupted, resumed to 90/90; Sonnet is the dominated middle (halt fired, 7 fabrications) |
+| `20260813T235513Z` | skill-arm pilot (--no-skill) | $0.02 | the fingerprint moves (skill dropped) | Yes — fp 4faa1f4f ≠ b041069e |
+| `20260813T235556Z` | Haiku no-skill arm (full, k=3) | $1.62 | does the skill narrow Haiku's honesty gap? (#199) | Yes — answered: no. The skill is a recall tool (+0.067 pass^k), not an honesty tool (control −0.11) |
 
-Running base rate: 8 of 13 objectives met, $36.25 spent, of which
-$32.76 measured a registered objective. The ledger exists because the
+Running base rate: 10 of 15 objectives met, $37.89 spent, of which
+$34.38 measured a registered objective. The ledger exists because the
 salvage-first write-ups of the five misses read, in sequence, like a
 string of successes — and a program that cannot see its own base rate
 selects worse questions each round.
@@ -1090,7 +1092,46 @@ Haiku is *surface-for-review*, not an autonomous verdict (it over-attributes
 and occasionally fabricates). Whether the change-forensics skill narrows that
 honesty gap cheaply is the next experiment (#199), run below.
 
-## Pre-registered experiment — the paired skill arm (run pending)
+## Pre-registered experiment — the paired skill arm
+
+### Result on Haiku — the skill is a recall tool, not an honesty tool (#199, 2026-08-13)
+
+Ran on Haiku (the new default worker), $1.62, pre-mortem
+`docs/drills/premortem-skill-arm-haiku.md`. With-skill is the existing
+Haiku arm (`20260813T154547Z`, `b041069e`); without-skill is
+`20260813T235556Z` (`--no-skill`, fingerprint moved to `4faa1f4f` — the
+pilot's load-bearing check that the skill was actually dropped).
+`skill-value`: available 30 → retrieved 30 (== available, static prefix)
+→ invoked 30 → **relevant 3** (the skill flipped 3 items fail→pass); 16
+items both arms passed (scored by cost).
+
+**The hypothesis (does the skill narrow Haiku's honesty gap?) is refuted
+— and inverted.** Deltas, skill minus no-skill:
+
+| axis | with-skill | no-skill | Δ |
+|---|---|---|---|
+| pass^k | 0.633 | 0.567 | **+0.067** |
+| found_top3 (recall) | 0.903 | 0.819 | **+0.083** |
+| ambiguous | 0.917 | 0.667 | **+0.250** |
+| transitive | 0.917 | 0.833 | +0.083 |
+| control (honesty) | 0.167 | 0.278 | **−0.111** |
+| fabrications | **2** | **1** | +1 (skill adds one) |
+
+The playbook makes Haiku a **more aggressive investigator**: it buys
+recall (flips 3 items, ambiguous +0.25) and *costs* restraint (control
+−0.11, one more fabrication) — pushing Haiku further toward the
+over-commit end of the axis, not back toward Opus's caution. The honesty
+deltas are on small samples (18 control rows, 1–2 fabrications), so
+"actively hurts honesty" is directional; the solid negative is that the
+skill **does not narrow the honesty gap**. So SPEC D29c's
+surface-for-review caveat is a hard property, not a prompt bug — the
+skill is kept for recall, its honesty cost accepted.
+
+**Literature tie:** this is the RAG-paper mechanism ("RAG LLMs are Not
+Safer", An et al., NAACL 2025) in our harness — benign added context
+increasing ungrounded output. Grounding, like safety, does not compose.
+
+### Registration (as pre-registered before the run)
 
 Does the change-forensics playbook earn its ~3.6k prefix tokens? The
 same 30 scenarios run with and without the skill body, so its value is

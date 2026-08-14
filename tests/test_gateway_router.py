@@ -10,15 +10,8 @@ import pytest
 import yaml
 
 from resgraph.gateway.router import (
-    CLASSIFICATION,
     DEFAULT_REGISTRY,
-    GLOBAL_DEFAULT,
     GLOBAL_DEFAULT_MODEL,
-    JUDGMENT,
-    OVERRIDE,
-    PIN,
-    TASK_CLASS_DEFAULT,
-    WORKHORSE,
     ClassRoute,
     TaskClass,
     resolve,
@@ -26,15 +19,15 @@ from resgraph.gateway.router import (
 
 
 def test_pin_wins_over_everything_and_never_falls_back():
-    d = resolve(pin="opus", model="haiku", task_class=JUDGMENT)
-    assert d.source == PIN
+    d = resolve(pin="opus", model="haiku", task_class="judgment")
+    assert d.source == "pin"
     assert d.model == "opus"
     assert d.fallback_allowed is False
 
 
 def test_override_beats_task_class_and_allows_fallback():
-    d = resolve(model="qwen-local-1.5b", task_class=JUDGMENT)
-    assert d.source == OVERRIDE
+    d = resolve(model="qwen-local-1.5b", task_class="judgment")
+    assert d.source == "override"
     assert d.model == "qwen-local-1.5b"
     assert d.fallback_allowed is True
 
@@ -42,35 +35,26 @@ def test_override_beats_task_class_and_allows_fallback():
 def test_task_class_defaults_match_the_registry():
     for cls, route in DEFAULT_REGISTRY.items():
         d = resolve(task_class=cls)
-        assert d.source == TASK_CLASS_DEFAULT
+        assert d.source == "task_class_default"
         assert d.model == route.model
         assert d.rationale == route.rationale
 
 
 def test_judgment_is_the_daily_driver_and_the_light_classes_run_local():
-    assert resolve(task_class=JUDGMENT).model == "haiku"
-    assert resolve(task_class=WORKHORSE).model == "qwen-local-1.5b"
-    assert resolve(task_class=CLASSIFICATION).model == "qwen-local-1.5b"
+    assert resolve(task_class="judgment").model == "haiku"
+    assert resolve(task_class="workhorse").model == "qwen-local-1.5b"
+    assert resolve(task_class="classification").model == "qwen-local-1.5b"
 
 
 def test_global_default_fails_cheap():
     d = resolve()
-    assert d.source == GLOBAL_DEFAULT
+    assert d.source == "global_default"
     assert d.model == GLOBAL_DEFAULT_MODEL.model
 
 
 def test_unknown_task_class_raises_instead_of_routing_somewhere_plausible():
     with pytest.raises(ValueError, match="unknown task_class"):
         resolve(task_class=cast("TaskClass", "mystery"))
-
-
-def test_source_vocabulary_is_the_recorded_contract():
-    assert (PIN, OVERRIDE, TASK_CLASS_DEFAULT, GLOBAL_DEFAULT) == (
-        "pin",
-        "override",
-        "task_class_default",
-        "global_default",
-    )
 
 
 def test_every_routed_alias_is_a_models_yaml_setup():
@@ -81,8 +65,10 @@ def test_every_routed_alias_is_a_models_yaml_setup():
 
 
 def test_a_custom_registry_remaps_a_class_without_touching_code():
-    table = {JUDGMENT: ClassRoute("qwen-local-1.5b", "remapped for a drill")}
-    d = resolve(task_class=JUDGMENT, registry=table)
-    assert d.source == TASK_CLASS_DEFAULT
+    table: dict[TaskClass, ClassRoute] = {
+        "judgment": ClassRoute("qwen-local-1.5b", "remapped for a drill")
+    }
+    d = resolve(task_class="judgment", registry=table)
+    assert d.source == "task_class_default"
     assert d.model == "qwen-local-1.5b"
     assert d.rationale == "remapped for a drill"

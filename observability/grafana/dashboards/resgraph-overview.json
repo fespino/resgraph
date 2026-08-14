@@ -526,6 +526,95 @@
      "legendFormat": "{{task_class}}"
     }
    ]
+  },
+  {
+   "id": 17,
+   "type": "timeseries",
+   "title": "Gateway cache hit ratio (5m) \u2014 both layers, never conflated",
+   "gridPos": {
+    "h": 8,
+    "w": 8,
+    "x": 0,
+    "y": 64
+   },
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "percentunit"
+    },
+    "overrides": []
+   },
+   "targets": [
+    {
+     "expr": "slo:gateway_cache_hit:ratio_5m",
+     "refId": "A",
+     "legendFormat": "{{layer}}"
+    }
+   ]
+  },
+  {
+   "id": 18,
+   "type": "timeseries",
+   "title": "Gateway tokens/sec p50 (5m) \u2014 is generation starving",
+   "gridPos": {
+    "h": 8,
+    "w": 8,
+    "x": 8,
+    "y": 64
+   },
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "none"
+    },
+    "overrides": []
+   },
+   "targets": [
+    {
+     "expr": "slo:gateway_tokens_per_second:p50_5m",
+     "refId": "A",
+     "legendFormat": "{{backend}}"
+    }
+   ]
+  },
+  {
+   "id": 19,
+   "type": "timeseries",
+   "title": "Gateway fallback events (5m) \u2014 degradation, silent or loud",
+   "gridPos": {
+    "h": 8,
+    "w": 8,
+    "x": 16,
+    "y": 64
+   },
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "none"
+    },
+    "overrides": []
+   },
+   "targets": [
+    {
+     "expr": "sum(rate(gateway_requests_total{outcome=~\"stream_error|rejected_429|pin_failed_502|exhausted_503\"}[5m]))",
+     "refId": "A",
+     "legendFormat": "honest failures"
+    },
+    {
+     "expr": "sum(rate(gateway_fallback_chain_length_count[5m]))",
+     "refId": "B",
+     "legendFormat": "requests walked"
+    }
+   ]
   }
  ],
  "templating": {

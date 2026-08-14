@@ -383,3 +383,26 @@ def test_a_failed_reopen_walks_on_and_exhausts_honestly(tmp_path):
     assert [e["type"] for e in events] == ["stream_error"]
     assert events[0]["tokens_emitted"] == 0
     assert opened == ["qwen-local-1.5b", "haiku"]
+
+
+def test_both_request_shapes_feed_the_same_ttft_series(tmp_path, monkeypatch):
+    path = tmp_path / "models.yaml"
+    path.write_text(yaml.safe_dump(SETUPS))
+    calls: list[tuple[str, dict]] = []
+    app = create_app(
+        models_path=path,
+        client_factory=lambda setup: FakeClient(setup["name"], {}, calls),
+        stream_factory=ok_stream,
+    )
+    client = TestClient(app)
+    ewma = client.app.state.gateway.backend("qwen-local-1.5b").ttft_ewma
+    samples: list[float] = []
+    original = ewma.update
+    monkeypatch.setattr(ewma, "update", lambda s: (samples.append(s), original(s))[1])
+
+    assert _gen(client, model="qwen-local-1.5b").status_code == 200
+    assert _gen(client, model="qwen-local-1.5b", stream=True).status_code == 200
+    # One sample per request shape, same series: dispatch ranks streamed and
+    # non-streamed traffic on one recency-weighted view per backend.
+    assert len(samples) == 2
+    assert ewma.value is not None

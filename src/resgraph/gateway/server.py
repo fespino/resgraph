@@ -55,7 +55,7 @@ PROBE_PROMPT = [{"role": "user", "content": "Reply with the single word: pong"}]
 
 class GenerateIn(BaseModel):
     messages: list[dict[str, Any]]
-    system: str | None = None
+    system: str | list[dict[str, Any]] | None = None
     tools: list[dict[str, Any]] | None = None
     max_tokens: int = 1024
     task_class: TaskClass | None = None
@@ -67,6 +67,8 @@ class GenerateIn(BaseModel):
 class UsageOut(BaseModel):
     input_tokens: int
     output_tokens: int
+    cache_read_tokens: int = 0
+    cache_creation_tokens: int = 0
 
 
 class GenerateOut(BaseModel):
@@ -156,7 +158,10 @@ def _call(gw: Gateway, alias: str, req: GenerateIn) -> tuple[list[dict[str, Any]
         if account.ttft is not None:
             backend.ttft_ewma.update(account.ttft)
         usage = UsageOut(
-            input_tokens=int(getattr(resp.usage, "input_tokens", 0) or 0), output_tokens=out
+            input_tokens=int(getattr(resp.usage, "input_tokens", 0) or 0),
+            output_tokens=out,
+            cache_read_tokens=int(getattr(resp.usage, "cache_read_input_tokens", 0) or 0),
+            cache_creation_tokens=int(getattr(resp.usage, "cache_creation_input_tokens", 0) or 0),
         )
         return [_wire(b) for b in resp.content], usage, account.ttft or 0.0
     finally:

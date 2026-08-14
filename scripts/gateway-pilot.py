@@ -28,9 +28,7 @@ messages = [
 
 tools = RegistryToolset(qctx_factory=lambda: None).blocks()
 
-client = GatewayClient(
-    base_url="http://127.0.0.1:8080", pin="haiku", cache_responses=False
-)
+client = GatewayClient(base_url="http://127.0.0.1:8080", pin="haiku", cache_responses=False)
 
 results = []
 for call in (1, 2):
@@ -49,7 +47,9 @@ for call in (1, 2):
         }
     )
 
-OUT.write_text(json.dumps({"request_system_chars": len(system[0]["text"]), "results": results}, indent=2))
+OUT.write_text(
+    json.dumps({"request_system_chars": len(system[0]["text"]), "results": results}, indent=2)
+)
 print(json.dumps(results, indent=2))
 
 r1, r2 = results

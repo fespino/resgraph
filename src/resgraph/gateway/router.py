@@ -15,15 +15,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 Source = Literal["pin", "override", "task_class_default", "global_default"]
-PIN: Source = "pin"
-OVERRIDE: Source = "override"
-TASK_CLASS_DEFAULT: Source = "task_class_default"
-GLOBAL_DEFAULT: Source = "global_default"
-
 TaskClass = Literal["judgment", "workhorse", "classification"]
-JUDGMENT: TaskClass = "judgment"
-WORKHORSE: TaskClass = "workhorse"
-CLASSIFICATION: TaskClass = "classification"
 
 
 @dataclass(frozen=True)
@@ -35,15 +27,15 @@ class ClassRoute:
 
 
 DEFAULT_REGISTRY: Mapping[TaskClass, ClassRoute] = {
-    JUDGMENT: ClassRoute(
+    "judgment": ClassRoute(
         "haiku",
         "triage reasoning; the daily-driver setup chosen by the model arms",
     ),
-    WORKHORSE: ClassRoute(
+    "workhorse": ClassRoute(
         "qwen-local-1.5b",
         "bulk/replay serving-shape traffic; the setup that fits this host",
     ),
-    CLASSIFICATION: ClassRoute(
+    "classification": ClassRoute(
         "qwen-local-1.5b",
         "light classification calls; deterministic graders dominate, replay fills this class",
     ),
@@ -76,14 +68,14 @@ def resolve(
     if pin:
         return RouteDecision(
             model=pin,
-            source=PIN,
+            source="pin",
             fallback_allowed=False,
             rationale="pinned: exact model, no fallback, no substitution",
         )
     if model:
         return RouteDecision(
             model=model,
-            source=OVERRIDE,
+            source="override",
             fallback_allowed=True,
             rationale="explicit model override",
         )
@@ -93,14 +85,14 @@ def resolve(
             raise ValueError(f"unknown task_class {task_class!r}; have: {sorted(table)}")
         return RouteDecision(
             model=route.model,
-            source=TASK_CLASS_DEFAULT,
+            source="task_class_default",
             fallback_allowed=True,
             rationale=route.rationale,
         )
     g = GLOBAL_DEFAULT_MODEL
     return RouteDecision(
         model=g.model,
-        source=GLOBAL_DEFAULT,
+        source="global_default",
         fallback_allowed=True,
         rationale=g.rationale,
     )

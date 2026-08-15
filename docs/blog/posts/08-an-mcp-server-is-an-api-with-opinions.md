@@ -390,11 +390,15 @@ catalog changes only when the process does, so serving it as
 expired-on-arrival defeated the caching the fields exist for. The
 server was conformant on the wire and undecided in substance.
 [PR #223](https://github.com/fespino/resgraph/pull/223) declares one
-hint across the cacheable methods — an hour, `"public"`, because no
-tool varies by caller — and the protocol test now asserts both
-fields, so an SDK default change fails the build. Same lesson,
-sharpened: a pin is prose until a real call asserts it, and a
-default you didn't choose is a decision you didn't make.
+hint across the cacheable methods — five minutes, `"public"`, because
+no tool varies by caller. Five minutes and not an hour, because the
+TTL is really the post-deploy blindness window: the catalog changes
+only at deploys, this server iterates often, and the caching benefit
+of going longer is negligible for an in-process list over stdio. The
+protocol test now asserts both fields, so an SDK default change fails
+the build. Same lesson, sharpened: a pin is prose until a real call
+asserts it, and a default you didn't choose is a decision you didn't
+make.
 
 One last opinion made it onto the server card because statelessness
 has a user-visible consequence: offset pagination re-runs the query

@@ -28,9 +28,10 @@ from resgraph.tools.registry import TOOL_REGISTRY, ToolRegistration
 SKILLS_DIR = Path(__file__).resolve().parents[3] / "skills"
 CARD_PATH = Path(__file__).with_name("CARD.md")
 
-# the catalog only changes when the process does: an hour bounds
-# cross-restart staleness; "public" because no tool varies by caller
-_CATALOG_HINT = CacheHint(ttl_ms=3_600_000, scope="public")
+# the catalog only changes when the process does, so the TTL is the
+# post-deploy blindness window on a dev-iterated catalog: five minutes;
+# "public" because no tool varies by caller
+_CATALOG_HINT = CacheHint(ttl_ms=300_000, scope="public")
 _CACHE_HINTS: dict[CacheableMethod, CacheHint] = {
     "tools/list": _CATALOG_HINT,
     "prompts/list": _CATALOG_HINT,

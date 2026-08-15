@@ -134,7 +134,7 @@ async def _exercise_surface(seeded, tmp_path):
         assert {str(r.uri) for r in resources.resources} == {"resgraph://card"}
 
         for cacheable in (tools_res, prompts_res, resources, card):
-            assert (cacheable.ttl_ms, cacheable.cache_scope) == (3_600_000, "public")
+            assert (cacheable.ttl_ms, cacheable.cache_scope) == (300_000, "public")
 
         out = await session.call_tool("blast_radius", {"resource_id": "host-hub000", "depth": 50})
         assert not out.is_error

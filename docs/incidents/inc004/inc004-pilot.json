@@ -1,0 +1,16 @@
+{
+  "outcome": "ok",
+  "backend": "anthropic",
+  "source": "task_class_default",
+  "chain": [
+    "ollama:qwen-local-1.5b"
+  ],
+  "latency": 1.0001780410530046,
+  "duration": 1.1884734160266817,
+  "usage": {
+    "input_tokens": 335,
+    "output_tokens": 29,
+    "cache_read_tokens": 0,
+    "cache_creation_tokens": 4800
+  }
+}

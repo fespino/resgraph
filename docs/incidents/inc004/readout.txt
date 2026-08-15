@@ -1,0 +1,39 @@
+kill_at=1786787784.0 restore_at=1786787966.0 records=11452
+
+== baseline ==
+stream-1  n=  6 outcomes={'end': 6} backends={'ollama': 6} ttft_p50=21.06779924989678 ttft_p95=26.763314249925315 lat_p50=None lat_p95=None
+stream-2  n=  5 outcomes={'end': 5} backends={'ollama': 5} ttft_p50=21.479060790967196 ttft_p95=25.69416850002017 lat_p50=None lat_p95=None
+call      n=  4 outcomes={'ok': 4} backends={'ollama': 4} ttft_p50=None ttft_p95=None lat_p50=22.701321708969772 lat_p95=32.88477174995933
+pin-local n=  4 outcomes={'ok': 4} backends={'ollama': 4} ttft_p50=None ttft_p95=None lat_p50=22.358815166982822 lat_p95=26.907938749995083
+pin-judge n=  7 outcomes={'ok': 7} backends={'anthropic': 7} ttft_p50=None ttft_p95=None lat_p50=1.8972366660600528 lat_p95=2.232580375042744
+
+== outage ==
+stream-1  n=5617 outcomes={'stream_error': 5617} backends={'ollama': 5617} ttft_p50=None ttft_p95=None lat_p50=None lat_p95=None
+stream-2  n=5614 outcomes={'stream_error': 5614} backends={'ollama': 5614} ttft_p50=None ttft_p95=None lat_p50=None lat_p95=None
+call      n= 47 outcomes={'ok': 47} backends={'anthropic': 47} ttft_p50=None ttft_p95=None lat_p50=1.651740291970782 lat_p95=3.027027415926568
+pin-local n= 18 outcomes={'502': 18} backends={'-': 18} ttft_p50=None ttft_p95=None lat_p50=None lat_p95=None
+pin-judge n=  9 outcomes={'ok': 9} backends={'anthropic': 9} ttft_p50=None ttft_p95=None lat_p50=1.761986167053692 lat_p95=2.2234887920785695
+
+== recovery ==
+stream-1  n= 52 outcomes={'stream_error': 46, 'end': 6} backends={'ollama': 52} ttft_p50=25.539311375003308 ttft_p95=43.65249962511007 lat_p50=None lat_p95=None
+stream-2  n= 51 outcomes={'stream_error': 46, 'end': 5} backends={'ollama': 51} ttft_p50=27.13121016707737 ttft_p95=48.52580879104789 lat_p50=None lat_p95=None
+call      n=  7 outcomes={'ok': 7} backends={'anthropic': 1, 'ollama': 6} ttft_p50=None ttft_p95=None lat_p50=25.794569333083928 lat_p95=41.34529762493912
+pin-local n=  5 outcomes={'502': 1, 'ok': 4} backends={'-': 1, 'ollama': 4} ttft_p50=None ttft_p95=None lat_p50=23.046470000059344 lat_p95=46.77396466699429
+pin-judge n=  6 outcomes={'ok': 6} backends={'anthropic': 6} ttft_p50=None ttft_p95=None lat_p50=1.9373882081126794 lat_p95=2.15708287502639
+
+== mid-stream honesty ==
+  streams ended ok with a nonempty chain (would-be splices): 0
+
+== pin audit ==
+  substituted pin calls: 0
+  pin-local 502s during outage: 18
+  pin-judge outcomes: {'ok': 22}
+
+== fall-forward price ==
+  paid fall-forward requests: 48, spend $0.0544 in 182s
+  per request: $0.00113; extrapolated $1.08/hour
+  pin-judge spend (whole drill): $0.0251
+
+== streamed lane during outage (registered 501) ==
+  {'stream_error': 11231}
+  call lane outage outcomes: {'ok': 47}

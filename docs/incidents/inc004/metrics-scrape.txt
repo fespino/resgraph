@@ -1,0 +1,59 @@
+# HELP gateway_requests_total requests by backend, outcome, source, task class
+# TYPE gateway_requests_total counter
+gateway_requests_total{backend="anthropic",otel_scope_name="resgraph",otel_scope_schema_url="",otel_scope_version="",outcome="ok",source="task_class_default",task_class="workhorse"} 49.0
+gateway_requests_total{backend="ollama",otel_scope_name="resgraph",otel_scope_schema_url="",otel_scope_version="",outcome="ok",source="task_class_default",task_class="workhorse"} 11.0
+gateway_requests_total{backend="anthropic",otel_scope_name="resgraph",otel_scope_schema_url="",otel_scope_version="",outcome="ok",source="pin",task_class="none"} 22.0
+gateway_requests_total{backend="ollama",otel_scope_name="resgraph",otel_scope_schema_url="",otel_scope_version="",outcome="ok",source="pin",task_class="none"} 8.0
+gateway_requests_total{backend="ollama",otel_scope_name="resgraph",otel_scope_schema_url="",otel_scope_version="",outcome="stream_ok",source="task_class_default",task_class="workhorse"} 22.0
+gateway_requests_total{backend="ollama",otel_scope_name="resgraph",otel_scope_schema_url="",otel_scope_version="",outcome="pin_failed_502",source="pin",task_class="none"} 19.0
+gateway_requests_total{backend="ollama",otel_scope_name="resgraph",otel_scope_schema_url="",otel_scope_version="",outcome="stream_error",source="task_class_default",task_class="workhorse"} 11324.0
+# HELP gateway_cost_usd estimated cost per request, by task class, backend, source
+# TYPE gateway_cost_usd histogram
+gateway_cost_usd_bucket{backend="anthropic",le="0.0005",otel_scope_name="resgraph",otel_scope_schema_url="",otel_scope_version="",source="task_class_default",task_class="workhorse"} 0.0
+gateway_cost_usd_bucket{backend="anthropic",le="0.001",otel_scope_name="resgraph",otel_scope_schema_url="",otel_scope_version="",source="task_class_default",task_class="workhorse"} 0.0
+gateway_cost_usd_bucket{backend="anthropic",le="0.005",otel_scope_name="resgraph",otel_scope_schema_url="",otel_scope_version="",source="task_class_default",task_class="workhorse"} 48.0
+gateway_cost_usd_bucket{backend="anthropic",le="0.01",otel_scope_name="resgraph",otel_scope_schema_url="",otel_scope_version="",source="task_class_default",task_class="workhorse"} 49.0
+gateway_cost_usd_bucket{backend="anthropic",le="0.02",otel_scope_name="resgraph",otel_scope_schema_url="",otel_scope_version="",source="task_class_default",task_class="workhorse"} 49.0
+gateway_cost_usd_bucket{backend="anthropic",le="0.05",otel_scope_name="resgraph",otel_scope_schema_url="",otel_scope_version="",source="task_class_default",task_class="workhorse"} 49.0
+gateway_cost_usd_bucket{backend="anthropic",le="0.1",otel_scope_name="resgraph",otel_scope_schema_url="",otel_scope_version="",source="task_class_default",task_class="workhorse"} 49.0
+gateway_cost_usd_bucket{backend="anthropic",le="0.3",otel_scope_name="resgraph",otel_scope_schema_url="",otel_scope_version="",source="task_class_default",task_class="workhorse"} 49.0
+gateway_cost_usd_bucket{backend="anthropic",le="+Inf",otel_scope_name="resgraph",otel_scope_schema_url="",otel_scope_version="",source="task_class_default",task_class="workhorse"} 49.0
+gateway_cost_usd_count{backend="anthropic",otel_scope_name="resgraph",otel_scope_schema_url="",otel_scope_version="",source="task_class_default",task_class="workhorse"} 49.0
+gateway_cost_usd_sum{backend="anthropic",otel_scope_name="resgraph",otel_scope_schema_url="",otel_scope_version="",source="task_class_default",task_class="workhorse"} 0.06090099999999996
+gateway_cost_usd_bucket{backend="ollama",le="0.0005",otel_scope_name="resgraph",otel_scope_schema_url="",otel_scope_version="",source="task_class_default",task_class="workhorse"} 33.0
+gateway_cost_usd_bucket{backend="ollama",le="0.001",otel_scope_name="resgraph",otel_scope_schema_url="",otel_scope_version="",source="task_class_default",task_class="workhorse"} 33.0
+gateway_cost_usd_bucket{backend="ollama",le="0.005",otel_scope_name="resgraph",otel_scope_schema_url="",otel_scope_version="",source="task_class_default",task_class="workhorse"} 33.0
+gateway_cost_usd_bucket{backend="ollama",le="0.01",otel_scope_name="resgraph",otel_scope_schema_url="",otel_scope_version="",source="task_class_default",task_class="workhorse"} 33.0
+gateway_cost_usd_bucket{backend="ollama",le="0.02",otel_scope_name="resgraph",otel_scope_schema_url="",otel_scope_version="",source="task_class_default",task_class="workhorse"} 33.0
+gateway_cost_usd_bucket{backend="ollama",le="0.05",otel_scope_name="resgraph",otel_scope_schema_url="",otel_scope_version="",source="task_class_default",task_class="workhorse"} 33.0
+gateway_cost_usd_bucket{backend="ollama",le="0.1",otel_scope_name="resgraph",otel_scope_schema_url="",otel_scope_version="",source="task_class_default",task_class="workhorse"} 33.0
+gateway_cost_usd_bucket{backend="ollama",le="0.3",otel_scope_name="resgraph",otel_scope_schema_url="",otel_scope_version="",source="task_class_default",task_class="workhorse"} 33.0
+gateway_cost_usd_bucket{backend="ollama",le="+Inf",otel_scope_name="resgraph",otel_scope_schema_url="",otel_scope_version="",source="task_class_default",task_class="workhorse"} 33.0
+gateway_cost_usd_count{backend="ollama",otel_scope_name="resgraph",otel_scope_schema_url="",otel_scope_version="",source="task_class_default",task_class="workhorse"} 33.0
+gateway_cost_usd_sum{backend="ollama",otel_scope_name="resgraph",otel_scope_schema_url="",otel_scope_version="",source="task_class_default",task_class="workhorse"} 0.0
+gateway_cost_usd_bucket{backend="anthropic",le="0.0005",otel_scope_name="resgraph",otel_scope_schema_url="",otel_scope_version="",source="pin",task_class="none"} 0.0
+gateway_cost_usd_bucket{backend="anthropic",le="0.001",otel_scope_name="resgraph",otel_scope_schema_url="",otel_scope_version="",source="pin",task_class="none"} 0.0
+gateway_cost_usd_bucket{backend="anthropic",le="0.005",otel_scope_name="resgraph",otel_scope_schema_url="",otel_scope_version="",source="pin",task_class="none"} 22.0
+gateway_cost_usd_bucket{backend="anthropic",le="0.01",otel_scope_name="resgraph",otel_scope_schema_url="",otel_scope_version="",source="pin",task_class="none"} 22.0
+gateway_cost_usd_bucket{backend="anthropic",le="0.02",otel_scope_name="resgraph",otel_scope_schema_url="",otel_scope_version="",source="pin",task_class="none"} 22.0
+gateway_cost_usd_bucket{backend="anthropic",le="0.05",otel_scope_name="resgraph",otel_scope_schema_url="",otel_scope_version="",source="pin",task_class="none"} 22.0
+gateway_cost_usd_bucket{backend="anthropic",le="0.1",otel_scope_name="resgraph",otel_scope_schema_url="",otel_scope_version="",source="pin",task_class="none"} 22.0
+gateway_cost_usd_bucket{backend="anthropic",le="0.3",otel_scope_name="resgraph",otel_scope_schema_url="",otel_scope_version="",source="pin",task_class="none"} 22.0
+gateway_cost_usd_bucket{backend="anthropic",le="+Inf",otel_scope_name="resgraph",otel_scope_schema_url="",otel_scope_version="",source="pin",task_class="none"} 22.0
+gateway_cost_usd_count{backend="anthropic",otel_scope_name="resgraph",otel_scope_schema_url="",otel_scope_version="",source="pin",task_class="none"} 22.0
+gateway_cost_usd_sum{backend="anthropic",otel_scope_name="resgraph",otel_scope_schema_url="",otel_scope_version="",source="pin",task_class="none"} 0.025058000000000007
+gateway_cost_usd_bucket{backend="ollama",le="0.0005",otel_scope_name="resgraph",otel_scope_schema_url="",otel_scope_version="",source="pin",task_class="none"} 8.0
+gateway_cost_usd_bucket{backend="ollama",le="0.001",otel_scope_name="resgraph",otel_scope_schema_url="",otel_scope_version="",source="pin",task_class="none"} 8.0
+gateway_cost_usd_bucket{backend="ollama",le="0.005",otel_scope_name="resgraph",otel_scope_schema_url="",otel_scope_version="",source="pin",task_class="none"} 8.0
+gateway_cost_usd_bucket{backend="ollama",le="0.01",otel_scope_name="resgraph",otel_scope_schema_url="",otel_scope_version="",source="pin",task_class="none"} 8.0
+gateway_cost_usd_bucket{backend="ollama",le="0.02",otel_scope_name="resgraph",otel_scope_schema_url="",otel_scope_version="",source="pin",task_class="none"} 8.0
+gateway_cost_usd_bucket{backend="ollama",le="0.05",otel_scope_name="resgraph",otel_scope_schema_url="",otel_scope_version="",source="pin",task_class="none"} 8.0
+gateway_cost_usd_bucket{backend="ollama",le="0.1",otel_scope_name="resgraph",otel_scope_schema_url="",otel_scope_version="",source="pin",task_class="none"} 8.0
+gateway_cost_usd_bucket{backend="ollama",le="0.3",otel_scope_name="resgraph",otel_scope_schema_url="",otel_scope_version="",source="pin",task_class="none"} 8.0
+gateway_cost_usd_bucket{backend="ollama",le="+Inf",otel_scope_name="resgraph",otel_scope_schema_url="",otel_scope_version="",source="pin",task_class="none"} 8.0
+gateway_cost_usd_count{backend="ollama",otel_scope_name="resgraph",otel_scope_schema_url="",otel_scope_version="",source="pin",task_class="none"} 8.0
+gateway_cost_usd_sum{backend="ollama",otel_scope_name="resgraph",otel_scope_schema_url="",otel_scope_version="",source="pin",task_class="none"} 0.0
+# HELP gateway_stream_errors_total mid-stream deaths, zero vs nonzero tokens emitted
+# TYPE gateway_stream_errors_total counter
+gateway_stream_errors_total{otel_scope_name="resgraph",otel_scope_schema_url="",otel_scope_version="",tokens_bucket="zero"} 11323.0
+gateway_stream_errors_total{otel_scope_name="resgraph",otel_scope_schema_url="",otel_scope_version="",tokens_bucket="nonzero"} 1.0

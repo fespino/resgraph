@@ -115,6 +115,8 @@ post-spend, that their question was unposable:
 | `20260813T235556Z` | Haiku no-skill arm (full, k=3) | $1.62 | does the skill narrow Haiku's honesty gap? (#199) | Yes — answered: no. The skill is a recall tool (+0.067 pass^k), not an honesty tool (control −0.11) |
 | gateway pilot, attempt 1 (2026-08-15) | gateway pilot: prefix-cache receipt | $0.007 | provider cache written through the running gateway | **No** — cache_creation 0: the ~3.6k system prefix alone sits under haiku's 4096-token cacheable minimum; the pre-mortem's registered guard fired |
 | gateway pilot, attempt 2 (2026-08-15) | same, full analyst shape (+ tool blocks, ~4.4k prefix) | $0.008 | byte-identical prefix in → cache_read out through the hop; source in the trail | Yes — creation 4800 → read 4800, both `cached: false`, `source: pin`, `backend: anthropic` end to end |
+| INC-004 pilot (2026-08-15) | failover drill pilot: ollama dead, one routed request | $0.006 | the fall-forward premise holds before the full drill spends | Yes — `backend: anthropic`, `source: task_class_default`, chain names the failed hop |
+| INC-004 drill (2026-08-15) | the failover drill: kill/restore under five-lane traffic | $0.082 | walk, pin honesty, mid-stream honesty, $/hour of falling forward | Yes — 47/47 fell forward, 0 substituted pins, 1 honest mid-generation death, $1.08/hour warm-cache; two findings filed (stream-path backpressure; chain length unmetered on the error path). Note: `docs/incidents/INC-004-gateway-failover.md` |
 
 Running base rate: 10 of 15 objectives met, $37.89 spent, of which
 $34.38 measured a registered objective. The ledger exists because the

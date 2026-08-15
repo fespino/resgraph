@@ -126,3 +126,19 @@ uv run python scripts/gateway-drill.py drill.jsonl
 docker compose kill ollama       # at the baseline→outage mark
 docker compose up -d ollama      # at the outage→recovery mark
 ```
+
+## Outcome (2026-08-15, pilot + drill + one supplementary kill, ~$0.088)
+
+Pilot PASS on the first request. Full drill: all five pass conditions met,
+with one repeat — the scheduled kill landed during prefill (TTFT ~21s of a
+~23s request leaves a ~2s token window), exactly the registered
+measure-nothing mode, so the mid-generation death was collected by a free
+targeted re-kill (5 tokens, then `stream_error{tokens_emitted: 5}`). Two of
+the three pre-registered code facts held as written; the third was
+half-right — the `GatewayDegradedChains` alert did stay quiet, but because
+chain lengths are unmetered on the error path, not because chains cannot
+exceed one hop (the reopen walk built ~11k length-2 chains, visible only in
+the log). New finding registered by no one: the streamed outage path is
+honest at every step and has no backpressure — 11,231 structured errors in
+182s from a client that honors `Retry-After` where one exists. Incident
+note: [INC-004](../incidents/INC-004-gateway-failover.md).

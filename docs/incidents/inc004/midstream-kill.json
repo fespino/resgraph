@@ -1,0 +1,1 @@
+{"supplementary_midstream_kill": {"run": "2026-08-15", "kill_sent_at_s": 31.9, "tokens_before_kill": 5, "terminal_event": {"type": "stream_error", "backend": "ollama", "reason": "peer closed connection without sending complete message body (incomplete chunked read)", "tokens_emitted": 5}}}

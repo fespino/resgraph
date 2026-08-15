@@ -389,7 +389,7 @@ the SDK fills in `0` and `"private"`: immediately stale. This
 catalog changes only when the process does, so serving it as
 expired-on-arrival defeated the caching the fields exist for. The
 server was conformant on the wire and undecided in substance.
-[PR #222](https://github.com/fespino/resgraph/pull/222) declares one
+[PR #223](https://github.com/fespino/resgraph/pull/223) declares one
 hint across the cacheable methods — an hour, `"public"`, because no
 tool varies by caller — and the protocol test now asserts both
 fields, so an SDK default change fails the build. Same lesson,

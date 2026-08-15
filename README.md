@@ -27,16 +27,16 @@
 | src/resgraph/evals/\_\_init\_\_.py           |        0 |        0 |    100% |           |
 | src/resgraph/evals/arms.py                   |       42 |        0 |    100% |           |
 | src/resgraph/evals/breaker.py                |       38 |        0 |    100% |           |
-| src/resgraph/evals/cli.py                    |      130 |        1 |     99% |       125 |
+| src/resgraph/evals/cli.py                    |      130 |        1 |     99% |       126 |
 | src/resgraph/evals/faults.py                 |       23 |        0 |    100% |           |
 | src/resgraph/evals/gate.py                   |      167 |        4 |     98% |152, 203, 215, 233 |
 | src/resgraph/evals/graders.py                |       67 |        2 |     97% |   76, 139 |
 | src/resgraph/evals/injection.py              |        6 |        0 |    100% |           |
 | src/resgraph/evals/judge.py                  |       16 |        0 |    100% |           |
 | src/resgraph/evals/pricing.py                |        6 |        0 |    100% |           |
-| src/resgraph/evals/providers.py              |      194 |        7 |     96% |94, 190-192, 198-200 |
+| src/resgraph/evals/providers.py              |      195 |        7 |     96% |94, 190-192, 198-200 |
 | src/resgraph/evals/report.py                 |       74 |        1 |     99% |       156 |
-| src/resgraph/evals/runner.py                 |      225 |       37 |     84% |159-164, 173-179, 186-194, 196-199, 206, 212, 230-231, 243-244, 313, 347, 380, 397, 404, 494-495 |
+| src/resgraph/evals/runner.py                 |      229 |       37 |     84% |159-164, 173-179, 186-194, 196-199, 206, 212, 230-231, 243-244, 313, 347, 380, 397, 404, 504-505 |
 | src/resgraph/evals/sanitize.py               |       45 |        2 |     96% |   38, 150 |
 | src/resgraph/evals/skillvalue.py             |       54 |        0 |    100% |           |
 | src/resgraph/evals/verify.py                 |       37 |        0 |    100% |           |
@@ -80,7 +80,7 @@
 | src/resgraph/tools/context.py                |        9 |        0 |    100% |           |
 | src/resgraph/tools/http.py                   |       21 |        0 |    100% |           |
 | src/resgraph/tools/registry.py               |       24 |        0 |    100% |           |
-| **TOTAL**                                    | **4554** |  **142** | **97%** |           |
+| **TOTAL**                                    | **4559** |  **142** | **97%** |           |
 
 
 ## Setup coverage badge

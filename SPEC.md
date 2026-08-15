@@ -988,11 +988,14 @@ revision's `ttlMs`/`cacheScope` are required fields on every list/read
 filed, a concern for the day this surface speaks HTTP. Unhinted, the
 SDK fills them with `0`/`"private"`: conformant on the wire, but a
 deploy-static catalog served "immediately stale" defeats the caching
-the fields exist for. Adopted: one `CacheHint(ttl_ms=3_600_000,
-scope="public")` across all six cacheable methods — an hour bounds
-staleness for clients caching across restarts; `"public"` because the
-surface does not vary by authorization context. Asserted end-to-end in
-the protocol test.
+the fields exist for. Adopted: one `CacheHint(ttl_ms=300_000,
+scope="public")` across all six cacheable methods. Five minutes, not
+longer: the catalog changes only at deploys, so the TTL is exactly the
+post-deploy window in which a client may serve the old catalog — and
+this is a dev-iterated server, while the caching benefit of a longer
+TTL is negligible (an in-process list over stdio). `"public"` because
+the surface does not vary by authorization context. Asserted
+end-to-end in the protocol test.
 
 ## D20 — Budgets inside the tool: refs+fetch, token caps, freshness (phase 7)
 

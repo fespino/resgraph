@@ -982,6 +982,18 @@ orchestration into the agent); separate schema definitions per surface
 re-pin when the 2026-07-28 revision leaves RC if anything binding
 changed.
 
+**Addendum (2026-08-15, #166 item 5 discharged as adopted):** the
+revision's `ttlMs`/`cacheScope` are required fields on every list/read
+*result* (`CacheableResult`) on every transport — not, as #166 first
+filed, a concern for the day this surface speaks HTTP. Unhinted, the
+SDK fills them with `0`/`"private"`: conformant on the wire, but a
+deploy-static catalog served "immediately stale" defeats the caching
+the fields exist for. Adopted: one `CacheHint(ttl_ms=3_600_000,
+scope="public")` across all six cacheable methods — an hour bounds
+staleness for clients caching across restarts; `"public"` because the
+surface does not vary by authorization context. Asserted end-to-end in
+the protocol test.
+
 ## D20 — Budgets inside the tool: refs+fetch, token caps, freshness (phase 7)
 
 The agent must not be able to ask an unbounded question, and
@@ -2088,5 +2100,6 @@ Two rules:
 | 2026-08-02 | "Pinned to MCP spec revision 2026-07-28" — D19 as first written during phase 7, and the phase's own protocol test | The pin was untested prose: the SDK negotiates that revision only on the stateless `discover` path, and the test was using the legacy `initialize` handshake, which negotiates an older revision — the suite was green while exercising the path the pinned revision deprecates | Caught pre-merge by reading the spec against the implementation (#77): the test switched to `discover` and now asserts the negotiated revision equals the pin, so an SDK upgrade that shifts it fails CI. The claim became true-and-tested before it shipped |
 | 2026-08-03 | "Narrative judge pinned (model, temperature=0, seed, template)" — D24 as first written | The API rejects `temperature` outright on this model generation (400: "deprecated for this model") and has never exposed a seed — two of the four pinned knobs were not ours to pin. Caught on the first real judge call of the baseline run, which is exactly when untested prose gets tested | D24 amended: the pin is model + template, the only knobs the API accepts; the judge call and its test updated. Same failure class as the revision-pin row above — a pin written before the API contradicts it |
 | 2026-08-03 | "Token-weighted cache hit ≥ 0.9 on multi-turn runs" as the discipline gate — D23 and the discovery memo's quality bar | The floor is unreachable on short runs even with zero waste: after iteration 2 eliminated transcript re-billing entirely (uncached input 250,754 → 234 tokens per run), 0/30 rows reached 0.9 because the residue is `cache_creation` — the one-time write every new token owes before it can be read. The metric penalized unavoidable cost, not waste | D23 amended (second amendment) and the memo bar updated in place with a dated note: the gate is uncached re-read fraction ≤ 0.1 — the re-billing the metric was built to catch — with cache-hit still reported. An eval bug by the phase's own taxonomy: ours, recorded loudly per the memo's no-quiet-bar-bending rule |
+| 2026-08-15 | "the `MCP-Method`/`MCP-Name` headers and `ttlMs`/`cacheScope` list-caching hints matter the day it speaks HTTP" — #166 item 5, the second-read watchlist | Half right: the headers are transport-level, but `ttlMs`/`cacheScope` are required fields on list/read *results* (`CacheableResult`) on every transport, stdio included — the SDK had been filling them `0`/`"private"`, serving a deploy-static catalog "immediately stale" | Caught fact-checking a blog draft against the spec changelog, not by either read of the release post. `cache_hints` adopted (1 h, `"public"`) with the protocol test asserting both fields; D19 addendum records the discharge; #166 corrected by comment |
 
 

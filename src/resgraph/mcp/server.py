@@ -11,6 +11,7 @@ from inspect import Parameter, Signature
 from pathlib import Path
 from typing import Any
 
+from mcp.server.caching import CacheableMethod, CacheHint
 from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.prompts import Prompt
 from mcp.server.mcpserver.resources import TextResource
@@ -26,6 +27,18 @@ from resgraph.tools.registry import TOOL_REGISTRY, ToolRegistration
 
 SKILLS_DIR = Path(__file__).resolve().parents[3] / "skills"
 CARD_PATH = Path(__file__).with_name("CARD.md")
+
+# the catalog only changes when the process does: an hour bounds
+# cross-restart staleness; "public" because no tool varies by caller
+_CATALOG_HINT = CacheHint(ttl_ms=3_600_000, scope="public")
+_CACHE_HINTS: dict[CacheableMethod, CacheHint] = {
+    "tools/list": _CATALOG_HINT,
+    "prompts/list": _CATALOG_HINT,
+    "resources/list": _CATALOG_HINT,
+    "resources/read": _CATALOG_HINT,
+    "resources/templates/list": _CATALOG_HINT,
+    "server/discover": _CATALOG_HINT,
+}
 
 _driver: Any = None
 _catalog: Any = None
@@ -100,6 +113,7 @@ def build_server(skills_dir: Path = SKILLS_DIR) -> MCPServer:
             "detail on the few that matter. Read the resgraph://card "
             "resource before first use."
         ),
+        cache_hints=_CACHE_HINTS,
     )
     for entry in TOOL_REGISTRY:
         if "mcp" in entry.surfaces:

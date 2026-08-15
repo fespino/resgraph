@@ -63,3 +63,7 @@ transcript through the hop (`cache_read` 39,298 / `creation` 8,594 on a
 7-turn run). The $0 replay collection earned its keep beforehand: the two
 crashes it surfaced (the CLI's missing-model KeyError, the unserializable
 echoed blocks) would each have been this run's stack trace.
+
+Provenance note: the row's `git_ref` (`f6c3027`) predates a branch
+untangle — the run's tree was this PR's `cc7d75e` plus one unrelated
+concurrent commit (`e94dc87`, an mcp change outside the eval path).

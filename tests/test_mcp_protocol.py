@@ -127,7 +127,13 @@ async def _exercise_surface(seeded, tmp_path):
         card = await session.read_resource("resgraph://card")
         assert "will NOT do" in card.contents[0].text
 
-        for cacheable in (tools_res, prompts_res, card):
+        # the cache hint below is per-METHOD; it is truthful only while
+        # every served resource is deploy-static — a new resource must
+        # fail here and force revisiting the hint
+        resources = await session.list_resources()
+        assert {str(r.uri) for r in resources.resources} == {"resgraph://card"}
+
+        for cacheable in (tools_res, prompts_res, resources, card):
             assert (cacheable.ttl_ms, cacheable.cache_scope) == (3_600_000, "public")
 
         out = await session.call_tool("blast_radius", {"resource_id": "host-hub000", "depth": 50})

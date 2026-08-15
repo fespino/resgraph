@@ -110,7 +110,8 @@ async def _exercise_surface(seeded, tmp_path):
         await session.discover()
         assert session.protocol_version == "2026-07-28"
 
-        tools = {t.name for t in (await session.list_tools()).tools}
+        tools_res = await session.list_tools()
+        tools = {t.name for t in tools_res.tools}
         assert tools == {
             "blast_radius",
             "dependency_path",
@@ -119,11 +120,15 @@ async def _exercise_surface(seeded, tmp_path):
             "fetch_resource",
         }
 
-        prompts = {p.name for p in (await session.list_prompts()).prompts}
+        prompts_res = await session.list_prompts()
+        prompts = {p.name for p in prompts_res.prompts}
         assert {"incident-impact", "change-forensics"} <= prompts
 
         card = await session.read_resource("resgraph://card")
         assert "will NOT do" in card.contents[0].text
+
+        for cacheable in (tools_res, prompts_res, card):
+            assert (cacheable.ttl_ms, cacheable.cache_scope) == (3_600_000, "public")
 
         out = await session.call_tool("blast_radius", {"resource_id": "host-hub000", "depth": 50})
         assert not out.is_error

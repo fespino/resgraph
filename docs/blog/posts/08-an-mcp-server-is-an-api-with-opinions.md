@@ -378,6 +378,24 @@ The second and third findings came from the same checklist:
   one piece of genuinely dead code. A coverage number can lie in
   both directions; know where your instrument cannot see.
 
+**Update (2026-08-16):** a fourth finding arrived after publication,
+from the same failure class as the revision pin — caught
+fact-checking an essay draft against the
+[spec changelog](https://modelcontextprotocol.io/specification/2026-07-28/changelog)
+rather than the release post. The pinned revision makes `ttlMs` and
+`cacheScope` required on every list and read result — on every
+transport, stdio included — and when a server doesn't decide them,
+the SDK fills in `0` and `"private"`: immediately stale. This
+catalog changes only when the process does, so serving it as
+expired-on-arrival defeated the caching the fields exist for. The
+server was conformant on the wire and undecided in substance.
+[PR #222](https://github.com/fespino/resgraph/pull/222) declares one
+hint across the cacheable methods — an hour, `"public"`, because no
+tool varies by caller — and the protocol test now asserts both
+fields, so an SDK default change fails the build. Same lesson,
+sharpened: a pin is prose until a real call asserts it, and a
+default you didn't choose is a decision you didn't make.
+
 One last opinion made it onto the server card because statelessness
 has a user-visible consequence: offset pagination re-runs the query
 per page — exactly the stateless shape the revision asks for —

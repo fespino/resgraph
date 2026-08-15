@@ -7,6 +7,7 @@ import pytest
 from resgraph.analyst.harness import Usage as HarnessUsage
 from resgraph.evals.providers import (
     ChatCompletionsClient,
+    GatewayClient,
     TextBlock,
     ToolUseBlock,
     build_client,
@@ -367,3 +368,59 @@ def test_a_block_list_system_flattens_to_text_for_the_chat_shape():
     ]
     out = to_chat_messages(system, [{"role": "user", "content": "q"}])
     assert out[0] == {"role": "system", "content": "prefix and rules"}
+
+
+def test_pinned_gateway_setups_declare_the_wire_model_they_pin():
+    """The committed models.yaml stays truthful: a pinned gateway setup's
+    declared model must equal its pin target's model, or rows misprice."""
+    from pathlib import Path
+
+    import yaml
+
+    setups = yaml.safe_load(Path("evals/models.yaml").read_text())
+    for name, setup in setups.items():
+        if setup.get("provider") == "gateway" and (pin := setup.get("pin")):
+            assert setup.get("model") == setups[pin]["model"], name
+
+
+def test_gateway_client_wire_encodes_echoed_response_blocks():
+    """A multi-turn conversation echoes prior Response dataclass blocks back
+    through the client; the POSTed body must be pure JSON."""
+    captured: dict[str, object] = {}
+
+    def fake_transport(url, payload, headers):
+        captured["payload"] = json.loads(json.dumps(payload))
+        return {
+            "content": [{"type": "text", "text": "ok"}],
+            "usage": {"input_tokens": 1, "output_tokens": 1},
+            "source": "pin",
+            "backend": "ollama",
+        }
+
+    client = GatewayClient(base_url="http://x", pin="qwen", transport=fake_transport)
+    client.messages.create(
+        max_tokens=8,
+        messages=[
+            {"role": "user", "content": [{"type": "text", "text": "hi"}]},
+            {
+                "role": "assistant",
+                "content": [
+                    TextBlock(text="looking"),
+                    ToolUseBlock(id="tu_1", name="fetch_resource", input={"id": "r1"}),
+                ],
+            },
+            {
+                "role": "user",
+                "content": [{"type": "tool_result", "tool_use_id": "tu_1", "content": "{}"}],
+            },
+        ],
+    )
+    payload = captured["payload"]
+    assistant = payload["messages"][1]["content"]
+    assert assistant[0] == {"type": "text", "text": "looking"}
+    assert assistant[1] == {
+        "type": "tool_use",
+        "id": "tu_1",
+        "name": "fetch_resource",
+        "input": {"id": "r1"},
+    }

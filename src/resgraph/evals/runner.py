@@ -417,6 +417,14 @@ def run_eval(
                     item_max_calls = (
                         STARVED_TOOL_CALLS if "budget_starved" in spec.tags else max_tool_calls
                     )
+                    llm_trail: list[dict[str, Any]] = []
+
+                    def capture(
+                        kind: str, event: dict[str, Any], trail: list[dict[str, Any]] = llm_trail
+                    ) -> None:
+                        if kind == "llm_call":
+                            trail.append({k: v for k, v in event.items() if k != "thinking"})
+
                     started = time.monotonic()
                     result = run_triage(
                         prompt,
@@ -424,6 +432,7 @@ def run_eval(
                         client,
                         model=model,
                         max_tool_calls=item_max_calls,
+                        on_event=capture,
                         extra_args=extra_args,
                         max_cost_usd=max_item_cost,
                         cost_fn=(
@@ -465,6 +474,7 @@ def run_eval(
                         {"tool": c.name, "ok": c.ok, "args": c.args} for c in result.trace
                     ],
                     "turns": result.turns,
+                    "llm_trail": llm_trail,
                     "tokens": tokens,
                     "cache_hit_rate": result.usage.cache_hit_rate,
                     "cache_fingerprint": fingerprint,

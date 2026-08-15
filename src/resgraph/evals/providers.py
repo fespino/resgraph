@@ -14,7 +14,7 @@ adapter is exercised offline against fixtures.
 import json
 import os
 from collections.abc import Callable, Iterator
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass, is_dataclass
 from pathlib import Path
 from typing import Any
 
@@ -359,7 +359,21 @@ class GatewayClient:
         tools: list[dict[str, Any]] | None = None,
         **_ignored: Any,
     ) -> Response:
-        body: dict[str, Any] = {"messages": messages, "max_tokens": max_tokens}
+        # assistant turns echo prior Response blocks (dataclasses); the wire
+        # wants their dict form
+        wire_messages = [
+            {
+                **m,
+                "content": [
+                    asdict(b) if is_dataclass(b) and not isinstance(b, type) else b
+                    for b in m["content"]
+                ],
+            }
+            if isinstance(m.get("content"), list)
+            else m
+            for m in messages
+        ]
+        body: dict[str, Any] = {"messages": wire_messages, "max_tokens": max_tokens}
         if system is not None:
             body["system"] = system
         if tools is not None:

@@ -75,9 +75,21 @@ qwen-local-1.5b:
 # Through the gateway: the seam's client POSTs /v1/generate and the
 # gateway's registry resolves the serving model. Routing belongs to the
 # setup (pin / task_class), not the caller; a measured run pins and
-# disables the response cache — the instrument bypass.
+# disables the response cache — the instrument bypass. A pinned setup
+# declares the wire model it pins so rows price correctly.
 haiku-via-gateway:
   provider: gateway
   base_url: http://localhost:8080
   pin: haiku
+  model: claude-haiku-4-5
   cache_responses: false
+
+# The replay-measurement setup: the response cache stays ON, which is the
+# point — this setup exists to measure the gateway cache layer on replayed
+# real traffic and is never a measured-run arm (a measured run pins with
+# the cache bypassed, like haiku-via-gateway above).
+qwen-replay-gateway:
+  provider: gateway
+  base_url: http://localhost:8080
+  pin: qwen-local-1.5b
+  model: qwen2.5:1.5b

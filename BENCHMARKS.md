@@ -369,3 +369,31 @@ Latency note: the canonical layer adds shaping + validation over the
 phase-5 query path; measured overhead is sub-millisecond against the
 2.5 ms live endpoint p50 above — not separately tabled.
 - Gateway serving capacity (knee, TTFT, admission behavior): docs/capacity.md — method + hardware there; laptop-scale only.
+
+## Replay cache — both layers, per traffic class (D32)
+
+The gateway's two cache layers measured separately on replayed REAL
+traffic, per the D32 rule (never synthetic prompts). Method: the same
+eval item run twice through the running gateway (`resgraph-evals run
+--worker qwen-replay-gateway --no-judge`, response cache ON — the
+replay setup, never a measured-run arm), `/metrics` snapshotted between
+passes (`scripts/replay-traffic.py`). Provider-layer row: the committed
+gateway-pilot receipt (two identical analyst-shaped calls pinned to
+haiku through the same hop). Hardware as in docs/capacity.md (Apple M3,
+8 GiB, Docker VM ~3.8 GiB). Run 2026-08-15.
+
+| traffic class (layer) | pass 1 (cold) | pass 2 (replay) | backend not spent |
+|---|---|---|---|
+| workhorse, temp-0 local (gateway layer) | 0/5 hits — 5 writes | **4/4 hits** | 13,634 tokens; 432.6 s of generation served in 0.07 s |
+| judgment, sampled paid (gateway layer) | ineligible by design | ineligible by design | — (a replayed sampled draw would be a quiet lie) |
+| judgment, sampled paid (provider prefix layer) | 0/1 — `cache_creation` 4,800 | **1/1** — `cache_read` 4,800 | 4,800 prefix tokens re-priced at 0.1× |
+
+The replay hit the full recorded trajectory byte-for-byte — the same
+tool call, the same report attempts, the same validation failures —
+because nothing the tools returned changed between passes: the cache
+converges with the world as observed, it never invents. The cold pass
+wrote one entry more than the replay consumed (5 writes, 4 replayed
+lookups; the recorded run has 4 turns) — bounded at one request and
+not attributable from the run row, noted rather than explained away.
+Cost delta in dollars: $0 on the local class by construction; the
+provider class re-prices its prefix at 0.1× on the replay leg.

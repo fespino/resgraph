@@ -63,7 +63,8 @@ def run(
     worker_setup: dict[str, Any] = (
         load_setup(worker, cfg) if worker else {"provider": "anthropic", "model": model}
     )
-    worker_model: str = worker_setup["model"]
+    # a routed gateway setup carries no model; its rows go unmetered
+    worker_model: str = worker_setup.get("model", "gateway-routed")
     worker_client = build_client(worker_setup)
     provenance: dict[str, Any] = {"worker": worker_setup}
 
@@ -81,7 +82,7 @@ def run(
         judge_setup: dict[str, Any] = (
             load_setup(judge, cfg) if judge else {"provider": "anthropic", "model": judge_model}
         )
-        judge_model_resolved = judge_setup["model"]
+        judge_model_resolved = judge_setup.get("model", "gateway-routed")
         judge_client = build_client(judge_setup)
         provenance["judge"] = judge_setup
 

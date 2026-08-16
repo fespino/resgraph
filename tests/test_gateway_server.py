@@ -628,3 +628,12 @@ def test_a_down_backend_with_a_streamable_fallback_still_walks(tmp_path):
     end = sse_events(r.text)[-1]
     assert end["backend"] == "anthropic"
     assert end["fallback_chain"] == ["ollama:qwen-local-1.5b"]
+
+
+def test_a_non_positive_probe_cadence_is_refused_at_startup(tmp_path):
+    path = tmp_path / "models.yaml"
+    setups = {k: dict(v) for k, v in SETUPS.items()}
+    setups["qwen-local-1.5b"]["probe_interval_s"] = 0
+    path.write_text(yaml.safe_dump(setups))
+    with pytest.raises(SystemExit, match="must be > 0"):
+        create_app(models_path=path, client_factory=lambda setup: None)

@@ -46,6 +46,11 @@
   postmortem; templates to point at, plus this phase's pre-mortem
 - docs/incidents/ — incident notes (induced drills labeled as such)
 - docs/reviews/ — recorded system reviews (harnessability, checklist walks)
+- docs/sentinel/ — misuse-detection phase: threat model (both halves,
+  breach signals with status) and prior art (Clio, OWASP, detection
+  economics)
+- scripts/egress-pilot.sh — the D35 measurement: can compose block
+  container egress without killing published ports (here: no)
 - benchmarks/ — measurement scripts (methods in BENCHMARKS.md)
 - src/resgraph/tools/ — canonical tool layer (D19/D20): registry as the
   single source of truth, budgets, refs+fetch shaping, HTTP projection

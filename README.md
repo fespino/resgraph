@@ -62,7 +62,7 @@
 | src/resgraph/graph/queries.py                |       47 |        0 |    100% |           |
 | src/resgraph/graph/schema.py                 |       22 |        0 |    100% |           |
 | src/resgraph/mcp/\_\_init\_\_.py             |        0 |        0 |    100% |           |
-| src/resgraph/mcp/server.py                   |       65 |        2 |     97% |  137, 141 |
+| src/resgraph/mcp/server.py                   |       68 |        2 |     97% |  152, 156 |
 | src/resgraph/mcp/skills.py                   |       38 |        0 |    100% |           |
 | src/resgraph/obs.py                          |      130 |        2 |     98% |   247-249 |
 | src/resgraph/query/\_\_init\_\_.py           |        0 |        0 |    100% |           |
@@ -80,7 +80,7 @@
 | src/resgraph/tools/context.py                |        9 |        0 |    100% |           |
 | src/resgraph/tools/http.py                   |       21 |        0 |    100% |           |
 | src/resgraph/tools/registry.py               |       24 |        0 |    100% |           |
-| **TOTAL**                                    | **4559** |  **142** | **97%** |           |
+| **TOTAL**                                    | **4562** |  **142** | **97%** |           |
 
 
 ## Setup coverage badge

@@ -127,3 +127,12 @@ def test_broken_lag_reader_does_not_kill_the_scrape():
         assert 'worker="w-broken"' not in out  # skipped, not fatal (D17)
     finally:
         obs.unregister_lag_reader("w-broken")
+
+
+def test_metrics_endpoint_binds_loopback():
+    httpd, thread = obs._serve_metrics(0)
+    try:
+        assert httpd.server_address[0] == "127.0.0.1"
+    finally:
+        httpd.shutdown()
+        thread.join()

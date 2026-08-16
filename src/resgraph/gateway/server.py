@@ -55,6 +55,7 @@ PROVIDER_LIMITS: Mapping[str, tuple[int, int]] = {"anthropic": (8, 16)}
 DEFAULT_LIMITS = (1, 4)
 PROBE_SLOW_S = 5.0
 PROBE_PROMPT = [{"role": "user", "content": "Reply with the single word: pong"}]
+UNSTREAMABLE_PROVIDERS = frozenset({"anthropic"})
 
 
 class GenerateIn(BaseModel):
@@ -296,6 +297,16 @@ def _serve_with_walk[T](
     raise HTTPException(503, detail=f"no backend could serve; chain={chain}")
 
 
+def _no_streamable_fallback(gw: Gateway, decision_model: str, unstreamable: frozenset[str]) -> bool:
+    down_provider = gw.setups[decision_model].get("provider", "default")
+    for provider, alias in gw.routed().items():
+        if provider == down_provider or provider in unstreamable:
+            continue
+        if gw.backend(alias).health.state != "down":
+            return False
+    return True
+
+
 def _open_stream(
     gw: Gateway, alias: str, req: GenerateIn, factory: StreamFactory
 ) -> tuple[Backend, Iterator[StreamEvent]]:
@@ -314,7 +325,7 @@ def _default_stream_factory(gw: Gateway) -> StreamFactory:
     setup knob (extra_args above all, the constrained-decoding channel)."""
 
     def open_stream(alias: str, kwargs: dict[str, Any]) -> Iterator[StreamEvent]:
-        if gw.setups[alias].get("provider") == "anthropic":
+        if gw.setups[alias].get("provider") in UNSTREAMABLE_PROVIDERS:
             raise HTTPException(
                 501, detail="anthropic streaming lands with its adapter; send stream=false"
             )
@@ -440,6 +451,10 @@ def create_app(
         registry=DEFAULT_REGISTRY if registry is None else registry,
     )
     factory = _default_stream_factory(gw) if stream_factory is None else stream_factory
+    # a custom factory declares no unstreamable providers: the eager
+    # refusal must not inherit the default factory's anthropic limit
+    unstreamable = UNSTREAMABLE_PROVIDERS if stream_factory is None else frozenset()
+    stream_retry_after_s = max(1, int(probe_interval_s or 15.0))
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -472,6 +487,28 @@ def create_app(
             raise HTTPException(400, detail=f"unknown model alias {decision.model!r}")
 
         if req.stream:
+            routed_backend = gw.backend(decision.model)
+            if routed_backend.health.state == "down":
+                labels = {
+                    "backend": routed_backend.name,
+                    "source": decision.source,
+                    "task_class": req.task_class or "none",
+                }
+                obs.GATEWAY_FALLBACK_CHAIN.record(0)
+                if not decision.fallback_allowed:
+                    obs.GATEWAY_REQUESTS.add(1, {**labels, "outcome": "pin_failed_502"})
+                    raise HTTPException(
+                        502,
+                        detail=f"pinned {decision.model!r} backend {routed_backend.name!r} is down",
+                    )
+                if _no_streamable_fallback(gw, decision.model, unstreamable):
+                    obs.GATEWAY_REQUESTS.add(1, {**labels, "outcome": "refused_503"})
+                    raise HTTPException(
+                        503,
+                        detail=f"backend {routed_backend.name!r} is down and no streamable "
+                        "fallback is up; retry after the next probe round",
+                        headers={"Retry-After": str(stream_retry_after_s)},
+                    )
             (backend, events), alias, chain = _serve_with_walk(
                 gw, decision, lambda a: _open_stream(gw, a, req, factory), req.task_class or "none"
             )

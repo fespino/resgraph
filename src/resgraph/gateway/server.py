@@ -509,6 +509,11 @@ def create_app(
     fallback_budget: FallForwardBudget | None = None,
 ) -> FastAPI:
     setups = yaml.safe_load(models_path.read_text()) or {}
+    for name, setup in setups.items():
+        cadence = setup.get("probe_interval_s")
+        if cadence is not None and float(cadence) <= 0:
+            # wait(0) spins: a hot probe loop, and a spend bug on a priced setup
+            raise SystemExit(f"setup {name!r}: probe_interval_s must be > 0, got {cadence}")
     gw = Gateway(
         setups=setups,
         client_factory=client_factory,

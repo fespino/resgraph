@@ -4,10 +4,15 @@ exist, and the gateway instruments record without a provider installed
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
+from typing import Any
 
 import yaml
+from fastapi.testclient import TestClient
 
 from resgraph import obs
+from resgraph.gateway import server as gwserver
+from resgraph.gateway.server import Gateway, _stream_observer, create_app
 
 RULES = Path("observability/rules/gateway_slo.yml")
 DASHBOARD = Path("observability/grafana/dashboards/resgraph-overview.json")
@@ -57,13 +62,6 @@ def test_depth_reader_registration_survives_a_broken_reader():
 def test_the_server_records_outcomes_costs_and_cache_hits(tmp_path, monkeypatch):
     """Served requests emit outcome, cost, and cache-hit metrics with the
     routing labels a cost question needs (backend/source/task_class)."""
-    from types import SimpleNamespace
-    from typing import Any
-
-    from fastapi.testclient import TestClient
-
-    from resgraph.gateway.server import create_app
-
     recorded: list[tuple[str, Any, dict]] = []
 
     class Rec:
@@ -75,8 +73,6 @@ def test_the_server_records_outcomes_costs_and_cache_hits(tmp_path, monkeypatch)
 
         def record(self, value, labels=None):
             recorded.append((self.name, value, labels or {}))
-
-    from resgraph.gateway import server as gwserver
 
     path = tmp_path / "models.yaml"
     path.write_text(
@@ -140,9 +136,6 @@ def test_the_server_records_outcomes_costs_and_cache_hits(tmp_path, monkeypatch)
 
 
 def test_the_stream_observer_maps_every_terminal_payload(tmp_path, monkeypatch):
-    from resgraph.gateway import server as gwserver
-    from resgraph.gateway.server import Gateway, _stream_observer
-
     recorded: list[tuple[str, object, dict]] = []
 
     class Rec:
@@ -216,13 +209,6 @@ def test_the_depth_gauge_is_quiet_before_any_gateway_registers(monkeypatch):
 
 
 def test_both_cache_layers_emit_hits_and_misses(tmp_path, monkeypatch):
-    from types import SimpleNamespace
-
-    from fastapi.testclient import TestClient
-
-    from resgraph.gateway import server as gwserver
-    from resgraph.gateway.server import create_app
-
     recorded: list[tuple[str, object, dict]] = []
 
     class Rec:
@@ -292,11 +278,6 @@ def test_both_cache_layers_emit_hits_and_misses(tmp_path, monkeypatch):
 def test_failed_walks_record_their_chain_length(tmp_path, monkeypatch):
     """The INC-004 blind spot: a request that degrades through the whole
     walk and dies must still feed the chain histogram."""
-    from fastapi.testclient import TestClient
-
-    from resgraph.gateway import server as gwserver
-    from resgraph.gateway.server import create_app
-
     recorded: list[float] = []
 
     class Rec:

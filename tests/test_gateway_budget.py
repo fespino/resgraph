@@ -155,9 +155,7 @@ def test_a_streamed_fall_forward_charges_the_budget(tmp_path):
     def factory(alias: str, kwargs: Any):
         if alias != "haiku":
             raise ConnectionError("backend unreachable")
-        return iter(
-            [("content", "ok"), ("usage", {"input_tokens": 1_000_000, "output_tokens": 0})]
-        )
+        return iter([("content", "ok"), ("usage", {"input_tokens": 1_000_000, "output_tokens": 0})])
 
     path = tmp_path / "models.yaml"
     path.write_text(yaml.safe_dump(SETUPS))

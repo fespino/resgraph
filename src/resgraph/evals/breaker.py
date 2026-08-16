@@ -21,6 +21,39 @@ DEFAULT_LEDGER = Path("data") / "judge-spend.json"
 WARN_FRACTION = 0.9
 
 
+class DailyLedger:
+    """A per-UTC-day spend ledger with a once-per-day warn flag — the
+    shared core under every spend breaker in the platform."""
+
+    def __init__(self, path: Path) -> None:
+        self.path = path
+
+    def _load(self) -> dict[str, Any]:
+        today = datetime.now(UTC).date().isoformat()
+        try:
+            state = json.loads(self.path.read_text())
+        except (FileNotFoundError, json.JSONDecodeError):
+            state = {}
+        if state.get("date") != today:
+            state = {"date": today, "spent_usd": 0.0, "warned": False}
+        return state
+
+    def spent_today(self) -> float:
+        return float(self._load()["spent_usd"])
+
+    def add(self, cost_usd: float, *, warn_at_usd: float) -> bool:
+        """Record spend; True exactly once per day when the warn line is
+        crossed."""
+        state = self._load()
+        state["spent_usd"] = float(state["spent_usd"]) + cost_usd
+        crossed = not state["warned"] and state["spent_usd"] >= warn_at_usd
+        if crossed:
+            state["warned"] = True
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.path.write_text(json.dumps(state))
+        return crossed
+
+
 class JudgeSpendBreaker:
     def __init__(
         self,
@@ -35,20 +68,14 @@ class JudgeSpendBreaker:
         self.cap_usd = cap_usd
         self.model = model
         self._input_rate, self._output_rate = prices_per_mtok[model]
-        self.ledger = ledger
+        self._ledger = DailyLedger(ledger)
 
-    def _load(self) -> dict[str, Any]:
-        today = datetime.now(UTC).date().isoformat()
-        try:
-            state = json.loads(self.ledger.read_text())
-        except (FileNotFoundError, json.JSONDecodeError):
-            state = {}
-        if state.get("date") != today:
-            state = {"date": today, "spent_usd": 0.0, "warned": False}
-        return state
+    @property
+    def ledger(self) -> Path:
+        return self._ledger.path
 
     def spent_today(self) -> float:
-        return float(self._load()["spent_usd"])
+        return self._ledger.spent_today()
 
     def check(self) -> None:
         """Call before a judge call: trips if today's spend is at cap."""
@@ -66,13 +93,8 @@ class JudgeSpendBreaker:
             (getattr(usage, "input_tokens", 0) or 0) * self._input_rate
             + (getattr(usage, "output_tokens", 0) or 0) * self._output_rate
         ) / 1_000_000
-        state = self._load()
-        state["spent_usd"] = float(state["spent_usd"]) + cost
-        if not state["warned"] and state["spent_usd"] >= WARN_FRACTION * self.cap_usd:
-            state["warned"] = True
+        if self._ledger.add(cost, warn_at_usd=WARN_FRACTION * self.cap_usd):
             print(
-                f"judge spend warning: ${state['spent_usd']:.2f} of "
+                f"judge spend warning: ${self._ledger.spent_today():.2f} of "
                 f"${self.cap_usd:.2f} daily cap (90% threshold crossed)"
             )
-        self.ledger.parent.mkdir(parents=True, exist_ok=True)
-        self.ledger.write_text(json.dumps(state))

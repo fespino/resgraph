@@ -124,6 +124,9 @@ GATEWAY_CACHE_TOKENS_SAVED = _meter.create_counter(
 GATEWAY_COST = _meter.create_histogram(
     "gateway_cost_usd", description="estimated cost per request, by task class, backend, source"
 )
+GATEWAY_FALLBACK_SPEND = _meter.create_counter(
+    "gateway_fallback_spend_usd", description="money the failure path spent falling forward"
+)
 
 # ingest_lag readers, registered per consumer; the gauge callback runs
 # at scrape time so the reading is as fresh as the scrape.
@@ -261,7 +264,7 @@ def _refresh_instruments() -> None:
     global ANALYST_RUN_SECONDS, ANALYST_RUN_COST, ANALYST_RUNS
     global GATEWAY_TTFT, GATEWAY_TOKENS_PER_S, GATEWAY_REQUESTS, GATEWAY_FALLBACK_CHAIN
     global GATEWAY_STREAM_ERRORS, GATEWAY_CACHE_HITS, GATEWAY_CACHE_MISSES
-    global GATEWAY_CACHE_TOKENS_SAVED, GATEWAY_COST
+    global GATEWAY_CACHE_TOKENS_SAVED, GATEWAY_COST, GATEWAY_FALLBACK_SPEND
     _meter = otel_metrics.get_meter("resgraph")
     READ = _meter.create_counter("ingest_read", description="entries read from the stream")
     APPLIED = _meter.create_counter("ingest_applied", description="messages applied")
@@ -315,6 +318,9 @@ def _refresh_instruments() -> None:
     )
     GATEWAY_COST = _meter.create_histogram(
         "gateway_cost_usd", description="estimated cost per request, by task class, backend, source"
+    )
+    GATEWAY_FALLBACK_SPEND = _meter.create_counter(
+        "gateway_fallback_spend_usd", description="money the failure path spent falling forward"
     )
     _meter.create_observable_gauge(
         "gateway_queue_depth",

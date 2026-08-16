@@ -33,9 +33,10 @@ from prometheus_client import make_asgi_app
 from pydantic import BaseModel
 
 from resgraph import obs
-from resgraph.evals.pricing import estimate_cost
+from resgraph.evals.pricing import PRICES_PER_MTOK, estimate_cost
 from resgraph.evals.providers import build_client
 from resgraph.gateway.accounting import StreamAccount
+from resgraph.gateway.budget import FallForwardBudget
 from resgraph.gateway.cache import ResponseCache, cache_key
 from resgraph.gateway.dispatch import Backend, ProbeResult, QueueFull, choose
 from resgraph.gateway.relay import StreamEvent, StreamFactory, parse_chat_sse, relay
@@ -98,6 +99,7 @@ class Gateway:
     clients: dict[str, Any] = field(default_factory=dict)
     backends: dict[str, Backend] = field(default_factory=dict)
     cache: ResponseCache = field(default_factory=ResponseCache)
+    fallback_budget: FallForwardBudget | None = None
 
     def client(self, alias: str) -> Any:
         if alias not in self.clients:
@@ -208,15 +210,24 @@ def _call(gw: Gateway, alias: str, req: GenerateIn) -> tuple[list[dict[str, Any]
         backend.release()
 
 
-def _next_alias(gw: Gateway, chain: list[str]) -> str | None:
+def _paid(gw: Gateway, alias: str) -> bool:
+    return gw.setups[alias].get("model") in PRICES_PER_MTOK
+
+
+def _next_alias(gw: Gateway, chain: list[str], *, ignore_budget: bool = False) -> str | None:
     """The next hop of the walk: an untried, not-down backend's serving
     alias, chosen by health then latency; None when the walk is exhausted.
     Candidates come from the routed providers only — the registry is the
-    serving authority, and an unrouted catalog setup is never a hop."""
+    serving authority, and an unrouted catalog setup is never a hop. A
+    paid candidate is eligible only while the fall-forward budget allows
+    (`ignore_budget` answers "was the exhaustion budget-caused?")."""
     tried = {c.split(":", 1)[0] for c in chain}
+    budget = gw.fallback_budget
     candidates = []
     for provider, fallback in gw.routed().items():
         if provider in tried:
+            continue
+        if not ignore_budget and budget is not None and _paid(gw, fallback) and not budget.allows():
             continue
         backend = gw.backend(fallback)
         if backend.health.state != "down":
@@ -283,17 +294,37 @@ def _serve_with_walk[T](
                 ) from exc
             _record_hop(gw, alias, exc, chain)
             alias = _next_alias(gw, chain)
-    log.error("[gateway:exhausted] chain=%s", chain)
+    budget = gw.fallback_budget
+    budget_blocked = (
+        budget is not None
+        and not budget.allows()
+        and _next_alias(gw, chain, ignore_budget=True) is not None
+    )
+    outcome = "budget_503" if budget_blocked else "exhausted_503"
     obs.GATEWAY_REQUESTS.add(
         1,
         {
             "backend": "none",
-            "outcome": "exhausted_503",
+            "outcome": outcome,
             "source": decision.source,
             "task_class": task_class,
         },
     )
     obs.GATEWAY_FALLBACK_CHAIN.record(len(chain))
+    if budget_blocked and budget is not None:
+        log.error(
+            "[gateway:fallback-budget] refusing paid fall-forward: $%.2f of $%.2f "
+            "daily cap spent; chain=%s",
+            budget.spent_today(),
+            budget.cap_usd,
+            chain,
+        )
+        raise HTTPException(
+            503,
+            detail=f"fall-forward budget exhausted (${budget.spent_today():.2f} of "
+            f"${budget.cap_usd:.2f} today); refusing to pay past the cap; chain={chain}",
+        )
+    log.error("[gateway:exhausted] chain=%s", chain)
     raise HTTPException(503, detail=f"no backend could serve; chain={chain}")
 
 
@@ -395,18 +426,23 @@ def _stream_observer(gw: Gateway, source: str, task_label: str) -> Callable[[dic
                     payload["tokens_per_s"], {"backend": payload["backend"]}
                 )
             u = payload["usage"]
-            obs.GATEWAY_COST.record(
-                estimate_cost(
-                    {
-                        "input": u.get("input_tokens", 0),
-                        "output": u.get("output_tokens", 0),
-                        "cache_read": 0,
-                        "cache_creation": 0,
-                    },
-                    gw.setups[payload["model"]]["model"],
-                ),
-                labels,
+            cost = estimate_cost(
+                {
+                    "input": u.get("input_tokens", 0),
+                    "output": u.get("output_tokens", 0),
+                    "cache_read": 0,
+                    "cache_creation": 0,
+                },
+                gw.setups[payload["model"]]["model"],
             )
+            obs.GATEWAY_COST.record(cost, labels)
+            if (
+                payload["fallback_chain"]
+                and gw.fallback_budget is not None
+                and _paid(gw, payload["model"])
+            ):
+                gw.fallback_budget.charge(cost)
+                obs.GATEWAY_FALLBACK_SPEND.add(cost, {"backend": payload["backend"]})
         elif payload["type"] == "disconnect":
             obs.GATEWAY_REQUESTS.add(
                 1,
@@ -443,12 +479,14 @@ def create_app(
     registry: Mapping[TaskClass, ClassRoute] | None = None,
     stream_factory: StreamFactory | None = None,
     probe_interval_s: float | None = None,
+    fallback_budget: FallForwardBudget | None = None,
 ) -> FastAPI:
     setups = yaml.safe_load(models_path.read_text()) or {}
     gw = Gateway(
         setups=setups,
         client_factory=client_factory,
         registry=DEFAULT_REGISTRY if registry is None else registry,
+        fallback_budget=fallback_budget,
     )
     factory = _default_stream_factory(gw) if stream_factory is None else stream_factory
     # a custom factory declares no unstreamable providers: the eager
@@ -574,6 +612,10 @@ def create_app(
             latency_s=latency,
             usage=usage,
         )
+        if chain and gw.fallback_budget is not None and _paid(gw, alias):
+            fallforward_cost = _cost_of(gw, alias, usage)
+            gw.fallback_budget.charge(fallforward_cost)
+            obs.GATEWAY_FALLBACK_SPEND.add(fallforward_cost, {"backend": out.backend})
         if req.cache_responses and gw.setups[alias].get("temperature") == 0:
             served_key = (
                 key

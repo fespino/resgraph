@@ -47,7 +47,7 @@
 | src/resgraph/gateway/dispatch.py             |       50 |        0 |    100% |           |
 | src/resgraph/gateway/relay.py                |       74 |        0 |    100% |           |
 | src/resgraph/gateway/router.py               |       24 |        0 |    100% |           |
-| src/resgraph/gateway/server.py               |      269 |        0 |    100% |           |
+| src/resgraph/gateway/server.py               |      290 |        0 |    100% |           |
 | src/resgraph/gen/\_\_init\_\_.py             |        0 |        0 |    100% |           |
 | src/resgraph/gen/churn.py                    |       65 |        4 |     94% |47-49, 108 |
 | src/resgraph/gen/cli.py                      |       75 |       13 |     83% |89-94, 105-110, 149-150 |
@@ -80,7 +80,7 @@
 | src/resgraph/tools/context.py                |        9 |        0 |    100% |           |
 | src/resgraph/tools/http.py                   |       21 |        0 |    100% |           |
 | src/resgraph/tools/registry.py               |       24 |        0 |    100% |           |
-| **TOTAL**                                    | **4566** |  **142** | **97%** |           |
+| **TOTAL**                                    | **4587** |  **142** | **97%** |           |
 
 
 ## Setup coverage badge

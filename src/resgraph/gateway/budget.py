@@ -3,7 +3,7 @@
 The walk buys availability with money in one direction only (local-down
 makes every free call a paid one), so fallback-served paid traffic gets
 a per-UTC-day cap: warn once at 90%, then paid candidates leave the
-walk and the refusal is honest and distinct. Routed paid traffic, pins,
+walk and the refusal is explicit and distinct. Routed paid traffic, pins,
 and unpriced backends are out of scope by construction."""
 
 import logging

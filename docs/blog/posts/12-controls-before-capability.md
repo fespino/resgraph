@@ -209,6 +209,16 @@ ships its own fresh run. The only override is a baseline-refresh
 label that downgrades a block to a report — it signals the gate, it
 does not bypass review, and fabrications are never overridable.
 
+Two CI details carry more design weight than their size suggests. The
+breach comment is a review artifact — the headline with its delta,
+every slice marked OK or BREACH, the failing items with the dimension
+that failed them — so a regression is read in the pull request rather
+than found later on a dashboard. And the gate is deliberately *not* a
+required branch-protection check: a path-filtered workflow never
+reports on unrelated PRs, and a required-but-absent status context
+would block them forever. Enforcement is the workflow's own failing
+step.
+
 ## The reviews were part of the build
 
 Three times in one phase, adversarial review of just-merged work

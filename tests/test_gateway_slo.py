@@ -55,6 +55,8 @@ def test_depth_reader_registration_survives_a_broken_reader():
 
 
 def test_the_server_records_outcomes_costs_and_cache_hits(tmp_path, monkeypatch):
+    """Served requests emit outcome, cost, and cache-hit metrics with the
+    routing labels a cost question needs (backend/source/task_class)."""
     from types import SimpleNamespace
     from typing import Any
 

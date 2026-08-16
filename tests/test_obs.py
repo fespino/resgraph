@@ -7,6 +7,11 @@ boundary must exist verbatim in the exported histogram.
 """
 
 import json
+import socket
+import subprocess
+import sys
+import time
+import urllib.request
 from datetime import UTC, datetime
 
 from fastapi.testclient import TestClient
@@ -136,3 +141,29 @@ def test_metrics_endpoint_binds_loopback():
     finally:
         httpd.shutdown()
         thread.join()
+
+
+def test_init_metrics_serves_on_loopback():
+    """The wiring, in a fresh interpreter: init_metrics' idempotence makes
+    the serving branch unreachable in-suite once a provider is installed."""
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        port = s.getsockname()[1]
+    code = (
+        f"from resgraph.obs import init_metrics; import time; "
+        f"init_metrics(port={port}); time.sleep(30)"
+    )
+    proc = subprocess.Popen([sys.executable, "-c", code])
+    try:
+        deadline = time.monotonic() + 15
+        while True:
+            try:
+                with urllib.request.urlopen(f"http://127.0.0.1:{port}/metrics", timeout=0.3) as r:
+                    assert r.status == 200
+                    break
+            except OSError:
+                assert time.monotonic() < deadline, "metrics endpoint never came up on loopback"
+                time.sleep(0.1)
+    finally:
+        proc.kill()
+        proc.wait()

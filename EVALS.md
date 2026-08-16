@@ -1,3 +1,4 @@
+<!-- context-core -->
 # EVALS — the analyst's iteration log
 
 The quality bar lives in `docs/discovery/incident-triage.md`, written
@@ -133,6 +134,7 @@ the fabrication halt clears and the big buckets are fixed — pass^k on
 a moving harness would measure noise).
 
 
+<!-- /context-core -->
 ## History — where the closed record lives
 
 Everything below this file's working set moved verbatim to
@@ -147,6 +149,7 @@ outcomes. Protocol rules, the paid-run ledger, the environment pin,
 and open registrations stay here — the working set is what a model
 may be fed; the history is what an audit replays.
 
+<!-- context-core -->
 ### Pre-registered refresh — the deferral schema change re-certifies the baseline (#153; registered 2026-08-11, run pending)
 
 The report schema gained `deferral` (D29a addendum — the third honest
@@ -211,3 +214,4 @@ withdrawn, since pilot 3 proved the tools out-argue it, and it
 returns rewritten against real coverage fields when they exist.
 - **Flip re-trial** applies per the protocol rule above.
 
+<!-- /context-core -->

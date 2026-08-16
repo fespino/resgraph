@@ -26,7 +26,7 @@
 | src/resgraph/consumer.py                     |      155 |        7 |     95% |84, 99, 111, 114, 130, 132-133 |
 | src/resgraph/evals/\_\_init\_\_.py           |        0 |        0 |    100% |           |
 | src/resgraph/evals/arms.py                   |       42 |        0 |    100% |           |
-| src/resgraph/evals/breaker.py                |       38 |        0 |    100% |           |
+| src/resgraph/evals/breaker.py                |       47 |        0 |    100% |           |
 | src/resgraph/evals/cli.py                    |      130 |        1 |     99% |       126 |
 | src/resgraph/evals/faults.py                 |       23 |        0 |    100% |           |
 | src/resgraph/evals/gate.py                   |      167 |        4 |     98% |152, 203, 215, 233 |
@@ -42,12 +42,13 @@
 | src/resgraph/evals/verify.py                 |       37 |        0 |    100% |           |
 | src/resgraph/gateway/\_\_init\_\_.py         |        0 |        0 |    100% |           |
 | src/resgraph/gateway/accounting.py           |       35 |        0 |    100% |           |
+| src/resgraph/gateway/budget.py               |       16 |        0 |    100% |           |
 | src/resgraph/gateway/cache.py                |       39 |        0 |    100% |           |
-| src/resgraph/gateway/cli.py                  |        8 |        0 |    100% |           |
+| src/resgraph/gateway/cli.py                  |        9 |        0 |    100% |           |
 | src/resgraph/gateway/dispatch.py             |       50 |        0 |    100% |           |
 | src/resgraph/gateway/relay.py                |       74 |        0 |    100% |           |
 | src/resgraph/gateway/router.py               |       24 |        0 |    100% |           |
-| src/resgraph/gateway/server.py               |      290 |        0 |    100% |           |
+| src/resgraph/gateway/server.py               |      311 |        0 |    100% |           |
 | src/resgraph/gen/\_\_init\_\_.py             |        0 |        0 |    100% |           |
 | src/resgraph/gen/churn.py                    |       65 |        4 |     94% |47-49, 108 |
 | src/resgraph/gen/cli.py                      |       75 |       13 |     83% |89-94, 105-110, 149-150 |
@@ -64,7 +65,7 @@
 | src/resgraph/mcp/\_\_init\_\_.py             |        0 |        0 |    100% |           |
 | src/resgraph/mcp/server.py                   |       68 |        2 |     97% |  152, 156 |
 | src/resgraph/mcp/skills.py                   |       38 |        0 |    100% |           |
-| src/resgraph/obs.py                          |      130 |        2 |     98% |   247-249 |
+| src/resgraph/obs.py                          |      132 |        2 |     98% |   250-252 |
 | src/resgraph/query/\_\_init\_\_.py           |        0 |        0 |    100% |           |
 | src/resgraph/query/dsl.py                    |       42 |        0 |    100% |           |
 | src/resgraph/query/executor.py               |       91 |        7 |     92% |70, 73-77, 111, 152 |
@@ -80,7 +81,7 @@
 | src/resgraph/tools/context.py                |        9 |        0 |    100% |           |
 | src/resgraph/tools/http.py                   |       21 |        0 |    100% |           |
 | src/resgraph/tools/registry.py               |       24 |        0 |    100% |           |
-| **TOTAL**                                    | **4587** |  **142** | **97%** |           |
+| **TOTAL**                                    | **4636** |  **142** | **97%** |           |
 
 
 ## Setup coverage badge

@@ -10,7 +10,7 @@
 | src/resgraph/analyst/audit.py                |       94 |        1 |     99% |       259 |
 | src/resgraph/analyst/cli.py                  |      203 |        1 |     99% |       356 |
 | src/resgraph/analyst/executor.py             |      111 |        1 |     99% |       210 |
-| src/resgraph/analyst/harness.py              |      190 |        5 |     97% |57, 61, 163-164, 277 |
+| src/resgraph/analyst/harness.py              |      190 |        2 |     99% |    57, 61 |
 | src/resgraph/analyst/models.py               |       16 |        0 |    100% |           |
 | src/resgraph/analyst/prompts.py              |       35 |        0 |    100% |           |
 | src/resgraph/analyst/remediation.py          |      103 |        1 |     99% |       136 |
@@ -30,14 +30,14 @@
 | src/resgraph/evals/cli.py                    |      130 |        1 |     99% |       126 |
 | src/resgraph/evals/faults.py                 |       23 |        0 |    100% |           |
 | src/resgraph/evals/gate.py                   |      167 |        4 |     98% |152, 203, 215, 233 |
-| src/resgraph/evals/graders.py                |       67 |        2 |     97% |   76, 139 |
+| src/resgraph/evals/graders.py                |       67 |        0 |    100% |           |
 | src/resgraph/evals/injection.py              |        6 |        0 |    100% |           |
 | src/resgraph/evals/judge.py                  |       16 |        0 |    100% |           |
 | src/resgraph/evals/pricing.py                |        6 |        0 |    100% |           |
 | src/resgraph/evals/providers.py              |      195 |        7 |     96% |94, 190-192, 198-200 |
 | src/resgraph/evals/report.py                 |       74 |        1 |     99% |       156 |
-| src/resgraph/evals/runner.py                 |      229 |       37 |     84% |159-164, 173-179, 186-194, 196-199, 206, 212, 230-231, 243-244, 313, 347, 380, 397, 404, 504-505 |
-| src/resgraph/evals/sanitize.py               |       45 |        2 |     96% |   38, 150 |
+| src/resgraph/evals/runner.py                 |      229 |       29 |     87% |159-164, 173-179, 188-192, 206, 212, 230-231, 243-244, 313, 347, 380, 397, 404, 504-505 |
+| src/resgraph/evals/sanitize.py               |       45 |        1 |     98% |        38 |
 | src/resgraph/evals/skillvalue.py             |       54 |        0 |    100% |           |
 | src/resgraph/evals/verify.py                 |       37 |        0 |    100% |           |
 | src/resgraph/gateway/\_\_init\_\_.py         |        0 |        0 |    100% |           |
@@ -70,7 +70,7 @@
 | src/resgraph/query/dsl.py                    |       42 |        0 |    100% |           |
 | src/resgraph/query/executor.py               |       91 |        7 |     92% |70, 73-77, 111, 152 |
 | src/resgraph/query/planner.py                |       83 |        0 |    100% |           |
-| src/resgraph/reconcile.py                    |       52 |        2 |     96% |    55, 93 |
+| src/resgraph/reconcile.py                    |       52 |        1 |     98% |        55 |
 | src/resgraph/schema.py                       |       50 |        0 |    100% |           |
 | src/resgraph/tools/\_\_init\_\_.py           |        0 |        0 |    100% |           |
 | src/resgraph/tools/budgets.py                |       23 |        0 |    100% |           |
@@ -81,7 +81,7 @@
 | src/resgraph/tools/context.py                |        9 |        0 |    100% |           |
 | src/resgraph/tools/http.py                   |       21 |        0 |    100% |           |
 | src/resgraph/tools/registry.py               |       24 |        0 |    100% |           |
-| **TOTAL**                                    | **4654** |  **142** | **97%** |           |
+| **TOTAL**                                    | **4654** |  **127** | **97%** |           |
 
 
 ## Setup coverage badge

@@ -1907,6 +1907,25 @@ slowest, no cost saving); and a scalar pass^k decision rule (it would
 have picked the dominated arm — the decision surface is slices × cost ×
 latency × fabrications, not one number).
 
+**Amended (#245, #247) — local serving facts are declared, recorded,
+asserted.** Two per-model facts previously left to server defaults join
+the worker provenance. The **weights digest**: resolved from the serving
+Ollama at run start and embedded per row — a tag is a name, not an
+identity, so rows recording only the tag cannot prove two runs executed
+the same weights; a setup MAY declare `weights_digest` and a mismatch
+with the server refuses the run (declaration optional so a fresh host
+bootstraps; an undeclared run still records what it ran). The **context
+window**: declared per local setup (`context_window`), exported to the
+server as its default (`OLLAMA_CONTEXT_LENGTH` in compose — the one
+knob the OpenAI-compatible endpoint cannot set per call), embedded per
+row, and asserted per call — a response whose reported prompt tokens
+reach the declared window refuses loudly, because the server clips
+silently and an input that did not fit proves nothing about the model
+that "answered" it (the fault-fired rule applied to prompts).
+**Rejected:** pinning the pull by digest as the only path (bootstrap
+needs the tag); a bigger undeclared default (the fix is declaring the
+knob, not picking a luckier default).
+
 ## D30 — Gateway shape: two backends, task-class routing, recorded source (phase 10)
 
 `resgraph-gateway` (FastAPI, one process) fronts two backends — `local` (Ollama) and `anthropic` (API, the second "region") — behind an OpenAI-compatible-ish `/v1/generate` taking `{messages, stream, task_class?, model?, pin?}`. It reuses D29c's client factory + tool-surface adapter and adds only the serving plumbing D29c excluded. This is the [Building Effective Agents](https://www.anthropic.com/research/building-effective-agents) **Routing** pattern applied to model selection, not prompt selection. Charter: [#162](https://github.com/fespino/resgraph/issues/162).

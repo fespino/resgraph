@@ -67,6 +67,9 @@ services:
     #   docker compose --profile local up -d
     profiles: ["local"]
     image: ollama/ollama:0.12.6@sha256:a61a8fd395dbb931cc8cb1b5da7a2510746575c87113fdc45b647ee59ef7f808
+    # matches the context_window the qwen-local-* setups declare; the
+    # server default is the knob Ollama's OpenAI endpoint cannot set per-call
+    environment: {OLLAMA_CONTEXT_LENGTH: "8192"}
     ports: ["127.0.0.1:11434:11434"]
     volumes: [ollama-models:/root/.ollama]
     healthcheck:

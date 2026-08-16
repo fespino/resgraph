@@ -192,6 +192,45 @@ def _httpx_transport(url: str, payload: dict[str, Any], headers: dict[str, str])
     return resp.json()
 
 
+def _get_json(url: str) -> dict[str, Any]:
+    resp = httpx.get(url, timeout=10.0)
+    resp.raise_for_status()
+    return resp.json()
+
+
+def pin_ollama_weights(
+    setup: dict[str, Any], *, get_json: Callable[[str], dict[str, Any]] | None = None
+) -> None:
+    """Resolve the served model's weights digest and embed it in the setup
+    (and so in every row's provenance). A tag is a name, not an identity:
+    upstream can republish it, and rows recording only the tag cannot
+    prove two runs executed the same weights. A declared digest that
+    mismatches the server refuses the run."""
+    if setup.get("provider") != "ollama":
+        return
+    get_json = get_json or _get_json
+    name, model = setup.get("name"), setup["model"]
+    root = setup["base_url"].rstrip("/").removesuffix("/v1")
+    try:
+        data = get_json(f"{root}/api/tags")
+    except Exception as e:
+        raise SystemExit(
+            f"setup {name!r}: cannot resolve weights digest ({root}/api/tags: {e})"
+        ) from e
+    digests = {m.get("name"): m.get("digest") for m in data.get("models", [])}
+    digest = digests.get(model)
+    if not digest:
+        have = ", ".join(sorted(k for k in digests if k)) or "none"
+        raise SystemExit(f"setup {name!r}: model {model!r} not on the server (have: {have})")
+    declared = setup.get("weights_digest")
+    if declared and declared != digest:
+        raise SystemExit(
+            f"setup {name!r}: declared weights_digest {declared} != served {digest}; "
+            "the server is not running the weights this setup names"
+        )
+    setup["weights_digest"] = digest
+
+
 def _httpx_line_transport(
     url: str, payload: dict[str, Any], headers: dict[str, str]
 ) -> Iterator[str]:
@@ -218,6 +257,7 @@ class _Messages:
         extra_args: dict[str, Any],
         transport: Transport,
         line_transport: LineTransport,
+        context_window: int | None = None,
     ) -> None:
         self._url = url
         self._api_key = api_key
@@ -227,6 +267,7 @@ class _Messages:
         self._extra_args = extra_args
         self._transport = transport
         self._line_transport = line_transport
+        self._context_window = context_window
 
     def _payload(
         self,
@@ -272,7 +313,14 @@ class _Messages:
         payload = self._payload(
             model=model, max_tokens=max_tokens, messages=messages, system=system, tools=tools
         )
-        return from_chat_response(self._transport(self._url, payload, self._headers()))
+        resp = from_chat_response(self._transport(self._url, payload, self._headers()))
+        window = self._context_window
+        if window and resp.usage.input_tokens >= window:
+            raise RuntimeError(
+                f"prompt ({resp.usage.input_tokens} tokens) filled the declared "
+                f"context window ({window}); the server may have truncated silently"
+            )
+        return resp
 
     def stream_lines(
         self,
@@ -309,6 +357,7 @@ class ChatCompletionsClient:
         extra_args: dict[str, Any] | None = None,
         transport: Transport | None = None,
         line_transport: LineTransport | None = None,
+        context_window: int | None = None,
     ) -> None:
         self.messages = _Messages(
             url=base_url.rstrip("/") + "/chat/completions",
@@ -319,6 +368,7 @@ class ChatCompletionsClient:
             extra_args=extra_args or {},
             transport=transport or _httpx_transport,
             line_transport=line_transport or _httpx_line_transport,
+            context_window=context_window,
         )
 
 
@@ -456,6 +506,7 @@ def _build_chat_completions(setup: dict[str, Any]) -> Any:
         seed=setup.get("seed"),
         tool_choice=setup.get("tool_choice", "auto"),
         extra_args=setup.get("extra_args"),
+        context_window=setup.get("context_window"),
     )
 
 

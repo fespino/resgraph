@@ -146,3 +146,30 @@ def test_the_ledger_resets_on_day_roll(tmp_path):
     budget = FallForwardBudget(cap_usd=2.0, ledger=ledger)
     assert budget.spent_today() == 0.0
     assert budget.allows()
+
+
+def test_a_streamed_fall_forward_charges_the_budget(tmp_path):
+    """The stream path charges too, so the anthropic adapter inherits the
+    budget instead of reopening the hole."""
+
+    def factory(alias: str, kwargs: Any):
+        if alias != "haiku":
+            raise ConnectionError("backend unreachable")
+        return iter(
+            [("content", "ok"), ("usage", {"input_tokens": 1_000_000, "output_tokens": 0})]
+        )
+
+    path = tmp_path / "models.yaml"
+    path.write_text(yaml.safe_dump(SETUPS))
+    budget = FallForwardBudget(cap_usd=2.0, ledger=tmp_path / "spend.json")
+    app = create_app(
+        models_path=path,
+        client_factory=lambda setup: None,
+        registry=REGISTRY,
+        stream_factory=factory,
+        fallback_budget=budget,
+    )
+    r = _gen(TestClient(app), task_class="workhorse", stream=True)
+    assert r.status_code == 200
+    assert '"backend": "anthropic"' in r.text
+    assert budget.spent_today() == pytest.approx(1.0)

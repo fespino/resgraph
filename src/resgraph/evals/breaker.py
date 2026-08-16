@@ -70,10 +70,6 @@ class JudgeSpendBreaker:
         self._input_rate, self._output_rate = prices_per_mtok[model]
         self._ledger = DailyLedger(ledger)
 
-    @property
-    def ledger(self) -> Path:
-        return self._ledger.path
-
     def spent_today(self) -> float:
         return self._ledger.spent_today()
 

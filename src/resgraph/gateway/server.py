@@ -56,6 +56,7 @@ PROVIDER_LIMITS: Mapping[str, tuple[int, int]] = {"anthropic": (8, 16)}
 DEFAULT_LIMITS = (1, 4)
 PROBE_SLOW_S = 5.0
 PROBE_PROMPT = [{"role": "user", "content": "Reply with the single word: pong"}]
+DEFAULT_PROBE_INTERVAL_S = 60.0
 UNSTREAMABLE_PROVIDERS = frozenset({"anthropic"})
 
 
@@ -100,6 +101,7 @@ class Gateway:
     backends: dict[str, Backend] = field(default_factory=dict)
     cache: ResponseCache = field(default_factory=ResponseCache)
     fallback_budget: FallForwardBudget | None = None
+    last_probe: dict[str, float] = field(default_factory=dict)
 
     def client(self, alias: str) -> Any:
         if alias not in self.clients:
@@ -379,26 +381,51 @@ def probe(gw: Gateway, alias: str) -> ProbeResult:
     return "slow" if time.monotonic() - started > PROBE_SLOW_S else "ok"
 
 
-def run_probe_round(gw: Gateway) -> dict[str, ProbeResult]:
-    """One probe pass over every backend, feeding the health machine.
-    State transitions are logged — recovery is gradual by the health rules,
-    so the readmission path is visible in the log, not inferred."""
+def _probe_cadence(gw: Gateway, alias: str) -> float:
+    return float(gw.setups[alias].get("probe_interval_s", DEFAULT_PROBE_INTERVAL_S))
+
+
+def _probeable(gw: Gateway) -> dict[str, str]:
+    """Routed providers that may be synthetically probed: the unpriced
+    ones. Uptime must not spend — a priced backend's health is passive,
+    its failures surface per-request through the walk."""
+    return {p: a for p, a in gw.routed().items() if not _paid(gw, a)}
+
+
+def probe_tick(gw: Gateway) -> float | None:
+    """The scheduler's wake granularity: the fastest configured cadence,
+    None when nothing is probeable."""
+    cadences = [_probe_cadence(gw, alias) for alias in _probeable(gw).values()]
+    return min(cadences) if cadences else None
+
+
+def run_probe_round(gw: Gateway, now: float | None = None) -> dict[str, ProbeResult]:
+    """One pass over the probeable backends that are due, feeding the
+    health machine. State transitions are logged — recovery is gradual by
+    the health rules, so the readmission path is visible in the log, not
+    inferred. The clock is injectable; per-provider due-ness lives here so
+    the loop shell stays logic-free."""
+    now = time.monotonic() if now is None else now
     results: dict[str, ProbeResult] = {}
-    for provider, alias in sorted(gw.routed().items()):
+    for provider, alias in sorted(_probeable(gw).items()):
+        last = gw.last_probe.get(provider)
+        if last is not None and now - last < _probe_cadence(gw, alias):
+            continue
+        gw.last_probe[provider] = now
         result = probe(gw, alias)
         backend = gw.backend(alias)
         was = backend.health.state
-        now = backend.health.observe(result)
+        state = backend.health.observe(result)
         results[provider] = result
-        if now != was:
+        if state != was:
             log.warning(
-                "[gateway:health] backend=%s state=%s was=%s probe=%s", provider, now, was, result
+                "[gateway:health] backend=%s state=%s was=%s probe=%s", provider, state, was, result
             )
     return results
 
 
-def _probe_loop(gw: Gateway, interval_s: float, stop: threading.Event) -> None:
-    while not stop.wait(interval_s):
+def _probe_loop(gw: Gateway, tick_s: float, stop: threading.Event) -> None:
+    while not stop.wait(tick_s):
         run_probe_round(gw)
 
 
@@ -478,7 +505,7 @@ def create_app(
     client_factory: Callable[[dict[str, Any]], Any] = build_client,
     registry: Mapping[TaskClass, ClassRoute] | None = None,
     stream_factory: StreamFactory | None = None,
-    probe_interval_s: float | None = None,
+    probes: bool = False,
     fallback_budget: FallForwardBudget | None = None,
 ) -> FastAPI:
     setups = yaml.safe_load(models_path.read_text()) or {}
@@ -492,16 +519,14 @@ def create_app(
     # a custom factory declares no unstreamable providers: the eager
     # refusal must not inherit the default factory's anthropic limit
     unstreamable = UNSTREAMABLE_PROVIDERS if stream_factory is None else frozenset()
-    stream_retry_after_s = max(1, int(probe_interval_s or 15.0))
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         stop = threading.Event()
         worker: threading.Thread | None = None
-        if probe_interval_s is not None:
-            worker = threading.Thread(
-                target=_probe_loop, args=(gw, probe_interval_s, stop), daemon=True
-            )
+        tick = probe_tick(gw)
+        if probes and tick is not None:
+            worker = threading.Thread(target=_probe_loop, args=(gw, tick, stop), daemon=True)
             worker.start()
         try:
             yield
@@ -545,7 +570,9 @@ def create_app(
                         503,
                         detail=f"backend {routed_backend.name!r} is down and no streamable "
                         "fallback is up; retry after the next probe round",
-                        headers={"Retry-After": str(stream_retry_after_s)},
+                        headers={
+                            "Retry-After": str(max(1, int(_probe_cadence(gw, decision.model))))
+                        },
                     )
             (backend, events), alias, chain = _serve_with_walk(
                 gw, decision, lambda a: _open_stream(gw, a, req, factory), req.task_class or "none"

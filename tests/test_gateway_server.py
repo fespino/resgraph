@@ -403,24 +403,47 @@ def test_both_request_shapes_feed_the_same_ttft_series(tmp_path, monkeypatch):
     assert ewma.value is not None
 
 
-def test_a_probe_round_feeds_every_backend_and_logs_transitions(harness, caplog):
+def test_a_probe_round_probes_only_unpriced_backends(harness, caplog):
     import logging as _logging
 
     from resgraph.gateway.server import run_probe_round
 
-    client, behaviors, _ = harness
+    client, behaviors, calls = harness
     gw = client.app.state.gateway
     with caplog.at_level(_logging.WARNING, logger="resgraph.gateway"):
-        results = run_probe_round(gw)
-    assert results == {"anthropic": "ok", "ollama": "ok"}
+        results = run_probe_round(gw, now=0.0)
+    assert results == {"ollama": "ok"}
+    assert "haiku" not in [name for name, _ in calls]
     assert not caplog.records
 
-    behaviors["haiku"] = "boom"
+    behaviors["qwen-local-1.5b"] = "boom"
     with caplog.at_level(_logging.WARNING, logger="resgraph.gateway"):
-        results = run_probe_round(gw)
-    assert results["anthropic"] == "fail"
-    assert gw.backend("haiku").health.state == "down"
+        results = run_probe_round(gw, now=60.0)
+    assert results["ollama"] == "fail"
+    assert gw.backend("qwen-local-1.5b").health.state == "down"
     assert any("[gateway:health]" in r.message for r in caplog.records)
+
+
+def test_probe_rounds_respect_the_per_setup_cadence(harness):
+    from resgraph.gateway.server import probe_tick, run_probe_round
+
+    client, _, calls = harness
+    gw = client.app.state.gateway
+    gw.setups["qwen-local-1.5b"]["probe_interval_s"] = 30
+    assert probe_tick(gw) == 30
+    assert run_probe_round(gw, now=0.0) == {"ollama": "ok"}
+    assert run_probe_round(gw, now=10.0) == {}
+    assert run_probe_round(gw, now=30.0) == {"ollama": "ok"}
+    assert len(calls) == 2
+
+
+def test_probe_tick_is_none_when_nothing_is_probeable(tmp_path):
+    from resgraph.gateway.server import probe_tick
+
+    path = tmp_path / "models.yaml"
+    path.write_text(yaml.safe_dump({"haiku": SETUPS["haiku"]}))
+    app = create_app(models_path=path, client_factory=lambda setup: None)
+    assert probe_tick(app.state.gateway) is None
 
 
 def test_probe_rounds_readmit_gradually(harness):
@@ -428,27 +451,29 @@ def test_probe_rounds_readmit_gradually(harness):
 
     client, behaviors, _ = harness
     gw = client.app.state.gateway
-    behaviors["haiku"] = "boom"
-    run_probe_round(gw)
-    assert gw.backend("haiku").health.state == "down"
-    del behaviors["haiku"]
-    run_probe_round(gw)
-    run_probe_round(gw)
-    assert gw.backend("haiku").health.state == "down"
-    run_probe_round(gw)
-    assert gw.backend("haiku").health.state == "healthy"
+    behaviors["qwen-local-1.5b"] = "boom"
+    run_probe_round(gw, now=0.0)
+    assert gw.backend("qwen-local-1.5b").health.state == "down"
+    del behaviors["qwen-local-1.5b"]
+    run_probe_round(gw, now=60.0)
+    run_probe_round(gw, now=120.0)
+    assert gw.backend("qwen-local-1.5b").health.state == "down"
+    run_probe_round(gw, now=180.0)
+    assert gw.backend("qwen-local-1.5b").health.state == "healthy"
 
 
 def test_the_lifespan_probe_thread_runs_and_stops(tmp_path):
     import time as _time
 
     path = tmp_path / "models.yaml"
-    path.write_text(yaml.safe_dump(SETUPS))
-    behaviors = {"haiku": "boom", "qwen-local-1.5b": "boom"}
+    setups = {k: dict(v) for k, v in SETUPS.items()}
+    setups["qwen-local-1.5b"]["probe_interval_s"] = 0.01
+    path.write_text(yaml.safe_dump(setups))
+    behaviors = {"qwen-local-1.5b": "boom"}
     app = create_app(
         models_path=path,
         client_factory=lambda setup: FakeClient(setup["name"], behaviors, []),
-        probe_interval_s=0.01,
+        probes=True,
     )
     with TestClient(app) as client:
         gw = client.app.state.gateway
@@ -471,7 +496,7 @@ def test_probe_rounds_never_touch_an_unrouted_catalog_setup(tmp_path):
         models_path=path, client_factory=lambda setup: FakeClient(setup["name"], {}, calls)
     )
     results = run_probe_round(TestClient(app).app.state.gateway)
-    assert sorted(results) == ["anthropic", "ollama"]
+    assert sorted(results) == ["ollama"]
     assert "gpt" not in [name for name, _ in calls]
 
 

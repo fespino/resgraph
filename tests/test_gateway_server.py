@@ -637,3 +637,21 @@ def test_a_non_positive_probe_cadence_is_refused_at_startup(tmp_path):
     path.write_text(yaml.safe_dump(setups))
     with pytest.raises(SystemExit, match="must be > 0"):
         create_app(models_path=path, client_factory=lambda setup: None)
+
+
+def test_ignore_probes_suppresses_a_declared_cadence(tmp_path):
+    import time as _time
+
+    path = tmp_path / "models.yaml"
+    setups = {k: dict(v) for k, v in SETUPS.items()}
+    setups["qwen-local-1.5b"]["probe_interval_s"] = 0.01
+    path.write_text(yaml.safe_dump(setups))
+    calls: list[tuple[str, dict]] = []
+    app = create_app(
+        models_path=path,
+        client_factory=lambda setup: FakeClient(setup["name"], {}, calls),
+        ignore_probes=True,
+    )
+    with TestClient(app):
+        _time.sleep(0.05)
+    assert calls == []

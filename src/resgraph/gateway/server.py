@@ -507,6 +507,7 @@ def create_app(
     registry: Mapping[TaskClass, ClassRoute] | None = None,
     stream_factory: StreamFactory | None = None,
     fallback_budget: FallForwardBudget | None = None,
+    ignore_probes: bool = False,
 ) -> FastAPI:
     setups = yaml.safe_load(models_path.read_text()) or {}
     for name, setup in setups.items():
@@ -530,7 +531,9 @@ def create_app(
         stop = threading.Event()
         worker: threading.Thread | None = None
         tick = probe_tick(gw)
-        if tick is not None:
+        # ignore_probes suppresses, never enables: the catalog stays the
+        # only authority for what is probed and how often
+        if not ignore_probes and tick is not None:
             worker = threading.Thread(target=_probe_loop, args=(gw, tick, stop), daemon=True)
             worker.start()
         try:

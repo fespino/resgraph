@@ -477,7 +477,6 @@ def test_the_lifespan_probe_thread_runs_and_stops(tmp_path):
     app = create_app(
         models_path=path,
         client_factory=lambda setup: FakeClient(setup["name"], behaviors, []),
-        probes=True,
     )
     with TestClient(app) as client:
         gw = client.app.state.gateway

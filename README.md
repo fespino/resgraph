@@ -22,12 +22,15 @@ flowchart LR
   B --> Q2[time travel\nDuckDB]
   Q --> A[analyst agent + MCP]
   Q2 --> A
+  A -->|tokens| GW[serving gateway\nroute, meter, fail honestly]
 ```
 
 ## Status
 
 Part I — the data foundation — is complete (phases 0–6); Part II — the
-AI layer — is underway. Each phase is tagged at its end state:
+AI layer — has landed the MCP surface, the analyst + its eval harness,
+the safe runtime, and the serving gateway (phases 7–10). Each phase is
+tagged at its end state:
 
 | Phase | What landed | Tag |
 |---|---|---|
@@ -40,11 +43,13 @@ AI layer — is underway. Each phase is tagged at its end state:
 | 6 | Observability: wide events, SLOs, the chaos drill (INC-001) | `phase-6-observability` |
 | 7 | MCP server: 5 task-shaped tools from one registry, drift guard, skills-as-prompts | `phase-7-mcp-server` |
 | 8 | Analyst agent + eval harness: planted ground truth, 8 pre-registered iterations, zero fabrications ever | `phase-8-analyst` |
+| 9 | Safe runtime: permission tiers, approval gate + audit at rest, budgets, honest degradation (INC-002/-003) | `phase-9-safe-runtime` |
+| 10 | Serving gateway: task-class routing with recorded source, honest stream failure, two measured cache layers, the failover drill (INC-004) | `phase-10-token-path` |
 
 Each increment lands via issue → PR, citing the SPEC decisions
-(D-numbers) it implements. Next: the safe runtime —
-permission tiers, audit at rest, and the chaos drill for an agent
-that acts.
+(D-numbers) it implements. Next: serving day-2 economics — a
+fall-forward spend budget calibrated by INC-004's measured $/hour, and
+health probes that don't spend (#206, #209).
 
 ## Quickstart: to a live dashboard
 
@@ -137,6 +142,10 @@ README never carries a number that file can't back.
 | Composite blast-radius as-of | 0.250 s p50 / 0.393 s p95 | 10k resources, 1M events; p95 is what the SLO is derived from |
 | Storage, 1M events | 18 MB data / 25 MB total | at batch 8,192; small batches 14× the metadata |
 | Hot-store loss to fully restored | 395 s, zero loss | induced (chaos drill): detected T+172 s by SLO burn, rebuilt in 21 s, reconciled exact — [INC-001](docs/incidents/INC-001-hotstore-loss.md) |
+| Cost per passed triage, daily-driver model | $0.085 (Haiku) | k=3 paired arms; Opus $0.711, Sonnet $0.706 — the harness prices any worker ([EVALS.md](EVALS.md)) |
+| Serving knee, local model | between c=2 and 4 | the knee belongs to the model server, not the gateway; TTFT is bimodal, so p50 alone lies — [docs/capacity.md](docs/capacity.md) |
+| Backend death → paid failover | 47/47 served, $1.08/hour | induced ([INC-004](docs/incidents/INC-004-gateway-failover.md)); warm-prefix price at drill traffic; streamed traffic cannot fall forward yet (#219) |
+| Replayed run through the response cache | 432.6 s → 0.07 s | same real item byte-identical, 13,634 backend tokens unspent; sampled traffic never cached, by design — [BENCHMARKS.md](BENCHMARKS.md) |
 
 ## Where things are
 
@@ -144,6 +153,8 @@ README never carries a number that file can't back.
   rejections and reversal conditions (D-numbers, cited from PRs).
 - [BENCHMARKS.md](BENCHMARKS.md) — methodology + hardware for every
   number above.
+- [EVALS.md](EVALS.md) — the eval protocol and its spend ledger:
+  pre-registrations before any paid run, every run's verdict recorded.
 - [docs/incidents/](docs/incidents/) — incident reports, starting with
   the induced hot-store loss.
 - [docs/security-posture.md](docs/security-posture.md) — the controls,

@@ -175,9 +175,26 @@ def test_cost_ceiling_injects_conclude_now_and_records_reason():
 
 def test_wall_clock_ceiling_trips_at_zero():
     client = FakeClient([response(text(HEDGED_REPORT))])
-    result = run_triage(PROMPT, FakeToolset(), client, model=MODEL, max_wall_s=0.0)
+    events: list[tuple[str, dict]] = []
+    result = run_triage(
+        PROMPT,
+        FakeToolset(),
+        client,
+        model=MODEL,
+        max_wall_s=0.0,
+        on_event=lambda kind, payload: events.append((kind, payload)),
+    )
     assert result.degraded and result.cutoff_reason == "wall_clock"
     assert result.report is not None
+    # the breach is emitted, not only recorded on the result
+    cutoffs = [p for k, p in events if k == "cutoff"]
+    assert cutoffs and cutoffs[0]["reason"] == "wall_clock"
+
+
+def test_a_schema_invalid_report_yields_field_level_errors():
+    report, errors = parse_and_validate('{"suspects": 7}', set())
+    assert report is None
+    assert errors and "suspects" in errors[0]
 
 
 def test_cost_ceiling_requires_its_meter():

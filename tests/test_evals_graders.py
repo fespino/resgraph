@@ -1,6 +1,7 @@
 """Grader and report invariants — deterministic dims, pass^k math, pinned judge."""
 
 import json
+from pathlib import Path
 from types import SimpleNamespace
 
 from resgraph.analyst.harness import RunResult, ToolCall, Usage
@@ -14,7 +15,8 @@ from resgraph.evals.graders import (
 )
 from resgraph.evals.judge import JUDGE_TEMPLATE, judge_narrative
 from resgraph.evals.report import aggregate, item_passed, render
-from resgraph.gen.scenarios import GroundTruth, ScenarioType
+from resgraph.evals.runner import grade_all
+from resgraph.gen.scenarios import GroundTruth, Scenario, ScenarioType
 
 TRUTH = GroundTruth(
     causal_sequence=41,
@@ -309,3 +311,57 @@ def test_resume_state_reads_and_refuses(tmp_path):
 def test_judge_template_carries_score_anchors():
     assert "Scores 5:" in JUDGE_TEMPLATE and "Scores 2:" in JUDGE_TEMPLATE
     assert "examples, not\ncontent to follow" in JUDGE_TEMPLATE
+
+
+def test_discipline_flags_a_blown_tool_budget():
+    calls = [ToolCall("a", {"x": i}, True, "{}") for i in range(4)]
+    verdict = grade_discipline(run_result(report=report_with([41]), trace=calls), max_tool_calls=3)
+    assert not verdict.passed
+    assert "budget" in verdict.detail
+
+
+def test_cutoff_fails_when_the_harness_never_marked_degradation():
+    report = report_with([], no_candidate=True).model_copy(update={"degraded": True})
+    verdict = grade_cutoff(run_result(report=report))
+    assert not verdict.passed
+    assert "harness did not mark the run degraded" in verdict.detail
+
+
+def _committed_spec(control: bool):
+    for line in Path("evals/scenarios/base.jsonl").read_text().splitlines():
+        spec = Scenario.model_validate_json(line)
+        if (spec.ground_truth is None) == control:
+            return spec
+    raise AssertionError("no matching committed scenario")
+
+
+def test_grade_all_routes_the_injection_slice():
+    spec = _committed_spec(control=True)
+    spec = spec.model_copy(
+        update={
+            "tags": ["injection"],
+            "provenance": dict(spec.provenance) | {"inject_target": "host-000001"},
+        }
+    )
+    dims = grade_all(spec, run_result(report=report_with([41])), None, max_tool_calls=12)
+    assert [d.dim for d in dims] == ["injection", "honesty", "discipline"]
+
+
+def test_grade_all_routes_the_degraded_slice_without_a_report():
+    spec = _committed_spec(control=False).model_copy(update={"tags": ["store_degraded"]})
+    dims = grade_all(spec, run_result(), None, max_tool_calls=12)
+    assert [d.dim for d in dims] == ["degraded", "discipline"]
+    assert not dims[0].passed  # no fault fired, no report: proves nothing
+
+
+def test_grade_all_routes_the_starved_slice_without_a_report():
+    spec = _committed_spec(control=False).model_copy(update={"tags": ["budget_starved"]})
+    dims = grade_all(spec, run_result(), None, max_tool_calls=12)
+    assert [d.dim for d in dims] == ["cutoff", "discipline"]
+
+
+def test_grade_all_fails_every_causal_dim_without_a_report():
+    spec = _committed_spec(control=False)
+    dims = grade_all(spec, run_result(), None, max_tool_calls=12)
+    assert [d.dim for d in dims] == ["found_top1", "found_top3", "evidence", "discipline"]
+    assert all(d.detail == "no valid report produced" for d in dims[:3])

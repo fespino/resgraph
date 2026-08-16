@@ -247,10 +247,14 @@ def init_metrics(port: int | None = None) -> None:
     )
     _refresh_instruments()
     if port:
-        from prometheus_client import start_http_server
+        _serve_metrics(port)
 
-        # loopback; the obs-profile Prometheus reaches it via host.docker.internal
-        start_http_server(port, addr="127.0.0.1")
+
+def _serve_metrics(port: int):
+    from prometheus_client import start_http_server
+
+    # loopback; the obs-profile Prometheus reaches it via host.docker.internal
+    return start_http_server(port, addr="127.0.0.1")
 
 
 def _refresh_instruments() -> None:

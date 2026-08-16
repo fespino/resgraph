@@ -506,7 +506,6 @@ def create_app(
     client_factory: Callable[[dict[str, Any]], Any] = build_client,
     registry: Mapping[TaskClass, ClassRoute] | None = None,
     stream_factory: StreamFactory | None = None,
-    probes: bool = False,
     fallback_budget: FallForwardBudget | None = None,
 ) -> FastAPI:
     setups = yaml.safe_load(models_path.read_text()) or {}
@@ -526,7 +525,7 @@ def create_app(
         stop = threading.Event()
         worker: threading.Thread | None = None
         tick = probe_tick(gw)
-        if probes and tick is not None:
+        if tick is not None:
             worker = threading.Thread(target=_probe_loop, args=(gw, tick, stop), daemon=True)
             worker.start()
         try:

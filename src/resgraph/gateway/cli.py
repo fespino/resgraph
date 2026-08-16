@@ -23,7 +23,7 @@ def serve(
     """Run the gateway. Probes start with the server and drive backend
     health; keep-alive is set for streams that hold connections through
     long generations. The fall-forward budget caps the money the failure
-    path may spend per UTC day before refusing honestly."""
+    path may spend per UTC day before refusing with the reason stated."""
     uvicorn.run(
         create_app(
             models_path=Path(models_config),

@@ -357,7 +357,7 @@ def test_a_pinned_stream_never_restarts_after_a_zero_token_death(tmp_path):
     assert opened == ["qwen-local-1.5b"]
 
 
-def test_a_failed_reopen_walks_on_and_exhausts_honestly(tmp_path):
+def test_a_failed_reopen_walks_on_to_exhaustion(tmp_path):
     opened: list[str] = []
 
     def factory(alias: str, kwargs: Any):

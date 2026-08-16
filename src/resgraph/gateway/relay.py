@@ -1,4 +1,4 @@
-"""The streaming relay: backend events in, SSE lines out, honesty preserved.
+"""The streaming relay: backend events in, SSE lines out, no splicing.
 
 The relay consumes a provider-neutral event stream — ("content", text) deltas
 and a ("usage", {...}) tail — and yields wire-ready SSE lines. A failure

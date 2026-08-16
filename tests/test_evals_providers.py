@@ -13,6 +13,7 @@ from resgraph.evals.providers import (
     build_client,
     from_chat_response,
     load_setup,
+    pin_ollama_weights,
     to_chat_messages,
     to_chat_tools,
 )
@@ -424,3 +425,94 @@ def test_gateway_client_wire_encodes_echoed_response_blocks():
         "name": "fetch_resource",
         "input": {"id": "r1"},
     }
+
+
+_TAGS = {"models": [{"name": "qwen2.5:1.5b", "digest": "sha256:aaa111"}]}
+
+
+def _ollama_setup(**extra):
+    return {
+        "name": "qwen-local-1.5b",
+        "provider": "ollama",
+        "model": "qwen2.5:1.5b",
+        "base_url": "http://localhost:11434/v1",
+        **extra,
+    }
+
+
+def test_weights_digest_is_resolved_and_embedded():
+    setup = _ollama_setup()
+    pin_ollama_weights(setup, get_json=lambda url: _TAGS)
+    assert setup["weights_digest"] == "sha256:aaa111"
+
+
+def test_weights_pin_strips_the_v1_suffix_from_the_base_url():
+    seen = []
+    pin_ollama_weights(_ollama_setup(), get_json=lambda url: seen.append(url) or _TAGS)
+    assert seen == ["http://localhost:11434/api/tags"]
+
+
+def test_weights_pin_ignores_non_ollama_setups():
+    setup = {"name": "haiku", "provider": "anthropic", "model": "claude-haiku-4-5"}
+    pin_ollama_weights(setup, get_json=lambda url: (_ for _ in ()).throw(AssertionError))
+    assert "weights_digest" not in setup
+
+
+def test_weights_pin_refuses_a_model_the_server_does_not_hold():
+    with pytest.raises(SystemExit, match="not on the server"):
+        pin_ollama_weights(_ollama_setup(model="qwen2.5:7b"), get_json=lambda url: _TAGS)
+
+
+def test_weights_pin_refuses_a_declared_digest_mismatch():
+    setup = _ollama_setup(weights_digest="sha256:bbb222")
+    with pytest.raises(SystemExit, match="declared weights_digest"):
+        pin_ollama_weights(setup, get_json=lambda url: _TAGS)
+
+
+def test_weights_pin_matching_declared_digest_passes():
+    setup = _ollama_setup(weights_digest="sha256:aaa111")
+    pin_ollama_weights(setup, get_json=lambda url: _TAGS)
+    assert setup["weights_digest"] == "sha256:aaa111"
+
+
+def test_weights_pin_refuses_an_unreachable_server():
+    def down(url):
+        raise OSError("connection refused")
+
+    with pytest.raises(SystemExit, match="cannot resolve weights digest"):
+        pin_ollama_weights(_ollama_setup(), get_json=down)
+
+
+def _chat_response(prompt_tokens):
+    return {
+        "choices": [{"message": {"content": "ok"}, "finish_reason": "stop"}],
+        "usage": {"prompt_tokens": prompt_tokens, "completion_tokens": 1},
+    }
+
+
+def test_a_prompt_filling_the_declared_window_refuses():
+    client = ChatCompletionsClient(
+        base_url="http://x/v1",
+        context_window=8192,
+        transport=lambda url, payload, headers: _chat_response(8192),
+    )
+    with pytest.raises(RuntimeError, match="filled the declared context window"):
+        client.messages.create(model="m", max_tokens=16, messages=[])
+
+
+def test_a_prompt_under_the_declared_window_passes():
+    client = ChatCompletionsClient(
+        base_url="http://x/v1",
+        context_window=8192,
+        transport=lambda url, payload, headers: _chat_response(4400),
+    )
+    resp = client.messages.create(model="m", max_tokens=16, messages=[])
+    assert resp.usage.input_tokens == 4400
+
+
+def test_no_declared_window_means_no_check():
+    client = ChatCompletionsClient(
+        base_url="http://x/v1",
+        transport=lambda url, payload, headers: _chat_response(10**6),
+    )
+    assert client.messages.create(model="m", max_tokens=16, messages=[]).usage.input_tokens == 10**6

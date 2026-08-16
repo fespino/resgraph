@@ -56,7 +56,7 @@ def run(
     model with no listed price is unmetered."""
     from resgraph.graph.client import get_driver
 
-    from .providers import build_client, load_setup
+    from .providers import build_client, load_setup, pin_ollama_weights
     from .runner import load_scenarios, run_eval
 
     cfg = Path(models_config)
@@ -65,6 +65,7 @@ def run(
     )
     # a routed gateway setup carries no model; its rows go unmetered
     worker_model: str = worker_setup.get("model", "gateway-routed")
+    pin_ollama_weights(worker_setup)
     worker_client = build_client(worker_setup)
     provenance: dict[str, Any] = {"worker": worker_setup}
 
@@ -83,6 +84,7 @@ def run(
             load_setup(judge, cfg) if judge else {"provider": "anthropic", "model": judge_model}
         )
         judge_model_resolved = judge_setup.get("model", "gateway-routed")
+        pin_ollama_weights(judge_setup)
         judge_client = build_client(judge_setup)
         provenance["judge"] = judge_setup
 

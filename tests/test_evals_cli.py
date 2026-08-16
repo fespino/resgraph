@@ -78,6 +78,10 @@ def test_run_resolves_worker_and_judge_from_setups(monkeypatch, tmp_path):
     )
     captured = {}
     _stub_run(monkeypatch, tmp_path, captured)
+    monkeypatch.setattr(
+        "resgraph.evals.providers._get_json",
+        lambda url: {"models": [{"name": "qwen2.5:7b", "digest": "sha256:abc"}]},
+    )
     result = runner.invoke(
         app,
         [
@@ -98,6 +102,8 @@ def test_run_resolves_worker_and_judge_from_setups(monkeypatch, tmp_path):
     # the resolved setup objects ride the run, self-contained (like git_ref)
     assert captured["provenance"]["worker"]["provider"] == "ollama"
     assert captured["provenance"]["worker"]["base_url"] == "http://x/v1"
+    # the digest pin rides the same embed (#245)
+    assert captured["provenance"]["worker"]["weights_digest"] == "sha256:abc"
     assert captured["provenance"]["judge"]["provider"] == "anthropic"
 
 

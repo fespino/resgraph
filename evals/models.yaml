@@ -52,6 +52,7 @@ qwen-local-7b:
   temperature: 0
   seed: 7
   quant: Q4_K_M
+  context_window: 8192
   tool_choice: required
 
 qwen-local-3b:
@@ -61,6 +62,7 @@ qwen-local-3b:
   temperature: 0
   seed: 7
   quant: Q4_K_M
+  context_window: 8192
   tool_choice: required
 
 qwen-local-1.5b:
@@ -70,6 +72,7 @@ qwen-local-1.5b:
   temperature: 0
   seed: 7
   quant: Q4_K_M
+  context_window: 8192
   tool_choice: required
   # probing is opt-in per setup; a local server can 200 its health
   # endpoint while generation has collapsed, so this one is probed

@@ -66,6 +66,8 @@ tests:
         values: "0+2x40"
       - series: 'gateway_requests_total{outcome="refused_503"}'
         values: "0+2x40"
+      - series: 'gateway_requests_total{outcome="budget_503"}'
+        values: "0+2x40"
     promql_expr_test:
       - expr: slo:gateway_availability:ratio_5m
         eval_time: 8m

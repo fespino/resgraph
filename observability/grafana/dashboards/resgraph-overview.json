@@ -1,626 +1,654 @@
 {
- "title": "resgraph-overview",
- "uid": "resgraph-overview",
- "schemaVersion": 39,
- "version": 1,
- "refresh": "5s",
- "time": {
-  "from": "now-30m",
-  "to": "now"
- },
- "panels": [
-  {
-   "id": 1,
-   "type": "timeseries",
-   "title": "Ingest throughput (applied/s per worker)",
-   "gridPos": {
-    "h": 8,
-    "w": 12,
-    "x": 0,
-    "y": 0
-   },
-   "datasource": {
-    "type": "prometheus",
-    "uid": "prometheus"
-   },
-   "fieldConfig": {
-    "defaults": {},
-    "overrides": []
-   },
-   "targets": [
-    {
-     "expr": "sum by (worker) (rate(ingest_applied_total[1m]))",
-     "refId": "A",
-     "legendFormat": "{{worker}}"
-    }
-   ]
+  "title": "resgraph-overview",
+  "uid": "resgraph-overview",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "5s",
+  "time": {
+    "from": "now-30m",
+    "to": "now"
   },
-  {
-   "id": 2,
-   "type": "timeseries",
-   "title": "Ingest lag (messages behind) \u2014 SLO threshold 31,500",
-   "gridPos": {
-    "h": 8,
-    "w": 12,
-    "x": 12,
-    "y": 0
-   },
-   "datasource": {
-    "type": "prometheus",
-    "uid": "prometheus"
-   },
-   "fieldConfig": {
-    "defaults": {
-     "thresholds": {
-      "mode": "absolute",
-      "steps": [
-       {
-        "color": "green",
-        "value": null
-       },
-       {
-        "color": "red",
-        "value": 31500
-       }
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Ingest throughput (applied/s per worker)",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum by (worker) (rate(ingest_applied_total[1m]))",
+          "refId": "A",
+          "legendFormat": "{{worker}}"
+        }
       ]
-     },
-     "custom": {
-      "thresholdsStyle": {
-       "mode": "line"
-      }
-     }
-    },
-    "overrides": []
-   },
-   "targets": [
-    {
-     "expr": "max(ingest_lag)",
-     "refId": "A",
-     "legendFormat": "max lag"
-    }
-   ]
-  },
-  {
-   "id": 3,
-   "type": "timeseries",
-   "title": "Batch apply p95 (s)",
-   "gridPos": {
-    "h": 8,
-    "w": 12,
-    "x": 0,
-    "y": 8
-   },
-   "datasource": {
-    "type": "prometheus",
-    "uid": "prometheus"
-   },
-   "fieldConfig": {
-    "defaults": {
-     "unit": "s"
-    },
-    "overrides": []
-   },
-   "targets": [
-    {
-     "expr": "histogram_quantile(0.95, sum by (le, worker) (rate(ingest_batch_apply_seconds_bucket[1m])))",
-     "refId": "A",
-     "legendFormat": "{{worker}}"
-    }
-   ]
-  },
-  {
-   "id": 4,
-   "type": "timeseries",
-   "title": "Stale skips + dead-letters (/s)",
-   "gridPos": {
-    "h": 8,
-    "w": 12,
-    "x": 12,
-    "y": 8
-   },
-   "datasource": {
-    "type": "prometheus",
-    "uid": "prometheus"
-   },
-   "fieldConfig": {
-    "defaults": {},
-    "overrides": []
-   },
-   "targets": [
-    {
-     "expr": "sum(rate(ingest_skipped_total[1m]))",
-     "refId": "A",
-     "legendFormat": "stale skipped"
     },
     {
-     "expr": "sum(rate(ingest_dlq_total[1m]))",
-     "refId": "B",
-     "legendFormat": "dead-lettered"
-    }
-   ]
-  },
-  {
-   "id": 5,
-   "type": "timeseries",
-   "title": "API p95 by source (s)",
-   "gridPos": {
-    "h": 8,
-    "w": 12,
-    "x": 0,
-    "y": 16
-   },
-   "datasource": {
-    "type": "prometheus",
-    "uid": "prometheus"
-   },
-   "fieldConfig": {
-    "defaults": {
-     "unit": "s"
-    },
-    "overrides": []
-   },
-   "targets": [
-    {
-     "expr": "histogram_quantile(0.95, sum by (le, source) (rate(api_request_seconds_bucket[1m])))",
-     "refId": "A",
-     "legendFormat": "{{source}}"
-    }
-   ]
-  },
-  {
-   "id": 6,
-   "type": "timeseries",
-   "title": "SLO ratios (5m) \u2014 freshness >=0.99, composite >=0.95",
-   "gridPos": {
-    "h": 8,
-    "w": 12,
-    "x": 12,
-    "y": 16
-   },
-   "datasource": {
-    "type": "prometheus",
-    "uid": "prometheus"
-   },
-   "fieldConfig": {
-    "defaults": {
-     "unit": "percentunit"
-    },
-    "overrides": []
-   },
-   "targets": [
-    {
-     "expr": "slo:ingest_freshness:ratio_5m",
-     "refId": "A",
-     "legendFormat": "freshness"
-    },
-    {
-     "expr": "slo:composite_latency:ratio_5m",
-     "refId": "B",
-     "legendFormat": "composite"
-    }
-   ]
-  },
-  {
-   "id": 7,
-   "type": "stat",
-   "title": "Freshness budget remaining (run)",
-   "gridPos": {
-    "h": 8,
-    "w": 6,
-    "x": 0,
-    "y": 24
-   },
-   "datasource": {
-    "type": "prometheus",
-    "uid": "prometheus"
-   },
-   "fieldConfig": {
-    "defaults": {
-     "unit": "percentunit",
-     "min": 0,
-     "max": 1,
-     "thresholds": {
-      "mode": "absolute",
-      "steps": [
-       {
-        "color": "red",
-        "value": null
-       },
-       {
-        "color": "yellow",
-        "value": 0.25
-       },
-       {
-        "color": "green",
-        "value": 0.5
-       }
+      "id": 2,
+      "type": "timeseries",
+      "title": "Ingest lag (messages behind) \u2014 SLO threshold 31,500",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 31500
+              }
+            ]
+          },
+          "custom": {
+            "thresholdsStyle": {
+              "mode": "line"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "max(ingest_lag)",
+          "refId": "A",
+          "legendFormat": "max lag"
+        }
       ]
-     }
     },
-    "overrides": []
-   },
-   "targets": [
     {
-     "expr": "clamp_min((avg_over_time(slo:ingest_freshness:good[$__range]) - 0.99) / 0.01, 0)",
-     "refId": "A"
-    }
-   ]
-  },
-  {
-   "id": 8,
-   "type": "stat",
-   "title": "Composite budget remaining (run)",
-   "gridPos": {
-    "h": 8,
-    "w": 6,
-    "x": 6,
-    "y": 24
-   },
-   "datasource": {
-    "type": "prometheus",
-    "uid": "prometheus"
-   },
-   "fieldConfig": {
-    "defaults": {
-     "unit": "percentunit",
-     "min": 0,
-     "max": 1,
-     "thresholds": {
-      "mode": "absolute",
-      "steps": [
-       {
-        "color": "red",
-        "value": null
-       },
-       {
-        "color": "yellow",
-        "value": 0.25
-       },
-       {
-        "color": "green",
-        "value": 0.5
-       }
+      "id": 3,
+      "type": "timeseries",
+      "title": "Batch apply p95 (s)",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, worker) (rate(ingest_batch_apply_seconds_bucket[1m])))",
+          "refId": "A",
+          "legendFormat": "{{worker}}"
+        }
       ]
-     }
     },
-    "overrides": []
-   },
-   "targets": [
     {
-     "expr": "clamp_min((sum(increase(api_request_seconds_bucket{source=\"composite\",le=\"0.6\"}[$__range])) / sum(increase(api_request_seconds_count{source=\"composite\"}[$__range])) - 0.95) / 0.05, 0)",
-     "refId": "A"
+      "id": 4,
+      "type": "timeseries",
+      "title": "Stale skips + dead-letters (/s)",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(ingest_skipped_total[1m]))",
+          "refId": "A",
+          "legendFormat": "stale skipped"
+        },
+        {
+          "expr": "sum(rate(ingest_dlq_total[1m]))",
+          "refId": "B",
+          "legendFormat": "dead-lettered"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "API p95 by source (s)",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 16
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, source) (rate(api_request_seconds_bucket[1m])))",
+          "refId": "A",
+          "legendFormat": "{{source}}"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "SLO ratios (5m) \u2014 freshness >=0.99, composite >=0.95",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 16
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "slo:ingest_freshness:ratio_5m",
+          "refId": "A",
+          "legendFormat": "freshness"
+        },
+        {
+          "expr": "slo:composite_latency:ratio_5m",
+          "refId": "B",
+          "legendFormat": "composite"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "stat",
+      "title": "Freshness budget remaining (run)",
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 0,
+        "y": 24
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.25
+              },
+              {
+                "color": "green",
+                "value": 0.5
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "clamp_min((avg_over_time(slo:ingest_freshness:good[$__range]) - 0.99) / 0.01, 0)",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "stat",
+      "title": "Composite budget remaining (run)",
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 6,
+        "y": 24
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.25
+              },
+              {
+                "color": "green",
+                "value": 0.5
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "clamp_min((sum(increase(api_request_seconds_bucket{source=\"composite\",le=\"0.6\"}[$__range])) / sum(increase(api_request_seconds_count{source=\"composite\"}[$__range])) - 0.95) / 0.05, 0)",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Read rate vs invalid (/s)",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 24
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(ingest_read_total[1m]))",
+          "refId": "A",
+          "legendFormat": "read"
+        },
+        {
+          "expr": "sum(rate(ingest_invalid_total[1m]))",
+          "refId": "B",
+          "legendFormat": "invalid"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Phantoms created (rate + run total)",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 32
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(graph_phantoms_created_total[1m]))",
+          "refId": "A",
+          "legendFormat": "created /s"
+        },
+        {
+          "expr": "sum(graph_phantoms_created_total)",
+          "refId": "B",
+          "legendFormat": "total (run)"
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Analyst SLO ratios (5m) \u2014 latency/cost >=0.95 (agent scraped, #145)",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 40
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "slo:analyst_latency:ratio_5m",
+          "refId": "A",
+          "legendFormat": "latency <=152s"
+        },
+        {
+          "expr": "slo:analyst_cost:ratio_5m",
+          "refId": "B",
+          "legendFormat": "cost <=$0.30"
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "Analyst degraded ratio (5m) \u2014 objective <=0.05 (agent scraped, #145)",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 40
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "slo:analyst_degraded:ratio_5m",
+          "refId": "A",
+          "legendFormat": "degraded"
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "type": "timeseries",
+      "title": "Gateway TTFT p95 (5m) \u2014 objective from capacity.md after the load test",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 48
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "slo:gateway_ttft:p95_5m",
+          "refId": "A",
+          "legendFormat": "{{backend}}"
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "type": "timeseries",
+      "title": "Gateway availability (5m) \u2014 successful or honestly failed",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 48
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "slo:gateway_availability:ratio_5m",
+          "refId": "A",
+          "legendFormat": "availability"
+        }
+      ]
+    },
+    {
+      "id": 15,
+      "type": "timeseries",
+      "title": "Gateway queue depth \u2014 the leading pressure signal",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 56
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "max by (backend) (gateway_queue_depth)",
+          "refId": "A",
+          "legendFormat": "{{backend}}"
+        }
+      ]
+    },
+    {
+      "id": 16,
+      "type": "timeseries",
+      "title": "Gateway cost per task p95 (1h) \u2014 the money SLO",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 56
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "slo:gateway_cost_per_task:p95_1h",
+          "refId": "A",
+          "legendFormat": "{{task_class}}"
+        }
+      ]
+    },
+    {
+      "id": 17,
+      "type": "timeseries",
+      "title": "Gateway cache hit ratio (5m) \u2014 both layers, never conflated",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 64
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "slo:gateway_cache_hit:ratio_5m",
+          "refId": "A",
+          "legendFormat": "{{layer}}"
+        }
+      ]
+    },
+    {
+      "id": 18,
+      "type": "timeseries",
+      "title": "Gateway tokens/sec p50 (5m) \u2014 is generation starving",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 64
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "slo:gateway_tokens_per_second:p50_5m",
+          "refId": "A",
+          "legendFormat": "{{backend}}"
+        }
+      ]
+    },
+    {
+      "id": 19,
+      "type": "timeseries",
+      "title": "Gateway fallback events (5m) \u2014 degradation, silent or loud",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 64
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(gateway_requests_total{outcome=~\"stream_error|rejected_429|refused_503|budget_503|pin_failed_502|exhausted_503\"}[5m]))",
+          "refId": "A",
+          "legendFormat": "honest failures"
+        },
+        {
+          "expr": "sum(rate(gateway_fallback_chain_length_count[5m]))",
+          "refId": "B",
+          "legendFormat": "requests walked"
+        }
+      ]
+    },
+    {
+      "id": 20,
+      "type": "timeseries",
+      "title": "Gateway fall-forward spend ($/h) \u2014 the failure path's money",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 72
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum by (backend) (rate(gateway_fallback_spend_usd_total[5m])) * 3600",
+          "refId": "A",
+          "legendFormat": "{{backend}}"
+        }
+      ]
     }
-   ]
+  ],
+  "templating": {
+    "list": []
   },
-  {
-   "id": 9,
-   "type": "timeseries",
-   "title": "Read rate vs invalid (/s)",
-   "gridPos": {
-    "h": 8,
-    "w": 12,
-    "x": 12,
-    "y": 24
-   },
-   "datasource": {
-    "type": "prometheus",
-    "uid": "prometheus"
-   },
-   "fieldConfig": {
-    "defaults": {},
-    "overrides": []
-   },
-   "targets": [
-    {
-     "expr": "sum(rate(ingest_read_total[1m]))",
-     "refId": "A",
-     "legendFormat": "read"
-    },
-    {
-     "expr": "sum(rate(ingest_invalid_total[1m]))",
-     "refId": "B",
-     "legendFormat": "invalid"
-    }
-   ]
-  },
-  {
-   "id": 10,
-   "type": "timeseries",
-   "title": "Phantoms created (rate + run total)",
-   "gridPos": {
-    "h": 8,
-    "w": 12,
-    "x": 0,
-    "y": 32
-   },
-   "datasource": {
-    "type": "prometheus",
-    "uid": "prometheus"
-   },
-   "fieldConfig": {
-    "defaults": {},
-    "overrides": []
-   },
-   "targets": [
-    {
-     "expr": "sum(rate(graph_phantoms_created_total[1m]))",
-     "refId": "A",
-     "legendFormat": "created /s"
-    },
-    {
-     "expr": "sum(graph_phantoms_created_total)",
-     "refId": "B",
-     "legendFormat": "total (run)"
-    }
-   ]
-  },
-  {
-   "id": 11,
-   "type": "timeseries",
-   "title": "Analyst SLO ratios (5m) \u2014 latency/cost >=0.95 (agent scraped, #145)",
-   "gridPos": {
-    "h": 8,
-    "w": 12,
-    "x": 0,
-    "y": 40
-   },
-   "datasource": {
-    "type": "prometheus",
-    "uid": "prometheus"
-   },
-   "fieldConfig": {
-    "defaults": {
-     "unit": "percentunit"
-    },
-    "overrides": []
-   },
-   "targets": [
-    {
-     "expr": "slo:analyst_latency:ratio_5m",
-     "refId": "A",
-     "legendFormat": "latency <=152s"
-    },
-    {
-     "expr": "slo:analyst_cost:ratio_5m",
-     "refId": "B",
-     "legendFormat": "cost <=$0.30"
-    }
-   ]
-  },
-  {
-   "id": 12,
-   "type": "timeseries",
-   "title": "Analyst degraded ratio (5m) \u2014 objective <=0.05 (agent scraped, #145)",
-   "gridPos": {
-    "h": 8,
-    "w": 12,
-    "x": 12,
-    "y": 40
-   },
-   "datasource": {
-    "type": "prometheus",
-    "uid": "prometheus"
-   },
-   "fieldConfig": {
-    "defaults": {
-     "unit": "percentunit"
-    },
-    "overrides": []
-   },
-   "targets": [
-    {
-     "expr": "slo:analyst_degraded:ratio_5m",
-     "refId": "A",
-     "legendFormat": "degraded"
-    }
-   ]
-  },
-  {
-   "id": 13,
-   "type": "timeseries",
-   "title": "Gateway TTFT p95 (5m) \u2014 objective from capacity.md after the load test",
-   "gridPos": {
-    "h": 8,
-    "w": 12,
-    "x": 0,
-    "y": 48
-   },
-   "datasource": {
-    "type": "prometheus",
-    "uid": "prometheus"
-   },
-   "fieldConfig": {
-    "defaults": {
-     "unit": "s"
-    },
-    "overrides": []
-   },
-   "targets": [
-    {
-     "expr": "slo:gateway_ttft:p95_5m",
-     "refId": "A",
-     "legendFormat": "{{backend}}"
-    }
-   ]
-  },
-  {
-   "id": 14,
-   "type": "timeseries",
-   "title": "Gateway availability (5m) \u2014 successful or honestly failed",
-   "gridPos": {
-    "h": 8,
-    "w": 12,
-    "x": 12,
-    "y": 48
-   },
-   "datasource": {
-    "type": "prometheus",
-    "uid": "prometheus"
-   },
-   "fieldConfig": {
-    "defaults": {
-     "unit": "percentunit"
-    },
-    "overrides": []
-   },
-   "targets": [
-    {
-     "expr": "slo:gateway_availability:ratio_5m",
-     "refId": "A",
-     "legendFormat": "availability"
-    }
-   ]
-  },
-  {
-   "id": 15,
-   "type": "timeseries",
-   "title": "Gateway queue depth \u2014 the leading pressure signal",
-   "gridPos": {
-    "h": 8,
-    "w": 12,
-    "x": 0,
-    "y": 56
-   },
-   "datasource": {
-    "type": "prometheus",
-    "uid": "prometheus"
-   },
-   "fieldConfig": {
-    "defaults": {
-     "unit": "none"
-    },
-    "overrides": []
-   },
-   "targets": [
-    {
-     "expr": "max by (backend) (gateway_queue_depth)",
-     "refId": "A",
-     "legendFormat": "{{backend}}"
-    }
-   ]
-  },
-  {
-   "id": 16,
-   "type": "timeseries",
-   "title": "Gateway cost per task p95 (1h) \u2014 the money SLO",
-   "gridPos": {
-    "h": 8,
-    "w": 12,
-    "x": 12,
-    "y": 56
-   },
-   "datasource": {
-    "type": "prometheus",
-    "uid": "prometheus"
-   },
-   "fieldConfig": {
-    "defaults": {
-     "unit": "currencyUSD"
-    },
-    "overrides": []
-   },
-   "targets": [
-    {
-     "expr": "slo:gateway_cost_per_task:p95_1h",
-     "refId": "A",
-     "legendFormat": "{{task_class}}"
-    }
-   ]
-  },
-  {
-   "id": 17,
-   "type": "timeseries",
-   "title": "Gateway cache hit ratio (5m) \u2014 both layers, never conflated",
-   "gridPos": {
-    "h": 8,
-    "w": 8,
-    "x": 0,
-    "y": 64
-   },
-   "datasource": {
-    "type": "prometheus",
-    "uid": "prometheus"
-   },
-   "fieldConfig": {
-    "defaults": {
-     "unit": "percentunit"
-    },
-    "overrides": []
-   },
-   "targets": [
-    {
-     "expr": "slo:gateway_cache_hit:ratio_5m",
-     "refId": "A",
-     "legendFormat": "{{layer}}"
-    }
-   ]
-  },
-  {
-   "id": 18,
-   "type": "timeseries",
-   "title": "Gateway tokens/sec p50 (5m) \u2014 is generation starving",
-   "gridPos": {
-    "h": 8,
-    "w": 8,
-    "x": 8,
-    "y": 64
-   },
-   "datasource": {
-    "type": "prometheus",
-    "uid": "prometheus"
-   },
-   "fieldConfig": {
-    "defaults": {
-     "unit": "none"
-    },
-    "overrides": []
-   },
-   "targets": [
-    {
-     "expr": "slo:gateway_tokens_per_second:p50_5m",
-     "refId": "A",
-     "legendFormat": "{{backend}}"
-    }
-   ]
-  },
-  {
-   "id": 19,
-   "type": "timeseries",
-   "title": "Gateway fallback events (5m) \u2014 degradation, silent or loud",
-   "gridPos": {
-    "h": 8,
-    "w": 8,
-    "x": 16,
-    "y": 64
-   },
-   "datasource": {
-    "type": "prometheus",
-    "uid": "prometheus"
-   },
-   "fieldConfig": {
-    "defaults": {
-     "unit": "none"
-    },
-    "overrides": []
-   },
-   "targets": [
-    {
-     "expr": "sum(rate(gateway_requests_total{outcome=~\"stream_error|rejected_429|pin_failed_502|exhausted_503\"}[5m]))",
-     "refId": "A",
-     "legendFormat": "honest failures"
-    },
-    {
-     "expr": "sum(rate(gateway_fallback_chain_length_count[5m]))",
-     "refId": "B",
-     "legendFormat": "requests walked"
-    }
-   ]
+  "annotations": {
+    "list": []
   }
- ],
- "templating": {
-  "list": []
- },
- "annotations": {
-  "list": []
- }
 }

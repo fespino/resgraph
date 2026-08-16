@@ -13,7 +13,7 @@ groups:
     rules:
       - record: slo:gateway_availability:ratio_5m
         expr: >
-          sum(rate(gateway_requests_total{outcome=~"ok|cached|stream_ok|stream_error|rejected_429|refused_503|pin_failed_502|exhausted_503|client_disconnected"}[5m]))
+          sum(rate(gateway_requests_total{outcome=~"ok|cached|stream_ok|stream_error|rejected_429|refused_503|budget_503|pin_failed_502|exhausted_503|client_disconnected"}[5m]))
           /
           sum(rate(gateway_requests_total[5m]))
       - record: slo:gateway_ttft:p95_5m

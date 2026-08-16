@@ -76,16 +76,6 @@ def test_the_server_records_outcomes_costs_and_cache_hits(tmp_path, monkeypatch)
 
     from resgraph.gateway import server as gwserver
 
-    for name in (
-        "GATEWAY_TTFT",
-        "GATEWAY_REQUESTS",
-        "GATEWAY_FALLBACK_CHAIN",
-        "GATEWAY_COST",
-        "GATEWAY_CACHE_HITS",
-        "GATEWAY_CACHE_TOKENS_SAVED",
-    ):
-        monkeypatch.setattr(gwserver.obs, name, Rec(name))
-
     path = tmp_path / "models.yaml"
     path.write_text(
         "haiku:\n  provider: anthropic\n  model: claude-haiku-4-5\n"
@@ -109,6 +99,16 @@ def test_the_server_records_outcomes_costs_and_cache_hits(tmp_path, monkeypatch)
             )
 
     client = TestClient(create_app(models_path=path, client_factory=lambda s: Fake()))
+    # patch AFTER create_app: init_metrics rebinds the instrument globals
+    for name in (
+        "GATEWAY_TTFT",
+        "GATEWAY_REQUESTS",
+        "GATEWAY_FALLBACK_CHAIN",
+        "GATEWAY_COST",
+        "GATEWAY_CACHE_HITS",
+        "GATEWAY_CACHE_TOKENS_SAVED",
+    ):
+        monkeypatch.setattr(gwserver.obs, name, Rec(name))
     body = {"messages": [{"role": "user", "content": "hi"}]}
 
     r = client.post("/v1/generate", json={**body, "task_class": "judgment"})
@@ -182,7 +182,15 @@ def test_the_stream_observer_maps_every_terminal_payload(tmp_path, monkeypatch):
             "reconciliation_ok": True,
         }
     )
-    observe({"type": "stream_error", "backend": "ollama", "reason": "died", "tokens_emitted": 4})
+    observe(
+        {
+            "type": "stream_error",
+            "backend": "ollama",
+            "reason": "died",
+            "tokens_emitted": 4,
+            "fallback_chain": ["ollama:qwen-local-1.5b", "anthropic:haiku"],
+        }
+    )
     observe({"type": "disconnect", "backend": "ollama"})
 
     outcomes = [la["outcome"] for n, v, la in recorded if n == "GATEWAY_REQUESTS"]
@@ -196,6 +204,8 @@ def test_the_stream_observer_maps_every_terminal_payload(tmp_path, monkeypatch):
     }
     errors = [(v, la) for n, v, la in recorded if n == "GATEWAY_STREAM_ERRORS"]
     assert errors == [(1, {"tokens_bucket": "nonzero"})]
+    chains = [v for n, v, la in recorded if n == "GATEWAY_FALLBACK_CHAIN"]
+    assert chains == [0, 2]
 
 
 def test_the_depth_gauge_is_quiet_before_any_gateway_registers(monkeypatch):
@@ -275,3 +285,45 @@ def test_both_cache_layers_emit_hits_and_misses(tmp_path, monkeypatch):
         ("GATEWAY_CACHE_MISSES", {"layer": "gateway"}),
         ("GATEWAY_CACHE_HITS", {"layer": "gateway"}),
     ]
+
+
+def test_failed_walks_record_their_chain_length(tmp_path, monkeypatch):
+    """The INC-004 blind spot: a request that degrades through the whole
+    walk and dies must still feed the chain histogram."""
+    from fastapi.testclient import TestClient
+
+    from resgraph.gateway import server as gwserver
+    from resgraph.gateway.server import create_app
+
+    recorded: list[float] = []
+
+    class Rec:
+        def record(self, value, labels=None):
+            recorded.append(value)
+
+    path = tmp_path / "models.yaml"
+    path.write_text(
+        "haiku:\n  provider: anthropic\n  model: claude-haiku-4-5\n"
+        "qwen-local-1.5b:\n  provider: ollama\n  model: qwen2.5:1.5b\n"
+        "  base_url: http://localhost:11434/v1\n  temperature: 0\n"
+    )
+
+    class Boom:
+        def __init__(self):
+            self.messages = self
+
+        def create(self, **kwargs):
+            raise RuntimeError("dead backend")
+
+    client = TestClient(create_app(models_path=path, client_factory=lambda s: Boom()))
+    monkeypatch.setattr(gwserver.obs, "GATEWAY_FALLBACK_CHAIN", Rec())
+    body = {"messages": [{"role": "user", "content": "hi"}]}
+
+    r = client.post("/v1/generate", json={**body, "task_class": "judgment"})
+    assert r.status_code == 503
+    assert recorded == [2]
+
+    recorded.clear()
+    r = client.post("/v1/generate", json={**body, "pin": "haiku"})
+    assert r.status_code == 502
+    assert recorded == [0]

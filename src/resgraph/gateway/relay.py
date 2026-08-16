@@ -106,6 +106,7 @@ def relay(
                     "backend": death.backend,
                     "reason": death.reason,
                     "tokens_emitted": death.tokens_emitted,
+                    "fallback_chain": fallback_chain,
                 }
                 completed = True
                 observe(error_payload)

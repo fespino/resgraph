@@ -145,6 +145,7 @@ def test_zero_token_death_with_an_exhausted_walk_surfaces():
     )
     assert [p["type"] for p in out] == ["stream_error"]
     assert out[0]["tokens_emitted"] == 0
+    assert out[0]["fallback_chain"] == ["ollama:qwen-local-1.5b"]
     assert backend.in_flight == 0
 
 

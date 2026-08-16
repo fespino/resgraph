@@ -71,6 +71,9 @@ qwen-local-1.5b:
   seed: 7
   quant: Q4_K_M
   tool_choice: required
+  # probing is opt-in per setup; a local server can 200 its health
+  # endpoint while generation has collapsed, so this one is probed
+  probe_interval_s: 60
 
 # Through the gateway: the seam's client POSTs /v1/generate and the
 # gateway's registry resolves the serving model. Routing belongs to the

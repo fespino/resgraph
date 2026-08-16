@@ -22,6 +22,7 @@ SETUPS = {
         "provider": "ollama",
         "model": "qwen2.5:1.5b",
         "base_url": "http://localhost:11434/v1",
+        "probe_interval_s": 60,
     },
 }
 
@@ -403,7 +404,7 @@ def test_both_request_shapes_feed_the_same_ttft_series(tmp_path, monkeypatch):
     assert ewma.value is not None
 
 
-def test_a_probe_round_probes_only_unpriced_backends(harness, caplog):
+def test_a_probe_round_probes_only_declared_setups(harness, caplog):
     import logging as _logging
 
     from resgraph.gateway.server import run_probe_round
@@ -437,11 +438,14 @@ def test_probe_rounds_respect_the_per_setup_cadence(harness):
     assert len(calls) == 2
 
 
-def test_probe_tick_is_none_when_nothing_is_probeable(tmp_path):
+def test_probe_tick_is_none_when_no_setup_declares_a_probe(tmp_path):
     from resgraph.gateway.server import probe_tick
 
     path = tmp_path / "models.yaml"
-    path.write_text(yaml.safe_dump({"haiku": SETUPS["haiku"]}))
+    undeclared = {
+        k: {kk: vv for kk, vv in v.items() if kk != "probe_interval_s"} for k, v in SETUPS.items()
+    }
+    path.write_text(yaml.safe_dump(undeclared))
     app = create_app(models_path=path, client_factory=lambda setup: None)
     assert probe_tick(app.state.gateway) is None
 

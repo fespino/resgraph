@@ -4,10 +4,15 @@
 # Actions: a floating tag means CI and laptops can silently run
 # different servers (a `latest` drift was a suspect in a flaky golden
 # test before pinning). Dependabot keeps the digests current.
+#
+# Ports bind loopback only: a laptop joins untrusted networks, and every
+# service here is unauthenticated by design — the "local-only" rationale
+# (Grafana's anonymous admin, Redis/Memgraph with no auth) is only true
+# if the bind address makes it true.
 services:
   redis:
     image: redis:8-alpine@sha256:978f0e01593e65eed801f2402944efcd936d43b5027e4908a7897baf88ed6241
-    ports: ["6379:6379"]
+    ports: ["127.0.0.1:6379:6379"]
     # AOF off: the stream is regenerable by seed (D6); durability is not
     # this layer's budget.
     command: ["redis-server", "--appendonly", "no"]
@@ -19,14 +24,14 @@ services:
     # deleted-vertex anomaly (#36) — as is 3.11.0; wipe() is the
     # workaround, so no version dodges it.
     image: memgraph/memgraph-mage@sha256:f252561ba38f4c5f530f9d0c7d916f47a37ed20fdfdcfd9b596ca149bd9a5fd8
-    ports: ["7687:7687"]
+    ports: ["127.0.0.1:7687:7687"]
     command: ["--log-level=WARNING", "--memory-limit=2048"]
   prometheus:
     # Observability profile (D17): opt-in so default runs stay lean —
     # the observer must not distort the benchmarks it observes.
     profiles: ["obs"]
     image: prom/prometheus:v3.13.2@sha256:508729e0e2d18e11fd742a5a5ca70e557b940a93948c3c95fd0123a6fd538b69
-    ports: ["9090:9090"]
+    ports: ["127.0.0.1:9090:9090"]
     volumes:
       - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./observability/rules:/etc/prometheus/rules:ro
@@ -34,7 +39,7 @@ services:
   grafana:
     profiles: ["obs"]
     image: grafana/grafana:13.1.3@sha256:ab5cb380e3ff3172d6c8bd2e7cfd31cce977d2881b260e1f5bc089bf0b759b43
-    ports: ["3000:3000"]
+    ports: ["127.0.0.1:3000:3000"]
     # anonymous admin: a local-only dashboard behind no network boundary;
     # auth here would be theater
     environment:
@@ -54,7 +59,7 @@ services:
     environment: {POSTGRES_PASSWORD: resgraph}
     # 5433 on the host: developer machines often run their own postgres
     # on 5432, which wins the localhost race against the container.
-    ports: ["5433:5432"]
+    ports: ["127.0.0.1:5433:5432"]
   ollama:
     # Local worker backend for the eval seam (D29c). Opt-in like obs/bench —
     # heavy, and only the --worker path needs it. Serves the OpenAI-compatible
@@ -62,7 +67,7 @@ services:
     #   docker compose --profile local up -d
     profiles: ["local"]
     image: ollama/ollama:0.12.6@sha256:a61a8fd395dbb931cc8cb1b5da7a2510746575c87113fdc45b647ee59ef7f808
-    ports: ["11434:11434"]
+    ports: ["127.0.0.1:11434:11434"]
     volumes: [ollama-models:/root/.ollama]
     healthcheck:
       test: ["CMD", "ollama", "list"]

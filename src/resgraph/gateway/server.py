@@ -259,6 +259,7 @@ def _serve_with_walk[T](
                     "task_class": task_class,
                 },
             )
+            obs.GATEWAY_FALLBACK_CHAIN.record(len(chain))
             raise HTTPException(
                 429, detail=str(exc), headers={"Retry-After": str(exc.retry_after_s)}
             ) from exc
@@ -275,6 +276,7 @@ def _serve_with_walk[T](
                         "task_class": task_class,
                     },
                 )
+                obs.GATEWAY_FALLBACK_CHAIN.record(0)
                 raise HTTPException(
                     502, detail=f"pinned {alias!r} failed on {gw.backend(alias).name}: {exc}"
                 ) from exc
@@ -290,6 +292,7 @@ def _serve_with_walk[T](
             "task_class": task_class,
         },
     )
+    obs.GATEWAY_FALLBACK_CHAIN.record(len(chain))
     raise HTTPException(503, detail=f"no backend could serve; chain={chain}")
 
 
@@ -408,6 +411,8 @@ def _stream_observer(gw: Gateway, source: str, task_label: str) -> Callable[[dic
                 1,
                 {"tokens_bucket": "zero" if payload["tokens_emitted"] == 0 else "nonzero"},
             )
+            # without this the chain histogram counts only survivors
+            obs.GATEWAY_FALLBACK_CHAIN.record(len(payload.get("fallback_chain", [])))
             obs.GATEWAY_REQUESTS.add(
                 1,
                 {

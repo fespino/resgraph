@@ -108,3 +108,19 @@ def test_oracle_catches_a_message_both_stores_missed(tmp_path_factory):
         or affected in report["only_in_oracle"]
         or affected in report["relationship_mismatches"]
     )
+
+
+def test_reconcile_detects_an_attribute_divergence(stores):
+    session, cat, msgs = stores
+    victim = sorted(_oracle(msgs))[0]
+    label = victim.split("-", 1)[0]
+    session.run(f"MATCH (n:{label} {{id: $id}}) SET n.drifted = 'x'", id=victim).consume()
+    try:
+        result = reconcile(session, cat)
+        assert not result["ok"]
+        assert victim in result["hot_vs_cold"]["attr_mismatches"]
+    finally:
+        wipe(session)
+        init_schema(session)
+        load_snapshot(session, msgs[:RESOURCES])
+        apply_batch(session, msgs[RESOURCES:])

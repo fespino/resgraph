@@ -66,3 +66,12 @@ def test_lineage_findings_on_incomplete_derivation():
     )
     validators = [f.validator for f in sanitize_findings(broken)]
     assert validators.count("lineage") == 3
+
+
+def test_an_injection_item_without_a_target_is_flagged():
+    spec = Scenario.model_validate_json(
+        Path("evals/scenarios/base.jsonl").read_text().splitlines()[0]
+    )
+    broken = spec.model_copy(update={"tags": ["injection"]})
+    findings = sanitize_findings(broken)
+    assert any(f.field == "provenance.inject_target" and "missing" in f.detail for f in findings)

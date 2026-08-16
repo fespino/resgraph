@@ -251,6 +251,8 @@ def init_metrics(port: int | None = None) -> None:
 
 
 def _serve_metrics(port: int):
+    # deferred like init_metrics' SDK imports: every component imports
+    # obs, only metrics-serving processes pay for the exporter
     from prometheus_client import start_http_server
 
     # loopback; the obs-profile Prometheus reaches it via host.docker.internal

@@ -3,10 +3,10 @@
 # baseline x 1.5 per D18 and land in capacity.md — until then the rules
 # record the ratios and quantiles the objectives will bind to, plus the
 # two alerts that need no baseline: silent degradation (fallback chains
-# longer than one hop) and dishonest failure (outcomes outside the
-# honest vocabulary). Availability counts successful-or-honestly-failed:
-# a surfaced stream_error or an explicit 429/502/503 is honest; only an
-# outcome outside the vocabulary would not be.
+# longer than one hop) and unexplained failure (outcomes outside the
+# declared vocabulary). Availability counts served-or-explicitly-failed:
+# a surfaced stream_error or an explicit 429/502/503 counts as
+# available; only an outcome outside the vocabulary would not.
 groups:
   - name: gateway_slo
     interval: 15s

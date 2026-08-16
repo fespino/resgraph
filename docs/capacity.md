@@ -37,7 +37,7 @@ TTFT p50 rises 2.7 s → 22.7 s: the knee sits between 2 and 4.** The
 lever is the model server, not the gateway — the gateway added routing,
 admission, and accounting; the serialization is ollama's. Beyond the
 knee, the bounded queue (in-flight cap 4 for the local backend) turns
-overload into fast, honest 429s with a drain-derived `Retry-After`:
+overload into fast, explicit 429s with a drain-derived `Retry-After`:
 at concurrency 8 the client saw 88 rejections, zero errors, and
 throughput held ~5.7 tokens/s — degradation is loud and flat, not a
 latency collapse.

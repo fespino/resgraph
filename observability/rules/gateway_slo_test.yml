@@ -1,6 +1,6 @@
 # promtool unit tests for the gateway SLO rules — synthetic series prove
 # the two baseline-free alerts fire under breach and stay quiet when
-# healthy, and the availability ratio counts honest failure as available.
+# healthy, and the availability ratio counts explicit failure as available.
 rule_files:
   - gateway_slo.yml
 
@@ -54,7 +54,7 @@ tests:
                 Gateway queue depth at or above the local bound — the leading
                 pressure signal; latency follows if this holds.
 
-  # Availability: honest failures (429, stream_error, the eager 503)
+  # Availability: explicit failures (429, stream_error, the eager 503)
   # still count as available; the ratio stays 1.0.
   - interval: 15s
     input_series:

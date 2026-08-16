@@ -149,7 +149,7 @@ def test_zero_token_death_with_an_exhausted_walk_surfaces():
     assert backend.in_flight == 0
 
 
-def test_reconciliation_mismatch_is_reported_honestly():
+def test_a_reconciliation_mismatch_is_reported_not_hidden():
     backend = admitted("ollama")
     events = iter([("content", "a"), ("usage", {"input_tokens": 1, "output_tokens": 100})])
     out = payloads(

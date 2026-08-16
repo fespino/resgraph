@@ -1988,6 +1988,48 @@ Adopted, the checkpoint-plus-log shape D12 already gave the hot store: **the arc
 
 **Rejected:** AI summarization on the critical path — a summarized open registration is a different commitment (pre-registration's whole point is that the words are fixed before the run), and a summary that cannot be diffed cannot be audited; the structural split moves text, never rewrites it, and cut the fed context 85% (23.4k → ~3.6k tokens) with zero drift risk. A digest pass stays available as a reviewed-diff second step only if the split proves insufficient. RAG over the archive — ch-22 machinery for a working-set problem; reversal condition: when the split can no longer hold the working set under ~10k tokens. SPEC.md's own treatment — deferred; it has one consumer (humans) and no comparability hole.
 
+## D35 — Egress posture: store containers keep egress; the control was measured and rejected (phase 11)
+
+The stores (redis, memgraph, postgres) have no legitimate outbound need
+— only the model-pull sidecar instructs a download (and the download is
+performed by the ollama server, which therefore does need egress at
+pull time). Cutting their egress would be free defense-in-depth if a
+compose-level mechanism existed on this platform. It was piloted, not
+assumed (`scripts/egress-pilot.sh`), and no mechanism passes:
+
+```
+egress-pilot: linux/arm64 28.0.4 on Darwin
+masquerade-off         inbound(host->port): works     egress(container->net): OPEN
+internal-true          inbound(host->port): refused   egress(container->net): blocked
+```
+
+- `enable_ip_masquerade: "false"` does nothing here: Docker Desktop
+  egress rides the VM's own NAT, not the bridge masquerade rule — a
+  control that controls nothing, worse than none (the green check
+  still appears).
+- `internal: true` blocks egress but kills port publishing, and every
+  consumer (tests, analyst, gateway) reaches the stores via host
+  loopback. The dual-network workaround restores the ports through a
+  second network that restores egress with them.
+
+**Decision:** rejected at laptop scale, on measurement. The inbound
+surface stays closed (every listener loopback-bound); unexpected
+egress stays a NAMED breach signal in the sentinel threat model, not
+an enforced control. **Reversal condition:** the stack moves to a
+Linux host (bridge masquerade semantics apply there — re-run the
+pilot; the script is the receipt either way — its output pins the
+Docker version, so a Desktop upgrade is a re-run trigger too) or the
+clients containerize into the compose network (published ports stop
+mattering and `internal: true` becomes viable). The rejection also
+leans on the value side: the stores hold synthetic, seed-regenerable
+worlds, so egress buys an attacker little — a store that ever holds
+non-synthetic data reopens this decision even if no mechanism
+improved, at which point the expensive options (containerized
+clients) get priced rather than dismissed. **Rejected:**
+in-VM iptables surgery (unsupported, drift-shaped, invisible to the
+compose file — the file must remain the authority for what the
+stack's network does).
+
 ## Phase contracts
 - The generator MUST emit D2 messages exactly and expose `--seed`
   for reproducibility.

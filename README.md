@@ -154,7 +154,9 @@ README never carries a number that file can't back.
 - [BENCHMARKS.md](BENCHMARKS.md) — methodology + hardware for every
   number above.
 - [EVALS.md](EVALS.md) — the eval protocol and its spend ledger:
-  pre-registrations before any paid run, every run's verdict recorded.
+  pre-registrations before any paid run, every run's verdict recorded;
+  the closed record lives in [EVALS-HISTORY.md](EVALS-HISTORY.md),
+  compacted per the checkpoint-plus-log rule (D34).
 - [docs/incidents/](docs/incidents/) — incident reports, starting with
   the induced hot-store loss.
 - [docs/security-posture.md](docs/security-posture.md) — the controls,

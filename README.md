@@ -28,6 +28,7 @@
 | src/resgraph/evals/arms.py                   |       42 |        0 |    100% |           |
 | src/resgraph/evals/breaker.py                |       47 |        0 |    100% |           |
 | src/resgraph/evals/cli.py                    |      130 |        1 |     99% |       126 |
+| src/resgraph/evals/context.py                |       12 |        0 |    100% |           |
 | src/resgraph/evals/faults.py                 |       23 |        0 |    100% |           |
 | src/resgraph/evals/gate.py                   |      167 |        4 |     98% |152, 203, 215, 233 |
 | src/resgraph/evals/graders.py                |       67 |        0 |    100% |           |
@@ -81,7 +82,7 @@
 | src/resgraph/tools/context.py                |        9 |        0 |    100% |           |
 | src/resgraph/tools/http.py                   |       21 |        0 |    100% |           |
 | src/resgraph/tools/registry.py               |       24 |        0 |    100% |           |
-| **TOTAL**                                    | **4654** |  **127** | **97%** |           |
+| **TOTAL**                                    | **4666** |  **127** | **97%** |           |
 
 
 ## Setup coverage badge

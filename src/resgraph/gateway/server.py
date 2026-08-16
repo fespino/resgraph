@@ -386,10 +386,11 @@ def _probe_cadence(gw: Gateway, alias: str) -> float:
 
 
 def _probeable(gw: Gateway) -> dict[str, str]:
-    """Routed providers that may be synthetically probed: the unpriced
-    ones. Uptime must not spend — a priced backend's health is passive,
-    its failures surface per-request through the walk."""
-    return {p: a for p, a in gw.routed().items() if not _paid(gw, a)}
+    """Routed providers whose setup declares `probe_interval_s` — probing
+    is opt-in per setup. Undeclared means never probed: uptime spends
+    nothing by default, and failures surface per-request through the
+    walk; declaring a probe on a priced setup is a deliberate spend."""
+    return {p: a for p, a in gw.routed().items() if "probe_interval_s" in gw.setups[a]}
 
 
 def probe_tick(gw: Gateway) -> float | None:

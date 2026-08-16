@@ -103,6 +103,14 @@ against its registration — and the instrument fixes above are what
 that correction looks like in practice: verify the premise cheaply,
 before the run that spends on it.
 
+The same reset drew a scope line worth stating on its own: after the
+arms merged, three new research threads opened in a single day, each
+individually interesting, and the correction was blunt — open issues
+are not a queue; the phase charter is. A research thread earns a
+label, not a lane. An eval program generates follow-up questions
+faster than any team can run them, and a program that chases each
+one is how excellent hygiene quietly stops shipping.
+
 ## The arms: three models, one harness, no code changes
 
 The experiment itself was pre-registered with a pre-mortem per arm

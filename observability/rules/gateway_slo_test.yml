@@ -54,8 +54,8 @@ tests:
                 Gateway queue depth at or above the local bound — the leading
                 pressure signal; latency follows if this holds.
 
-  # Availability: honest failures (429 + stream_error) still count as
-  # available; the ratio stays 1.0.
+  # Availability: honest failures (429, stream_error, the eager 503)
+  # still count as available; the ratio stays 1.0.
   - interval: 15s
     input_series:
       - series: 'gateway_requests_total{outcome="ok"}'
@@ -63,6 +63,8 @@ tests:
       - series: 'gateway_requests_total{outcome="rejected_429"}'
         values: "0+2x40"
       - series: 'gateway_requests_total{outcome="stream_error"}'
+        values: "0+2x40"
+      - series: 'gateway_requests_total{outcome="refused_503"}'
         values: "0+2x40"
     promql_expr_test:
       - expr: slo:gateway_availability:ratio_5m

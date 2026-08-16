@@ -565,3 +565,38 @@ def test_the_analysts_block_system_is_accepted_not_422d(harness):
     assert r.status_code == 200
     _, kwargs = calls[0]
     assert kwargs["system"] == system
+
+
+def test_a_stream_to_a_down_backend_with_no_streamable_fallback_is_an_eager_503(harness):
+    """The INC-004 hot loop: with the default factory anthropic cannot
+    stream, so a down local backend refuses at admission with Retry-After
+    instead of an instant stream_error the client will hammer."""
+    client, _, calls = harness
+    client.app.state.gateway.backend("qwen-local-1.5b").health.state = "down"
+    r = _gen(client, task_class="workhorse", stream=True)
+    assert r.status_code == 503
+    assert int(r.headers["Retry-After"]) >= 1
+    assert calls == []
+
+
+def test_a_pinned_stream_to_a_down_backend_is_an_eager_502(harness):
+    client, _, calls = harness
+    client.app.state.gateway.backend("qwen-local-1.5b").health.state = "down"
+    r = _gen(client, pin="qwen-local-1.5b", stream=True)
+    assert r.status_code == 502
+    assert calls == []
+
+
+def test_a_down_backend_with_a_streamable_fallback_still_walks(tmp_path):
+    def factory(alias: str, kwargs: Any):
+        if alias == "qwen-local-1.5b":
+            raise ConnectionError("backend unreachable")
+        return ok_stream(alias, kwargs)
+
+    client = stream_harness(tmp_path, factory)
+    client.app.state.gateway.backend("qwen-local-1.5b").health.state = "down"
+    r = _gen(client, task_class="workhorse", stream=True)
+    assert r.status_code == 200
+    end = sse_events(r.text)[-1]
+    assert end["backend"] == "anthropic"
+    assert end["fallback_chain"] == ["ollama:qwen-local-1.5b"]

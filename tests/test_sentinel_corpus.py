@@ -92,3 +92,40 @@ def test_cli_build_reproduces_the_committed_corpus(monkeypatch, tmp_path):
     result = CliRunner().invoke(cli.app, ["corpus", "build"])
     assert result.exit_code == 0
     assert out.read_bytes() == (corpus.CORPUS_DIR / "attacks.jsonl").read_bytes()
+
+
+def test_cli_refresh_manifest_writes_what_the_loader_reads(monkeypatch, tmp_path):
+    """The refresh branch end to end on a fixture tree: scan -> manifest
+    -> loader -> attacks, proving writer and reader agree on the format."""
+    runs = tmp_path / "evals" / "runs"
+    runs.mkdir(parents=True)
+    trace = [
+        {"tool": "fetch_resource", "ok": True, "args": {"resource_id": "vm-000001", "at": "t"}},
+        {"tool": "resource_history", "ok": True, "args": {"resource_id": "vm-000001"}},
+        {"tool": "world_diff", "ok": True, "args": {"from_t": "a", "to_t": "b"}},
+    ]
+    row = {
+        "run_id": "r1",
+        "scenario_id": "s1",
+        "trial": 0,
+        "tags": [],
+        "tool_trace": trace,
+        "tool_calls": 3,
+        "tokens": {"input": 10, "output": 20, "total": 30},
+        "report": {"narrative": "fine"},
+    }
+    (runs / "clean.jsonl").write_text(json.dumps(row) + "\n")
+    (runs / "drill.jsonl").write_text(json.dumps({**row, "tags": ["fault:cold"]}) + "\n")
+
+    sentinel_dir = tmp_path / "evals" / "sentinel"
+    monkeypatch.setattr(corpus, "MANIFEST_PATH", sentinel_dir / "benign-manifest.json")
+    monkeypatch.setattr(corpus, "ATTACKS_PATH", sentinel_dir / "attacks.jsonl")
+    monkeypatch.chdir(tmp_path)
+
+    result = CliRunner().invoke(cli.app, ["corpus", "build", "--refresh-manifest"])
+    assert result.exit_code == 0, result.output
+    manifest = json.loads(corpus.MANIFEST_PATH.read_text())
+    assert manifest["runs"] == ["evals/runs/clean.jsonl"]  # the fault run stayed out
+    attacks = corpus.load_attacks(corpus.ATTACKS_PATH)
+    assert len(attacks) == 4 * corpus.PER_TYPE
+    assert all(a["sentinel"]["base_run"].startswith("r1/") for a in attacks)

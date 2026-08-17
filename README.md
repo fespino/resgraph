@@ -73,6 +73,9 @@
 | src/resgraph/query/planner.py                |       83 |        0 |    100% |           |
 | src/resgraph/reconcile.py                    |       52 |        1 |     98% |        55 |
 | src/resgraph/schema.py                       |       50 |        0 |    100% |           |
+| src/resgraph/sentinel/\_\_init\_\_.py        |        0 |        0 |    100% |           |
+| src/resgraph/sentinel/cli.py                 |       31 |        2 |     94% |    53, 57 |
+| src/resgraph/sentinel/corpus.py              |       82 |        0 |    100% |           |
 | src/resgraph/tools/\_\_init\_\_.py           |        0 |        0 |    100% |           |
 | src/resgraph/tools/budgets.py                |       23 |        0 |    100% |           |
 | src/resgraph/tools/canonical/\_\_init\_\_.py |        0 |        0 |    100% |           |
@@ -82,7 +85,7 @@
 | src/resgraph/tools/context.py                |        9 |        0 |    100% |           |
 | src/resgraph/tools/http.py                   |       21 |        0 |    100% |           |
 | src/resgraph/tools/registry.py               |       24 |        0 |    100% |           |
-| **TOTAL**                                    | **4698** |  **129** | **97%** |           |
+| **TOTAL**                                    | **4811** |  **131** | **97%** |           |
 
 
 ## Setup coverage badge

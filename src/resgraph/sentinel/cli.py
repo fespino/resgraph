@@ -114,8 +114,13 @@ def classify_cmd(
     cap = classifier.CallCap()
     verdicts = []
     for row, v in flagged:
-        flags = [f.rule for f in v.l1.flags] or ["l2_anomaly"]
-        c = classifier.classify(client, setup["model"], row, flags, cap)
+        evidence = [f"{f.rule}: {f.reason}" for f in v.l1.flags]
+        top_z = sorted(v.l2_z.items(), key=lambda kv: -kv[1])[:3]
+        evidence.append(
+            "vs this worker's benign baseline (z-scores): "
+            + ", ".join(f"{n}={z:.1f}" for n, z in top_z)
+        )
+        c = classifier.classify(client, setup["model"], row, evidence, cap)
         truth = (row.get("sentinel") or {}).get("attack_type", "benign")
         verdicts.append({**c.__dict__, "truth": truth})
         typer.echo(f"{c.run_key}: {c.tag} (truth={truth}){' DEFERRED' if c.deferred else ''}")

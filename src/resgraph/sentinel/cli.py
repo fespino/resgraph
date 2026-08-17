@@ -93,6 +93,12 @@ def classify_cmd(
         "opus", "--judge", help="Pinned classifier setup in evals/models.yaml."
     ),
     out: str = typer.Option("evals/sentinel/l3-verdicts.jsonl", "--out"),
+    cap: int = typer.Option(
+        50, "--cap", help="Deliberate daily-cap override for this run [default: the D38 cap]."
+    ),
+    deferred_only: bool = typer.Option(
+        False, "--deferred-only", help="Finish only the runs the cap deferred in --out."
+    ),
 ) -> None:
     """Layer 3 over the funnel's admissions: classify each flagged run
     with the pinned judge, honoring the daily call cap (defer, never
@@ -111,7 +117,10 @@ def classify_cmd(
         flagged = flagged[:1]
     setup = load_setup(judge, _Path("evals/models.yaml"))
     client = build_client(setup)
-    cap = classifier.CallCap()
+    call_cap = classifier.CallCap(cap=cap)
+    prior = {}
+    if deferred_only:
+        prior = {v["run_key"]: v for v in map(_json.loads, _Path(out).read_text().splitlines())}
     verdicts = []
     for row, v in flagged:
         evidence = [f"{f.rule}: {f.reason}" for f in v.l1.flags]
@@ -120,7 +129,13 @@ def classify_cmd(
             "vs this worker's benign baseline (z-scores): "
             + ", ".join(f"{n}={z:.1f}" for n, z in top_z)
         )
-        c = classifier.classify(client, setup["model"], row, evidence, cap)
+        key = (row.get("sentinel") or {}).get(
+            "id"
+        ) or f"{row.get('run_id')}/{row.get('scenario_id')}/t{row.get('trial')}"
+        if deferred_only and not prior.get(key, {}).get("deferred", True):
+            verdicts.append(prior[key])
+            continue
+        c = classifier.classify(client, setup["model"], row, evidence, call_cap)
         truth = (row.get("sentinel") or {}).get("attack_type", "benign")
         verdicts.append({**c.__dict__, "truth": truth})
         typer.echo(f"{c.run_key}: {c.tag} (truth={truth}){' DEFERRED' if c.deferred else ''}")

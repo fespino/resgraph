@@ -74,8 +74,11 @@
 | src/resgraph/reconcile.py                    |       52 |        1 |     98% |        55 |
 | src/resgraph/schema.py                       |       50 |        0 |    100% |           |
 | src/resgraph/sentinel/\_\_init\_\_.py        |        0 |        0 |    100% |           |
-| src/resgraph/sentinel/cli.py                 |       31 |        2 |     94% |    53, 57 |
+| src/resgraph/sentinel/cli.py                 |       45 |        2 |     96% |    53, 57 |
 | src/resgraph/sentinel/corpus.py              |       82 |        0 |    100% |           |
+| src/resgraph/sentinel/profile.py             |       51 |        0 |    100% |           |
+| src/resgraph/sentinel/rules.py               |       51 |        0 |    100% |           |
+| src/resgraph/sentinel/scan.py                |       36 |        0 |    100% |           |
 | src/resgraph/tools/\_\_init\_\_.py           |        0 |        0 |    100% |           |
 | src/resgraph/tools/budgets.py                |       23 |        0 |    100% |           |
 | src/resgraph/tools/canonical/\_\_init\_\_.py |        0 |        0 |    100% |           |
@@ -85,7 +88,7 @@
 | src/resgraph/tools/context.py                |        9 |        0 |    100% |           |
 | src/resgraph/tools/http.py                   |       21 |        0 |    100% |           |
 | src/resgraph/tools/registry.py               |       24 |        0 |    100% |           |
-| **TOTAL**                                    | **4811** |  **131** | **97%** |           |
+| **TOTAL**                                    | **4963** |  **131** | **97%** |           |
 
 
 ## Setup coverage badge

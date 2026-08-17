@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <title>Coverage for src/resgraph/sentinel/cli.py: 94%</title>
+    <title>Coverage for src/resgraph/sentinel/cli.py: 96%</title>
     <link rel="icon" sizes="32x32" href="favicon_32_cb_c827f16f.png">
     <link rel="stylesheet" href="style_cb_4667309f.css" type="text/css">
     <script src="coverage_html_cb_dd2e7eb5.js" defer></script>
@@ -12,7 +12,7 @@
     <div class="content">
         <h1>
             <span class="text">Coverage for </span><b>src<span class="sep">/</span>resgraph<span class="sep">/</span>sentinel<span class="sep">/</span>cli.py</b>:
-            <span class="pc_cov">94%</span>
+            <span class="pc_cov">96%</span>
         </h1>
         <aside id="help_panel_wrapper">
             <input id="help_panel_state" type="checkbox">
@@ -54,8 +54,8 @@
             </div>
         </aside>
         <h2>
-            <span class="text">31 statements &nbsp;</span>
-            <button type="button" class="run button_toggle_run" value="run" data-shortcut="r" title="Toggle lines run">29<span class="text"> run</span></button>
+            <span class="text">45 statements &nbsp;</span>
+            <button type="button" class="run button_toggle_run" value="run" data-shortcut="r" title="Toggle lines run">43<span class="text"> run</span></button>
             <button type="button" class="mis show_mis button_toggle_mis" value="mis" data-shortcut="m" title="Toggle lines missing">2<span class="text"> missing</span></button>
             <button type="button" class="exc show_exc button_toggle_exc" value="exc" data-shortcut="x" title="Toggle lines excluded">0<span class="text"> excluded</span></button>
         </h2>
@@ -65,7 +65,7 @@
             <a id="nextFileLink" class="nav" href="z_20c52153140557c1_corpus_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.15.4">coverage.py v7.15.4</a>,
-            created at 2026-08-17 00:58 +0000
+            created at 2026-08-17 09:15 +0000
         </p>
         <aside class="hidden">
             <button type="button" class="button_next_chunk" data-shortcut="j"></button>
@@ -137,6 +137,35 @@
     <p class="pln"><span class="n"><a id="t55" href="#t55">55</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t56" href="#t56">56</a></span><span class="t"><span class="key">if</span> <span class="nam">__name__</span> <span class="op">==</span> <span class="str">&quot;__main__&quot;</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
     <p class="mis show_mis"><span class="n"><a id="t57" href="#t57">57</a></span><span class="t">    <span class="nam">main</span><span class="op">(</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t58" href="#t58">58</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t59" href="#t59">59</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t60" href="#t60">60</a></span><span class="t"><span class="op">@</span><span class="nam">app</span><span class="op">.</span><span class="nam">command</span><span class="op">(</span><span class="str">&quot;scan&quot;</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t61" href="#t61">61</a></span><span class="t"><span class="key">def</span> <span class="nam">scan_cmd</span><span class="op">(</span><span class="op">)</span> <span class="op">-&gt;</span> <span class="key">None</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t62" href="#t62">62</a></span><span class="t">    <span class="str">&quot;&quot;&quot;Layers 1+2 over the combined corpus: benign false-positive rate</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t63" href="#t63">63</a></span><span class="t"><span class="str">    first (the headline), then per-layer confusion, per-rule hits, the</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t64" href="#t64">64</a></span><span class="t"><span class="str">    per-type recall, and the funnel into layer 3.&quot;&quot;&quot;</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t65" href="#t65">65</a></span><span class="t">    <span class="key">from</span> <span class="op">.</span> <span class="key">import</span> <span class="nam">scan</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t66" href="#t66">66</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t67" href="#t67">67</a></span><span class="t">    <span class="nam">report</span> <span class="op">=</span> <span class="nam">scan</span><span class="op">.</span><span class="nam">scan_corpus</span><span class="op">(</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t68" href="#t68">68</a></span><span class="t">    <span class="nam">combined</span> <span class="op">=</span> <span class="nam">report</span><span class="op">.</span><span class="nam">confusion</span><span class="op">(</span><span class="str">&quot;l3&quot;</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t69" href="#t69">69</a></span><span class="t">    <span class="nam">benign_total</span> <span class="op">=</span> <span class="nam">combined</span><span class="op">[</span><span class="str">&quot;fp&quot;</span><span class="op">]</span> <span class="op">+</span> <span class="nam">combined</span><span class="op">[</span><span class="str">&quot;tn&quot;</span><span class="op">]</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t70" href="#t70">70</a></span><span class="t">    <span class="nam">typer</span><span class="op">.</span><span class="nam">echo</span><span class="op">(</span><span class="fst">f&quot;</span><span class="fst">benign false-positive rate: </span><span class="op">{</span><span class="nam">combined</span><span class="op">[</span><span class="str">&#x27;fp&#x27;</span><span class="op">]</span><span class="op">}</span><span class="fst">/</span><span class="op">{</span><span class="nam">benign_total</span><span class="op">}</span><span class="fst">&quot;</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t71" href="#t71">71</a></span><span class="t">    <span class="key">for</span> <span class="nam">layer</span> <span class="key">in</span> <span class="op">(</span><span class="str">&quot;l1&quot;</span><span class="op">,</span> <span class="str">&quot;l2&quot;</span><span class="op">)</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t72" href="#t72">72</a></span><span class="t">        <span class="nam">c</span> <span class="op">=</span> <span class="nam">report</span><span class="op">.</span><span class="nam">confusion</span><span class="op">(</span><span class="nam">layer</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t73" href="#t73">73</a></span><span class="t">        <span class="nam">typer</span><span class="op">.</span><span class="nam">echo</span><span class="op">(</span><span class="fst">f&quot;</span><span class="op">{</span><span class="nam">layer</span><span class="op">}</span><span class="fst">: tp=</span><span class="op">{</span><span class="nam">c</span><span class="op">[</span><span class="str">&#x27;tp&#x27;</span><span class="op">]</span><span class="op">}</span><span class="fst"> fp=</span><span class="op">{</span><span class="nam">c</span><span class="op">[</span><span class="str">&#x27;fp&#x27;</span><span class="op">]</span><span class="op">}</span><span class="fst"> fn=</span><span class="op">{</span><span class="nam">c</span><span class="op">[</span><span class="str">&#x27;fn&#x27;</span><span class="op">]</span><span class="op">}</span><span class="fst"> tn=</span><span class="op">{</span><span class="nam">c</span><span class="op">[</span><span class="str">&#x27;tn&#x27;</span><span class="op">]</span><span class="op">}</span><span class="fst">&quot;</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t74" href="#t74">74</a></span><span class="t">    <span class="nam">typer</span><span class="op">.</span><span class="nam">echo</span><span class="op">(</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t75" href="#t75">75</a></span><span class="t">        <span class="str">&quot;per-rule (tp/fp): &quot;</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t76" href="#t76">76</a></span><span class="t">        <span class="op">+</span> <span class="str">&quot;, &quot;</span><span class="op">.</span><span class="nam">join</span><span class="op">(</span><span class="fst">f&quot;</span><span class="op">{</span><span class="nam">name</span><span class="op">}</span><span class="fst">=</span><span class="op">{</span><span class="nam">v</span><span class="op">[</span><span class="str">&#x27;tp&#x27;</span><span class="op">]</span><span class="op">}</span><span class="fst">/</span><span class="op">{</span><span class="nam">v</span><span class="op">[</span><span class="str">&#x27;fp&#x27;</span><span class="op">]</span><span class="op">}</span><span class="fst">&quot;</span> <span class="key">for</span> <span class="nam">name</span><span class="op">,</span> <span class="nam">v</span> <span class="key">in</span> <span class="nam">report</span><span class="op">.</span><span class="nam">per_rule</span><span class="op">(</span><span class="op">)</span><span class="op">.</span><span class="nam">items</span><span class="op">(</span><span class="op">)</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t77" href="#t77">77</a></span><span class="t">    <span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t78" href="#t78">78</a></span><span class="t">    <span class="nam">typer</span><span class="op">.</span><span class="nam">echo</span><span class="op">(</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t79" href="#t79">79</a></span><span class="t">        <span class="str">&quot;recall by type: &quot;</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t80" href="#t80">80</a></span><span class="t">        <span class="op">+</span> <span class="str">&quot;, &quot;</span><span class="op">.</span><span class="nam">join</span><span class="op">(</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t81" href="#t81">81</a></span><span class="t">            <span class="fst">f&quot;</span><span class="op">{</span><span class="nam">t</span><span class="op">}</span><span class="fst">=</span><span class="op">{</span><span class="nam">caught</span><span class="op">}</span><span class="fst">/</span><span class="op">{</span><span class="nam">total</span><span class="op">}</span><span class="fst">&quot;</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t82" href="#t82">82</a></span><span class="t">            <span class="key">for</span> <span class="nam">t</span><span class="op">,</span> <span class="op">(</span><span class="nam">caught</span><span class="op">,</span> <span class="nam">total</span><span class="op">)</span> <span class="key">in</span> <span class="nam">sorted</span><span class="op">(</span><span class="nam">report</span><span class="op">.</span><span class="nam">recall_by_type</span><span class="op">(</span><span class="op">)</span><span class="op">.</span><span class="nam">items</span><span class="op">(</span><span class="op">)</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t83" href="#t83">83</a></span><span class="t">        <span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t84" href="#t84">84</a></span><span class="t">    <span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t85" href="#t85">85</a></span><span class="t">    <span class="nam">reach</span> <span class="op">=</span> <span class="nam">sum</span><span class="op">(</span><span class="num">1</span> <span class="key">for</span> <span class="nam">v</span> <span class="key">in</span> <span class="nam">report</span><span class="op">.</span><span class="nam">verdicts</span> <span class="key">if</span> <span class="nam">v</span><span class="op">.</span><span class="nam">reaches_l3</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t86" href="#t86">86</a></span><span class="t">    <span class="nam">typer</span><span class="op">.</span><span class="nam">echo</span><span class="op">(</span><span class="fst">f&quot;</span><span class="fst">funnel: </span><span class="op">{</span><span class="nam">reach</span><span class="op">}</span><span class="fst">/</span><span class="op">{</span><span class="nam">len</span><span class="op">(</span><span class="nam">report</span><span class="op">.</span><span class="nam">verdicts</span><span class="op">)</span><span class="op">}</span><span class="fst"> runs would reach layer 3</span><span class="fst">&quot;</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
 </main>
 <footer>
     <div class="content">
@@ -146,7 +175,7 @@
             <a class="nav" href="z_20c52153140557c1_corpus_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.15.4">coverage.py v7.15.4</a>,
-            created at 2026-08-17 00:58 +0000
+            created at 2026-08-17 09:15 +0000
         </p>
     </div>
 </footer>

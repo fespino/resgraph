@@ -6,6 +6,7 @@
 
 import json
 from collections import Counter
+from typing import Any
 
 import typer
 
@@ -141,3 +142,90 @@ def classify_cmd(
         typer.echo(f"{c.run_key}: {c.tag} (truth={truth}){' DEFERRED' if c.deferred else ''}")
     _Path(out).write_text("".join(_json.dumps(v, sort_keys=True) + "\n" for v in verdicts))
     typer.echo(f"{len(verdicts)} verdicts -> {out} (template {classifier.TEMPLATE_SHA})")
+
+
+queue_app = typer.Typer(no_args_is_help=True, add_completion=False)
+app.add_typer(queue_app, name="queue")
+
+
+def _evidence(v: Any) -> list[str]:
+    ev = [f"{f.rule}: {f.reason}" for f in v.l1.flags]
+    top = sorted(v.l2_z.items(), key=lambda kv: -kv[1])[:3]
+    ev.append("vs worker baseline (z): " + ", ".join(f"{n}={z:.1f}" for n, z in top))
+    return ev
+
+
+@queue_app.command("fill")
+def queue_fill() -> None:
+    """Enqueue every funnel admission with its highlighted evidence
+    (idempotent: decided runs stay decided)."""
+    from . import queue as q
+    from . import scan
+
+    report = scan.scan_corpus()
+    store = q.ReviewStore()
+    from pathlib import Path as _P
+
+    verdicts = {}
+    vpath = _P("evals/sentinel/l3-verdicts.jsonl")
+    if vpath.exists():
+        verdicts = {
+            row["run_key"]: row["tag"] for row in map(json.loads, vpath.read_text().splitlines())
+        }
+    n = 0
+    for v in report.verdicts:
+        if v.reaches_l3:
+            store.enqueue(v.run_key, _evidence(v), verdicts.get(v.run_key))
+            n += 1
+    typer.echo(f"{n} runs in the queue")
+
+
+@queue_app.command("list")
+def queue_list() -> None:
+    from . import queue as q
+
+    for item in q.ReviewStore().pending():
+        typer.echo(f"{item['run_key']}  l3={item['l3_tag']}")
+        for e in item["evidence"]:
+            typer.echo(f"    - {e}")
+
+
+@queue_app.command("decide")
+def queue_decide(
+    run_key: str,
+    status: str = typer.Argument(..., help="confirmed_malicious | false_positive | unclear"),
+    reviewer: str = typer.Option(..., "--reviewer"),
+) -> None:
+    """Record the label and close its loop: a false positive writes
+    scoped exclusions, a confirmed catch joins the recall floor."""
+    from . import queue as q
+
+    d = q.ReviewStore().decide(run_key, status, reviewer)
+    typer.echo(
+        f"{d.run_key}: {d.status} (exclusions+{d.exclusions_added}, confirmed+{d.confirmed_added})"
+    )
+
+
+@app.command("gate")
+def gate_cmd() -> None:
+    """The CI recall gate (the D29b shape pointed at the detector):
+    exit 1 if any seeded or confirmed attack goes uncaught, any rule
+    flags benign traffic, or the benign FP budget is breached."""
+    from . import scan
+
+    report = scan.scan_corpus()
+    failures = []
+    for attack_type, (caught, total) in report.recall_by_type().items():
+        if caught != total:
+            failures.append(f"recall floor: {attack_type} {caught}/{total}")
+    for name, counts in report.per_rule().items():
+        if counts["fp"]:
+            failures.append(f"rule {name} flags benign traffic ({counts['fp']})")
+    c = report.confusion("l3")
+    if c["fp"] / (c["fp"] + c["tn"]) > 0.03:
+        failures.append(f"benign FP budget breached: {c['fp']}/{c['fp'] + c['tn']}")
+    if failures:
+        for f in failures:
+            typer.echo(f"BLOCK: {f}")
+        raise typer.Exit(1)
+    typer.echo("gate: PASS (recall floors held, rules silent on benign, FP within budget)")

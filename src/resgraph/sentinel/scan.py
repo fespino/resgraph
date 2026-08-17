@@ -7,12 +7,14 @@ headline, not attack recall.
 """
 
 from dataclasses import dataclass
+from typing import Any
 
-from . import corpus, profile, rules
+from . import corpus, profile, queue, rules
 
 
 @dataclass(frozen=True)
 class Verdict:
+    run_key: str
     malicious: bool
     attack_type: str | None
     l1: rules.RuleVerdict
@@ -54,15 +56,22 @@ class Report:
         return out
 
 
+def _run_key(row: dict[str, Any]) -> str:
+    sid = (row.get("sentinel") or {}).get("id")
+    return sid or f"{row.get('run_id')}/{row.get('scenario_id')}/t{row.get('trial')}"
+
+
 def scan_corpus() -> Report:
     benign = corpus.iter_benign()
     attacks = corpus.load_attacks()
     baseline = profile.fit(benign)
+    exclusions = queue.load_exclusions()
     verdicts = [
         Verdict(
+            run_key=_run_key(row),
             malicious="sentinel" in row,
             attack_type=(row.get("sentinel") or {}).get("attack_type"),
-            l1=rules.scan_rules(row),
+            l1=_excluded(rules.scan_rules(row), _run_key(row), exclusions),
             l2_score=(scored := baseline.score(row))[0],
             l2_flagged=baseline.flagged(row),
             l2_z=scored[1],
@@ -70,3 +79,14 @@ def scan_corpus() -> Report:
         for row in [*benign, *attacks]
     ]
     return Report(verdicts=verdicts)
+
+
+def _excluded(
+    verdict: rules.RuleVerdict, run_key: str, exclusions: set[tuple[str, str]]
+) -> rules.RuleVerdict:
+    """A scoped exclusion suppresses one rule for one reviewed run —
+    the rule stays live everywhere else (never a rule disable)."""
+    if not exclusions:
+        return verdict
+    kept = tuple(f for f in verdict.flags if (f.rule, run_key) not in exclusions)
+    return verdict if len(kept) == len(verdict.flags) else rules.RuleVerdict(flags=kept)

@@ -2114,6 +2114,62 @@ feature is explainable to a reviewer; a trained score is not, and the
 explanation is what the review queue renders); thresholds chosen by
 feel (every bound above cites the benign measurement it clears).
 
+## D38 — Layer 3: a pinned intent classifier with an earned, narrow scope (phase 11)
+
+The judge is Opus, chosen BY the D29c arms table, not by habit: for a
+misuse classifier the expensive error is a false malicious tag on a
+benign run (reviewer burnout), and the arms measured Opus as the
+under-accusing end of the commit↔abstain axis (control 0.78, zero
+fabrications) vs Haiku's over-attribution (0.17). Pinned like any
+instrument: setup + template hash stamped per verdict; a template
+change is a labeled baseline event. The prompt fences the transcript
+as data (the classifier reads adversarial input by definition). A
+per-UTC-day call cap warns at 90% and DEFERS past the cap — a
+deferred classification is still a classification; a dropped one is a
+blind spot (proven live: the cap deferred 11 mid-pass, dropped none).
+
+**The measured scope (two registered passes, both ledgered):** v1
+(rule names only) 5/20 planted classes; v2 (evidence in-prompt) 5/20
+— identical, which is the finding: the volumetric plants carry benign
+narratives (D36's mutation design), so an intent-reading judge
+correctly finds no intent in the text. Benign 9/9 benign_anomaly in
+both passes. **Scope therefore narrowed to what was earned:**
+text-borne attacks (injection 4-5/5) and benign-anomaly triage;
+volumetric verdicts belong to layers 1+2, which measured them.
+**Rejected:** re-prompting toward the synthetic corpus (optimizing
+the judge against planted shapes is training on the test); a cheaper
+classifier (the under-accusation property is the seat's requirement).
+
+## D39 — The review queue and the flywheel: labels close loops in code (phase 11)
+
+Embedded SQLite (D27's rationale: a queue that depends on a service
+being up loses labels exactly when it matters). Each entry carries
+the TRIGGERING EVIDENCE (rule reasons + top z-scores + the L3 tag) —
+an un-highlighted transcript makes the reviewer re-derive the
+detection, which buries humans and, measured in D38, buries LLM
+reviewers identically. Decisions record reviewer and
+seconds-to-decision (a 900ms decision on a complex flag is a
+reviewable fact — D26's discipline), and are APPEND-ONLY: a decided
+run cannot be re-decided or silently reopened by re-enqueueing.
+
+The flywheel, closed in code:
+- **false_positive** → a scoped exclusion per (rule, run_key) — the
+  rule stays live everywhere else, never a rule disable — written to
+  a committed JSONL the scanner applies, so the carve-out is a
+  reviewable diff and the run must score clean forever.
+- **confirmed_malicious** → the run joins `confirmed.jsonl` by
+  reference: part of the recall floor from that day on.
+- **Retunes ride the gate:** `resgraph-sentinel gate` (exit 0/1)
+  blocks any tuning change that misses a seeded-or-confirmed attack,
+  lets a rule flag benign traffic, or breaches the 3% benign FP
+  budget — the D29b shape pointed at the detector, enforced in CI
+  through the committed-corpus tests.
+
+**Rejected:** a served queue store (laptop scale; same reversal as
+D27 — a second reviewer moves it); free-form review notes as the
+label (a status enum is what closes loops; prose doesn't compile);
+auto-applying L3's tag as the decision (the human is the point).
+
 ## Phase contracts
 - The generator MUST emit D2 messages exactly and expose `--seed`
   for reproducibility.

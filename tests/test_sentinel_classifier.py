@@ -65,3 +65,43 @@ def test_classify_stamps_the_template_hash(tmp_path):
     assert c.tag == "budget_abuse"
     assert c.template_sha == classifier.TEMPLATE_SHA
     assert client.calls == 1
+
+
+def test_empty_evidence_renders_the_fallback_line():
+    assert "- statistical anomaly" in classifier.render_prompt({"tool_trace": [], "tokens": {}}, [])
+
+
+def test_classify_cmd_spends_once_and_deferred_only_finishes_the_queue(monkeypatch, tmp_path):
+    """The paid command end to end on a fake client: a tight cap defers,
+    then --deferred-only re-spends ONLY the deferred rows and preserves
+    the rest byte-for-byte."""
+    import json
+
+    from typer.testing import CliRunner
+
+    import resgraph.evals.providers as providers
+    from resgraph.sentinel import cli
+
+    client = _FakeClient("TAG: benign_anomaly\nREASON: looked fine")
+    monkeypatch.setattr(providers, "build_client", lambda setup: client)
+    monkeypatch.setattr(classifier, "LEDGER_PATH", tmp_path / "ledger.json")
+    out = tmp_path / "verdicts.jsonl"
+
+    r1 = CliRunner().invoke(cli.app, ["classify", "--out", str(out), "--cap", "10"])
+    assert r1.exit_code == 0, r1.output
+    rows = [json.loads(line) for line in out.read_text().splitlines()]
+    assert len(rows) == 29
+    deferred = [r for r in rows if r["deferred"]]
+    assert len(deferred) == 19 and client.calls == 10
+
+    calls_before = client.calls
+    kept = {r["run_key"]: r for r in rows if not r["deferred"]}
+    r2 = CliRunner().invoke(
+        cli.app, ["classify", "--out", str(out), "--cap", "65", "--deferred-only"]
+    )
+    assert r2.exit_code == 0, r2.output
+    rows2 = [json.loads(line) for line in out.read_text().splitlines()]
+    assert not any(r["deferred"] for r in rows2)
+    assert client.calls == calls_before + len(deferred)  # only the queue re-spent
+    for key, row in kept.items():
+        assert next(r for r in rows2 if r["run_key"] == key) == row

@@ -18,6 +18,7 @@ class Verdict:
     l1: rules.RuleVerdict
     l2_score: float
     l2_flagged: bool
+    l2_z: dict[str, float]
 
     @property
     def reaches_l3(self) -> bool:
@@ -62,8 +63,9 @@ def scan_corpus() -> Report:
             malicious="sentinel" in row,
             attack_type=(row.get("sentinel") or {}).get("attack_type"),
             l1=rules.scan_rules(row),
-            l2_score=baseline.score(row)[0],
+            l2_score=(scored := baseline.score(row))[0],
             l2_flagged=baseline.flagged(row),
+            l2_z=scored[1],
         )
         for row in [*benign, *attacks]
     ]

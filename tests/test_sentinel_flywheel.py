@@ -108,6 +108,25 @@ def test_queue_cli_fill_list_decide_on_patched_paths(monkeypatch, tmp_path):
     assert runner.invoke(cli.app, args).exit_code != 0  # append-only via the CLI too
 
 
+def test_the_gate_holds_the_confirmed_floor(monkeypatch, tmp_path):
+    """A confirmed catch that a tuning change would now miss — or that
+    the stream no longer contains — blocks like a seeded regression."""
+    report = scan.scan_corpus()
+    quiet = next(v.run_key for v in report.verdicts if not v.reaches_l3)
+    caught = next(v.run_key for v in report.verdicts if v.reaches_l3)
+    conf = tmp_path / "confirmed.jsonl"
+    monkeypatch.setattr(queue, "CONFIRMED_PATH", conf)
+
+    conf.write_text(json.dumps({"run_key": caught}) + "\n")
+    assert CliRunner().invoke(cli.app, ["gate"]).exit_code == 0
+
+    conf.write_text(json.dumps({"run_key": quiet}) + "\n" + json.dumps({"run_key": "ghost"}) + "\n")
+    result = CliRunner().invoke(cli.app, ["gate"])
+    assert result.exit_code == 1
+    assert f"would now be missed: {quiet}" in result.output
+    assert "not in the scanned stream: ghost" in result.output
+
+
 def test_the_gate_blocks_a_rule_that_flags_benign_traffic(monkeypatch):
     monkeypatch.setitem(rules.RULES, "noisy", lambda row, th: rules.Flag("noisy", "always"))
     result = CliRunner().invoke(cli.app, ["gate"])

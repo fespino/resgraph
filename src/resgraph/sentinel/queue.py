@@ -150,3 +150,10 @@ def load_exclusions(path: Path | None = None) -> set[tuple[str, str]]:
     return {
         (row["rule"], row["run_key"]) for row in map(json.loads, p.read_text().splitlines()) if row
     }
+
+
+def load_confirmed(path: Path | None = None) -> set[str]:
+    p = path or CONFIRMED_PATH
+    if not p.exists():
+        return set()
+    return {row["run_key"] for row in map(json.loads, p.read_text().splitlines()) if row}

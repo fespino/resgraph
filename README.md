@@ -75,10 +75,10 @@
 | src/resgraph/schema.py                       |       50 |        0 |    100% |           |
 | src/resgraph/sentinel/\_\_init\_\_.py        |        0 |        0 |    100% |           |
 | src/resgraph/sentinel/classifier.py          |       64 |        0 |    100% |           |
-| src/resgraph/sentinel/cli.py                 |      133 |        3 |     98% |54, 58, 118 |
+| src/resgraph/sentinel/cli.py                 |      141 |        3 |     98% |54, 58, 118 |
 | src/resgraph/sentinel/corpus.py              |       82 |        0 |    100% |           |
 | src/resgraph/sentinel/profile.py             |       51 |        0 |    100% |           |
-| src/resgraph/sentinel/queue.py               |       70 |        0 |    100% |           |
+| src/resgraph/sentinel/queue.py               |       75 |        0 |    100% |           |
 | src/resgraph/sentinel/rules.py               |       51 |        0 |    100% |           |
 | src/resgraph/sentinel/scan.py                |       46 |        0 |    100% |           |
 | src/resgraph/tools/\_\_init\_\_.py           |        0 |        0 |    100% |           |
@@ -90,7 +90,7 @@
 | src/resgraph/tools/context.py                |        9 |        0 |    100% |           |
 | src/resgraph/tools/http.py                   |       21 |        0 |    100% |           |
 | src/resgraph/tools/registry.py               |       24 |        0 |    100% |           |
-| **TOTAL**                                    | **5195** |  **132** | **97%** |           |
+| **TOTAL**                                    | **5208** |  **132** | **97%** |           |
 
 
 ## Setup coverage badge

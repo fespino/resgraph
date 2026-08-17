@@ -2221,7 +2221,10 @@ platform's thesis); raw provider ids in the catalog (D30's rejection
 stands); prompt-token estimation at admission (unreliable at this
 layer; the declared-window check is the honest subset); silent
 endpoint choice for pins (see above — the gateway must not pick a
-serving location a measured run will attribute).
+serving location a measured run will attribute); a softer
+pin-the-weights word (`pin_model`: exact model, serving free to
+float) — parked with its trigger in #286, not built while no
+multi-endpoint alias exists in the committed catalog.
 
 ## Phase contracts
 - The generator MUST emit D2 messages exactly and expose `--seed`

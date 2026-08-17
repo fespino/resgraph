@@ -84,3 +84,40 @@ def scan_cmd() -> None:
     )
     reach = sum(1 for v in report.verdicts if v.reaches_l3)
     typer.echo(f"funnel: {reach}/{len(report.verdicts)} runs would reach layer 3")
+
+
+@app.command("classify")
+def classify_cmd(
+    pilot: bool = typer.Option(False, "--pilot", help="One flagged run only (the paid-run gate)."),
+    judge: str = typer.Option(
+        "opus", "--judge", help="Pinned classifier setup in evals/models.yaml."
+    ),
+    out: str = typer.Option("evals/sentinel/l3-verdicts.jsonl", "--out"),
+) -> None:
+    """Layer 3 over the funnel's admissions: classify each flagged run
+    with the pinned judge, honoring the daily call cap (defer, never
+    drop). Writes one verdict row per run with the template hash."""
+    import json as _json
+    from pathlib import Path as _Path
+
+    from resgraph.evals.providers import build_client, load_setup
+
+    from . import classifier, corpus, scan
+
+    report = scan.scan_corpus()
+    rows = [*corpus.iter_benign(), *corpus.load_attacks()]
+    flagged = [(r, v) for r, v in zip(rows, report.verdicts, strict=True) if v.reaches_l3]
+    if pilot:
+        flagged = flagged[:1]
+    setup = load_setup(judge, _Path("evals/models.yaml"))
+    client = build_client(setup)
+    cap = classifier.CallCap()
+    verdicts = []
+    for row, v in flagged:
+        flags = [f.rule for f in v.l1.flags] or ["l2_anomaly"]
+        c = classifier.classify(client, setup["model"], row, flags, cap)
+        truth = (row.get("sentinel") or {}).get("attack_type", "benign")
+        verdicts.append({**c.__dict__, "truth": truth})
+        typer.echo(f"{c.run_key}: {c.tag} (truth={truth}){' DEFERRED' if c.deferred else ''}")
+    _Path(out).write_text("".join(_json.dumps(v, sort_keys=True) + "\n" for v in verdicts))
+    typer.echo(f"{len(verdicts)} verdicts -> {out} (template {classifier.TEMPLATE_SHA})")

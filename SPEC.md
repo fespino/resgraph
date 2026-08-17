@@ -1988,6 +1988,43 @@ Adopted, the checkpoint-plus-log shape D12 already gave the hot store: **the arc
 
 **Rejected:** AI summarization on the critical path — a summarized open registration is a different commitment (pre-registration's whole point is that the words are fixed before the run), and a summary that cannot be diffed cannot be audited; the structural split moves text, never rewrites it, and cut the fed context 85% (23.4k → ~3.6k tokens) with zero drift risk. A digest pass stays available as a reviewed-diff second step only if the split proves insufficient. RAG over the archive — ch-22 machinery for a working-set problem; reversal condition: when the split can no longer hold the working set under ~10k tokens. SPEC.md's own treatment — deferred; it has one consumer (humans) and no comparability hole.
 
+## D36 — The detection corpus: benign by reference, attacks by planted mutation (phase 11)
+
+Sentinel is measured on a combined stream, and the benign
+false-positive rate is the headline — recall on attacks alone is the
+easy half and a detector optimized for it is a reviewer-burnout
+machine. Two halves, both committed:
+
+- **Benign, by reference.** `evals/sentinel/benign-manifest.json`
+  names the committed run files whose rows are all normal triage;
+  the run files stay the record and the manifest is a selection, not
+  a copy. A file is excluded if any row carries a companion/fault tag
+  (store_degraded, budget_starved, injection, coverage_gap, reskin,
+  fault:*) — those runs are deliberately abnormal. A test pins the
+  manifest to a fresh selection so a new companion run cannot enter
+  the benign pool silently.
+- **Attacks, by planted mutation.** Seeded attacks are deterministic
+  mutations of benign rows — D25's plant-the-cause discipline applied
+  to malice at the run level. Each stays a real run except the
+  planted dimension and carries ground truth in a `sentinel` object.
+  Four types map to the OWASP LLM Top 10: injection (LLM01,
+  narrative-appended steering), exfil_shaped (LLM02, wide fan-out),
+  budget_abuse (unbounded consumption, re-fetch loop + token
+  inflation), privileged_probe (LLM06, a failed apply_remediation —
+  an *attempt* signal, since D26 blocks the act structurally).
+
+**Two invariants, both tested.** The base run per item is chosen by a
+seed derived from the item id, so the corpus rebuilds byte-for-byte
+(`resgraph-sentinel corpus build`) and a generator change that moves
+the bytes fails CI until the corpus is regenerated as a reviewable
+diff. And the one payload attacks may carry is a fixed,
+sentinel-marked template — only injection items carry the marker, the
+benign corpus never does, so the corpus cannot become a channel for
+un-swept content (the SANITIZATION check-8 shape). **Rejected:**
+free-text attack payloads (an un-swept channel); synthesizing attack
+runs from scratch (they would not be real traffic, and the whole
+point is that an attack is a normal run with one thing wrong).
+
 ## D35 — Egress posture: store containers keep egress; the control was measured and rejected (phase 11)
 
 The stores (redis, memgraph, postgres) have no legitimate outbound need

@@ -2170,6 +2170,59 @@ D27 — a second reviewer moves it); free-form review notes as the
 label (a status enum is what closes loops; prose doesn't compile);
 auto-applying L3's tag as the decision (the human is the point).
 
+## D40 — The catalog primitive: one alias, many endpoints; /v1/models; capability admission (gateway phase, #264)
+
+The structural gap between the miniature and the real gateway
+(validated against [OpenRouter's provider-routing
+docs](https://openrouter.ai/docs/features/provider-routing), 2026-08-18):
+their routable unit is the *endpoint* — one model served by many
+providers, selection choosing the provider FOR the model — while our
+registry conflated alias and serving location 1:1. Adopted:
+
+- **The alias is the request vocabulary; the endpoint is the routable
+  unit.** A setup MAY declare `endpoints:` — named partial setups
+  merged over the alias's own keys (id `alias@name`, `@` reserved).
+  A setup without the key is its own single endpoint, so the 1:1
+  world is byte-identical: endpoint id == alias, dispatch state stays
+  provider-keyed. An expanded endpoint gets its OWN dispatch state
+  (health, queue, TTFT) — two serving locations must not share one
+  health record.
+- **Selection and the walk.** The precedence router (D30) still
+  resolves an alias; a new endpoint plan then orders the alias's
+  admitted endpoints healthy-first then lowest-TTFT, and the
+  init-failure walk hops *within the alias first* (same model,
+  different serving) before the cross-model walk. The response's
+  `model` field carries the served endpoint id — provenance got more
+  precise, not different.
+- **A pin binds to an endpoint.** Pinning an alias with several
+  endpoints is refused as ambiguous (400): quantization differs per
+  endpoint, so serving location is part of what a measured run pins
+  (the D29c discipline extended one level down). `load_setup`
+  enforces the same rule for eval arms — an arm names a concrete
+  serving location or is refused.
+- **`GET /v1/models`** serves the routable catalog from the registry
+  as its single source: aliases, per-endpoint serving facts
+  (provider, wire model, quant, context window), declared
+  capabilities, and per-token prices where `PRICES_PER_MTOK` knows
+  the wire model (no price on file = unmetered, the shared
+  convention). Rows carry `routed` — the D30 serving-authority
+  distinction (catalog entry vs served backend) made visible.
+- **Capability admission filters on DECLARED capability only.** A
+  request needing tools excludes endpoints declaring
+  `capabilities.tools: false`; `max_tokens` above a declared
+  `context_window` excludes; all-excluded refuses 400 with every
+  reason named. Undeclared admits — refusing on ignorance would
+  refuse everything. Reversal: flip to strict admission once every
+  committed setup declares its capabilities.
+
+**Rejected:** mutable "latest" aliases (an anti-feature here — a name
+that silently changes meaning breaks reproducibility; pins are the
+platform's thesis); raw provider ids in the catalog (D30's rejection
+stands); prompt-token estimation at admission (unreliable at this
+layer; the declared-window check is the honest subset); silent
+endpoint choice for pins (see above — the gateway must not pick a
+serving location a measured run will attribute).
+
 ## Phase contracts
 - The generator MUST emit D2 messages exactly and expose `--seed`
   for reproducibility.

@@ -15,6 +15,8 @@
 # therefore runs correctly without a matching --thinking at the call site.
 opus:
   provider: anthropic
+  capabilities:
+    tools: true
   model: claude-opus-4-8
   extra_args:
     thinking:
@@ -22,6 +24,8 @@ opus:
 
 sonnet:
   provider: anthropic
+  capabilities:
+    tools: true
   model: claude-sonnet-4-6
   extra_args:
     thinking:
@@ -29,14 +33,38 @@ sonnet:
 
 haiku:
   provider: anthropic
+  capabilities:
+    tools: true
   model: claude-haiku-4-5
 
 # A hosted chat-completions provider — OpenAI, OpenRouter, a cloud endpoint.
 openai:
   provider: openai
+  capabilities:
+    tools: true
   model: gpt-4o
   base_url: https://api.openai.com/v1
   api_key_env: OPENAI_API_KEY
+
+# An alias MAY declare `endpoints:` — one model, many serving locations —
+# and the gateway selects among them per request (health, then latency);
+# a pin must then name one (`alias@name`): serving location is part of
+# what a measured run pins, since quantization can differ per endpoint.
+# Each entry merges over the alias's own keys. Example (not active — this
+# host runs one serving stack):
+#
+#   qwen-local-1.5b:
+#     model: qwen2.5:1.5b
+#     context_window: 8192
+#     endpoints:
+#       - name: ollama
+#         provider: ollama
+#         base_url: http://localhost:11434/v1
+#         quant: Q4_K_M
+#       - name: llamacpp
+#         provider: llamacpp
+#         base_url: http://localhost:8081/v1
+#         quant: Q8_0
 
 # A self-hosted model, on localhost or a remote GPU — same client, only the URL
 # changes. tool_choice: required forces a tool call (the constrained-decoding
@@ -47,6 +75,8 @@ openai:
 # on it (#192). Only 1.5b has been run end to end here; 3b/7b await the hardware.
 qwen-local-7b:
   provider: ollama
+  capabilities:
+    tools: true
   model: qwen2.5:7b
   base_url: http://localhost:11434/v1
   temperature: 0
@@ -57,6 +87,8 @@ qwen-local-7b:
 
 qwen-local-3b:
   provider: ollama
+  capabilities:
+    tools: true
   model: qwen2.5:3b
   base_url: http://localhost:11434/v1
   temperature: 0
@@ -67,6 +99,8 @@ qwen-local-3b:
 
 qwen-local-1.5b:
   provider: ollama
+  capabilities:
+    tools: true
   model: qwen2.5:1.5b
   base_url: http://localhost:11434/v1
   temperature: 0

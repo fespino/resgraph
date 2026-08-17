@@ -39,6 +39,7 @@ from resgraph.gateway.accounting import StreamAccount
 from resgraph.gateway.budget import FallForwardBudget
 from resgraph.gateway.cache import ResponseCache, cache_key
 from resgraph.gateway.dispatch import Backend, ProbeResult, QueueFull, choose
+from resgraph.gateway.registry import capability_mismatch, catalog_rows, expand
 from resgraph.gateway.relay import StreamEvent, StreamFactory, parse_chat_sse, relay
 from resgraph.gateway.router import (
     DEFAULT_REGISTRY,
@@ -92,11 +93,16 @@ class GenerateOut(BaseModel):
 
 @dataclass
 class Gateway:
-    """Setups, their clients, and one dispatch state per provider."""
+    """The endpoint table, their clients, and one dispatch state per backend.
+
+    ``setups`` maps endpoint id → concrete setup (id == alias for the 1:1
+    case); ``aliases`` maps alias → its endpoint ids. The alias is the
+    request vocabulary, the endpoint is the routable unit."""
 
     setups: dict[str, dict[str, Any]]
     client_factory: Callable[[dict[str, Any]], Any]
     registry: Mapping[TaskClass, ClassRoute] = field(default_factory=lambda: DEFAULT_REGISTRY)
+    aliases: dict[str, list[str]] = field(default_factory=dict)
     clients: dict[str, Any] = field(default_factory=dict)
     backends: dict[str, Backend] = field(default_factory=dict)
     cache: ResponseCache = field(default_factory=ResponseCache)
@@ -110,21 +116,46 @@ class Gateway:
 
     def backend(self, alias: str) -> Backend:
         provider = self.setups[alias].get("provider", "default")
-        if provider not in self.backends:
+        # an expanded endpoint gets its own dispatch state (two serving
+        # locations must not share one health/queue); implicit endpoints
+        # keep provider-keyed state, the 1:1 world unchanged
+        key = alias if "@" in alias else provider
+        if key not in self.backends:
             concurrency, queue_max = PROVIDER_LIMITS.get(provider, DEFAULT_LIMITS)
-            self.backends[provider] = Backend(provider, concurrency, queue_max)
-        return self.backends[provider]
+            self.backends[key] = Backend(key, concurrency, queue_max)
+        return self.backends[key]
+
+    def candidates(self, alias: str) -> list[str]:
+        """The endpoint ids serving an alias (an endpoint id names itself)."""
+        ids = self.aliases.get(alias)
+        if ids is not None:
+            return list(ids)
+        return [alias] if alias in self.setups else []
+
+    def serving_endpoint(self, alias: str) -> str | None:
+        """The endpoint that would serve this alias now: healthy before
+        degraded, then lowest observed TTFT; a fully-down alias still names
+        its first endpoint (the walk decides what down means)."""
+        ids = self.candidates(alias)
+        if not ids:
+            return None
+        if len(ids) == 1:
+            return ids[0]  # nothing to choose; keep dispatch state lazy
+        nxt = choose([self.backend(e) for e in ids])
+        if nxt is None:
+            return ids[0]
+        return next(e for e in ids if self.backend(e).name == nxt.name)
 
     def routed(self) -> dict[str, str]:
-        """provider → serving alias, from the registry plus the global
+        """provider → serving endpoint id, from the registry plus the global
         default. The registry is the gateway's serving authority; a setup it
         does not route is a catalog entry (an eval arm), never a backend to
         serve, walk to, or probe — an unrouted provider must not be spent on."""
         out: dict[str, str] = {}
         for route in [*self.registry.values(), GLOBAL_DEFAULT_MODEL]:
-            setup = self.setups.get(route.model)
-            if setup is not None:
-                out.setdefault(setup.get("provider", "default"), route.model)
+            eid = self.serving_endpoint(route.model)
+            if eid is not None:
+                out.setdefault(self.setups[eid].get("provider", "default"), eid)
         return out
 
     def alias_for_backend(self, provider: str) -> str | None:
@@ -227,7 +258,7 @@ def _next_alias(gw: Gateway, chain: list[str], *, ignore_budget: bool = False) -
     budget = gw.fallback_budget
     candidates = []
     for provider, fallback in gw.routed().items():
-        if provider in tried:
+        if provider in tried or gw.backend(fallback).name in tried:
             continue
         if not ignore_budget and budget is not None and _paid(gw, fallback) and not budget.allows():
             continue
@@ -253,13 +284,20 @@ def _record_hop(gw: Gateway, alias: str, exc: Exception, chain: list[str]) -> No
 
 
 def _serve_with_walk[T](
-    gw: Gateway, decision: Any, attempt: Callable[[str], T], task_class: str
+    gw: Gateway,
+    decision: Any,
+    attempt: Callable[[str], T],
+    task_class: str,
+    first: str | None = None,
+    more: list[str] | None = None,
 ) -> tuple[T, str, list[str]]:
     """Drive the init-failure walk for any attempt shape (a full call or a
-    stream open): pins fail loudly, other traffic hops until served or
-    exhausted."""
+    stream open): pins fail loudly, other traffic hops first to the routed
+    alias's remaining endpoints (same model, different serving), then
+    cross-model until served or exhausted."""
     chain: list[str] = []
-    alias: str | None = decision.model
+    within: list[str] = list(more or [])
+    alias: str | None = decision.model if first is None else first
     while alias is not None:
         try:
             return attempt(alias), alias, chain
@@ -295,7 +333,7 @@ def _serve_with_walk[T](
                     502, detail=f"pinned {alias!r} failed on {gw.backend(alias).name}: {exc}"
                 ) from exc
             _record_hop(gw, alias, exc, chain)
-            alias = _next_alias(gw, chain)
+            alias = within.pop(0) if within else _next_alias(gw, chain)
     budget = gw.fallback_budget
     budget_blocked = (
         budget is not None
@@ -338,6 +376,59 @@ def _no_streamable_fallback(gw: Gateway, decision_model: str, unstreamable: froz
         if gw.backend(alias).health.state != "down":
             return False
     return True
+
+
+def _endpoint_plan(gw: Gateway, decision: Any, req: GenerateIn) -> tuple[str, list[str]]:
+    """Resolve the decision's target into (first endpoint, remaining
+    within-alias candidates), applying capability admission per request.
+
+    A pin binds to a single endpoint: pinning an alias with several
+    endpoints is refused as ambiguous — serving location is part of what a
+    measured run pins (quantization differs per endpoint), so the gateway
+    must not choose it silently. Other traffic gets health-then-latency
+    ordering among the alias's admitted endpoints."""
+    target = decision.model
+    wants_tools = bool(req.tools)
+    if decision.source == "pin":
+        if target in gw.setups:
+            reason = capability_mismatch(
+                gw.setups[target], wants_tools=wants_tools, max_tokens=req.max_tokens
+            )
+            if reason is not None:
+                raise HTTPException(400, detail=f"pinned {target!r} cannot serve: {reason}")
+            return target, []
+        ids = gw.aliases.get(target)
+        if ids and len(ids) > 1:
+            raise HTTPException(
+                400, detail=f"pin {target!r} is ambiguous across endpoints {ids}; pin one of them"
+            )
+        raise HTTPException(400, detail=f"unknown model alias {target!r}")
+    if target in gw.setups and target not in gw.aliases:
+        candidates = [target]  # an override may name an endpoint id directly
+    else:
+        candidates = gw.candidates(target)
+        if not candidates:
+            raise HTTPException(400, detail=f"unknown model alias {target!r}")
+    admitted, reasons = [], []
+    for eid in candidates:
+        reason = capability_mismatch(
+            gw.setups[eid], wants_tools=wants_tools, max_tokens=req.max_tokens
+        )
+        if reason is None:
+            admitted.append(eid)
+        else:
+            reasons.append(f"{eid}: {reason}")
+    if not admitted:
+        raise HTTPException(400, detail="no endpoint can serve this request: " + "; ".join(reasons))
+    up = [e for e in admitted if gw.backend(e).health.state != "down"] or admitted
+    up.sort(
+        key=lambda e: (
+            gw.backend(e).health.state != "healthy",
+            gw.backend(e).ttft_ewma.value is not None,
+            gw.backend(e).ttft_ewma.value or 0.0,
+        )
+    )
+    return up[0], up[1:]
 
 
 def _open_stream(
@@ -509,16 +600,17 @@ def create_app(
     fallback_budget: FallForwardBudget | None = None,
     ignore_probes: bool = False,
 ) -> FastAPI:
-    setups = yaml.safe_load(models_path.read_text()) or {}
-    for name, setup in setups.items():
+    table, aliases = expand(yaml.safe_load(models_path.read_text()) or {})
+    for name, setup in table.items():
         cadence = setup.get("probe_interval_s")
         if cadence is not None and float(cadence) <= 0:
             # wait(0) spins: a hot probe loop, and a spend bug on a priced setup
             raise SystemExit(f"setup {name!r}: probe_interval_s must be > 0, got {cadence}")
     gw = Gateway(
-        setups=setups,
+        setups=table,
         client_factory=client_factory,
         registry=DEFAULT_REGISTRY if registry is None else registry,
+        aliases=aliases,
         fallback_budget=fallback_budget,
     )
     factory = _default_stream_factory(gw) if stream_factory is None else stream_factory
@@ -551,14 +643,22 @@ def create_app(
         lambda: [(name, b.in_flight) for name, b in gw.backends.items()]
     )
 
+    @app.get("/v1/models")  # registration is the use
+    def models() -> dict[str, Any]:  # pyright: ignore[reportUnusedFunction]
+        """The routable catalog from the registry as its single source:
+        aliases, their endpoints' serving facts, declared capabilities,
+        prices where the pricing table knows the wire model. No mutable
+        \"latest\" aliases, by decision — pins are the platform's point."""
+        routed_aliases = {r.model for r in [*gw.registry.values(), GLOBAL_DEFAULT_MODEL]}
+        return {"data": catalog_rows(gw.setups, gw.aliases, routed_aliases, PRICES_PER_MTOK)}
+
     @app.post("/v1/generate", response_model=GenerateOut)  # registration is the use
     def generate(req: GenerateIn) -> GenerateOut | StreamingResponse:  # pyright: ignore[reportUnusedFunction]
         decision = resolve(pin=req.pin, model=req.model, task_class=req.task_class)
-        if decision.model not in gw.setups:
-            raise HTTPException(400, detail=f"unknown model alias {decision.model!r}")
+        first, within = _endpoint_plan(gw, decision, req)
 
         if req.stream:
-            routed_backend = gw.backend(decision.model)
+            routed_backend = gw.backend(first)
             if routed_backend.health.state == "down":
                 labels = {
                     "backend": routed_backend.name,
@@ -572,18 +672,21 @@ def create_app(
                         502,
                         detail=f"pinned {decision.model!r} backend {routed_backend.name!r} is down",
                     )
-                if _no_streamable_fallback(gw, decision.model, unstreamable):
+                if not within and _no_streamable_fallback(gw, first, unstreamable):
                     obs.GATEWAY_REQUESTS.add(1, {**labels, "outcome": "refused_503"})
                     raise HTTPException(
                         503,
                         detail=f"backend {routed_backend.name!r} is down and no streamable "
                         "fallback is up; retry after the next probe round",
-                        headers={
-                            "Retry-After": str(max(1, int(_probe_cadence(gw, decision.model))))
-                        },
+                        headers={"Retry-After": str(max(1, int(_probe_cadence(gw, first))))},
                     )
             (backend, events), alias, chain = _serve_with_walk(
-                gw, decision, lambda a: _open_stream(gw, a, req, factory), req.task_class or "none"
+                gw,
+                decision,
+                lambda a: _open_stream(gw, a, req, factory),
+                req.task_class or "none",
+                first=first,
+                more=within,
             )
 
             def reopen(chain2: list[str]) -> tuple[str, Backend, Iterator[StreamEvent]] | None:
@@ -617,8 +720,8 @@ def create_app(
         # sampled response replayed as the answer would be a quiet lie, so
         # anything else is a pass-through — and a hit says cached=true.
         key = None
-        if req.cache_responses and gw.setups[decision.model].get("temperature") == 0:
-            key = cache_key(decision.model, _request_kwargs(gw, decision.model, req))
+        if req.cache_responses and gw.setups[first].get("temperature") == 0:
+            key = cache_key(first, _request_kwargs(gw, first, req))
             hit = gw.cache.get(key)
             if hit is None:
                 obs.GATEWAY_CACHE_MISSES.add(1, {"layer": "gateway"})
@@ -636,7 +739,12 @@ def create_app(
                 )
                 return hit.model_copy(update={"cached": True})
         (content, usage, latency), alias, chain = _serve_with_walk(
-            gw, decision, lambda a: _call(gw, a, req), req.task_class or "none"
+            gw,
+            decision,
+            lambda a: _call(gw, a, req),
+            req.task_class or "none",
+            first=first,
+            more=within,
         )
         out = GenerateOut(
             content=content,
@@ -654,7 +762,7 @@ def create_app(
         if req.cache_responses and gw.setups[alias].get("temperature") == 0:
             served_key = (
                 key
-                if alias == decision.model and key is not None
+                if alias == first and key is not None
                 else cache_key(alias, _request_kwargs(gw, alias, req))
             )
             gw.cache.put(served_key, out, usage.input_tokens + usage.output_tokens)

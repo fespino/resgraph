@@ -46,8 +46,8 @@ class CallCap:
     """Per-UTC-day call counter, warn once at 90%, defer past the cap
     (laptop-atomic JSON, same reversal condition as the D29a ledger)."""
 
-    def __init__(self, path: Path = LEDGER_PATH, cap: int = DAILY_CALL_CAP) -> None:
-        self.path, self.cap = path, cap
+    def __init__(self, path: Path | None = None, cap: int = DAILY_CALL_CAP) -> None:
+        self.path, self.cap = path or LEDGER_PATH, cap
 
     def _state(self) -> dict[str, Any]:
         today = datetime.now(UTC).date().isoformat()

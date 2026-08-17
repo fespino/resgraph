@@ -2067,6 +2067,53 @@ in-VM iptables surgery (unsupported, drift-shaped, invisible to the
 compose file — the file must remain the authority for what the
 stack's network does).
 
+## D37 — Detection layers 1+2: measured thresholds, per-worker profiles, a funnel that is the architecture (phase 11)
+
+Sentinel scores completed runs through cost-ordered layers; a run
+reaches the paid layer 3 only through a flag, and the funnel count is
+printed by the same command that measures the confusion matrices
+(`resgraph-sentinel scan`) — proven, not asserted.
+
+- **Layer 1 is rules, and every threshold is measured against the
+  committed benign corpus, not invented.** The agent surface for the
+  forbidden-tool rule derives from the registry (a privileged call is
+  an ATTEMPT signal; D26 blocks the act). Tool-call ceiling 15 (the
+  harness cap; benign max equals it), output-token ceiling 20,000
+  (benign max 17,248; the abuse plant is 40k+), identical-repeat
+  ceiling 4 (benign max 2; the abuse loop plants 30), injection
+  signatures with zero measured benign hits. Each rule reports its own
+  tp/fp so it is individually tunable; retunes belong to the flywheel
+  on labels (W5), not to ad-hoc edits.
+- **Layer 2 is a per-WORKER behavior profile.** The benign corpus
+  spans three arms with different tool habits — one global profile
+  would read each worker as the others' anomaly. z-scores per feature
+  (calls, distinct resources, max depth, output tokens,
+  fetch/traverse ratio, failed calls), aggregate = max |z| so the
+  worst feature IS the explanation, threshold = a Tukey fence over
+  the benign aggregate distribution. The fence multiplier was chosen
+  by a measured sweep: recall is fence-invariant on the corpus
+  (volumetric attacks score beyond any fence; text/insert attacks are
+  invisible to features at every fence — they are layer 1's by
+  design), so the multiplier trades only benign false positives:
+  35/361 at 1.5x vs 9/361 at 3.0x. Far-out (3.0) adopted. An unknown
+  worker scores infinite — no baseline to be normal against is itself
+  the signal.
+- **The measured result on the committed corpus:** layer 1 catches
+  20/20 seeded attacks with 0 benign flags; combined benign
+  false-positive rate 9/361 (~2.5%, all from layer 2's novelty
+  channel); funnel 29/381 would reach layer 3. These floors are
+  asserted as tests — the W5 CI recall gate formalizes them.
+- **The stratified sampler is pure policy**: deterministic per-window
+  seed, per-type quota with a floor (a low-volume run type still
+  accumulates signal), uniform fill — wired to stream mode when it
+  exists; testable offline now.
+
+**Rejected:** a global behavior profile (reads workers as each other's
+anomalies); training a model for layer 2 (a z-score with a named worst
+feature is explainable to a reviewer; a trained score is not, and the
+explanation is what the review queue renders); thresholds chosen by
+feel (every bound above cites the benign measurement it clears).
+
 ## Phase contracts
 - The generator MUST emit D2 messages exactly and expose `--seed`
   for reproducibility.

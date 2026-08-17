@@ -55,3 +55,32 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+
+@app.command("scan")
+def scan_cmd() -> None:
+    """Layers 1+2 over the combined corpus: benign false-positive rate
+    first (the headline), then per-layer confusion, per-rule hits, the
+    per-type recall, and the funnel into layer 3."""
+    from . import scan
+
+    report = scan.scan_corpus()
+    combined = report.confusion("l3")
+    benign_total = combined["fp"] + combined["tn"]
+    typer.echo(f"benign false-positive rate: {combined['fp']}/{benign_total}")
+    for layer in ("l1", "l2"):
+        c = report.confusion(layer)
+        typer.echo(f"{layer}: tp={c['tp']} fp={c['fp']} fn={c['fn']} tn={c['tn']}")
+    typer.echo(
+        "per-rule (tp/fp): "
+        + ", ".join(f"{name}={v['tp']}/{v['fp']}" for name, v in report.per_rule().items())
+    )
+    typer.echo(
+        "recall by type: "
+        + ", ".join(
+            f"{t}={caught}/{total}"
+            for t, (caught, total) in sorted(report.recall_by_type().items())
+        )
+    )
+    reach = sum(1 for v in report.verdicts if v.reaches_l3)
+    typer.echo(f"funnel: {reach}/{len(report.verdicts)} runs would reach layer 3")

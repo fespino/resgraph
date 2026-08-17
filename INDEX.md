@@ -47,8 +47,12 @@
 - docs/incidents/ — incident notes (induced drills labeled as such)
 - docs/reviews/ — recorded system reviews (harnessability, checklist walks)
 - docs/sentinel/ — misuse-detection phase: threat model (both halves,
-  breach signals with status) and prior art (Clio, OWASP, detection
-  economics)
+  breach signals with status), prior art (Clio, OWASP, detection
+  economics), corpus (benign manifest + seeded attacks)
+- src/resgraph/sentinel/ — the detection surface: corpus.py (benign +
+  seeded attacks), cli.py (resgraph-sentinel)
+- evals/sentinel/ — the committed corpus: benign-manifest.json (runs by
+  reference) + attacks.jsonl (deterministic, ground-truthed)
 - scripts/egress-pilot.sh — the D35 measurement: can compose block
   container egress without killing published ports (here: no)
 - benchmarks/ — measurement scripts (methods in BENCHMARKS.md)

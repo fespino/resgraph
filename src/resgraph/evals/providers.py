@@ -21,6 +21,8 @@ from typing import Any
 import httpx
 import yaml
 
+from resgraph.gateway.registry import expand
+
 Transport = Callable[[str, dict[str, Any], dict[str, str]], dict[str, Any]]
 LineTransport = Callable[[str, dict[str, Any], dict[str, str]], Iterator[str]]
 
@@ -479,11 +481,19 @@ def _build_gateway(setup: dict[str, Any]) -> Any:
 def load_setup(name: str, path: Path) -> dict[str, Any]:
     """Read a named client setup from the YAML config. Secrets are never here —
     keys come from the environment (``api_key_env`` names the variable); the file
-    holds only provider, model, endpoint, and determinism knobs."""
-    setups = yaml.safe_load(path.read_text()) or {}
-    if name not in setups:
-        raise SystemExit(f"no setup {name!r} in {path}; have: {', '.join(sorted(setups))}")
-    return {"name": name, **setups[name]}
+    holds only provider, model, endpoint, and determinism knobs.
+
+    ``name`` is an alias or an ``alias@endpoint`` id; an alias with several
+    endpoints must be named per endpoint — an eval arm is a concrete serving
+    location (quantization differs per endpoint), never a choice the loader
+    makes silently."""
+    table, aliases = expand(yaml.safe_load(path.read_text()) or {})
+    if name in table:
+        return {"name": name, **table[name]}
+    ids = aliases.get(name)
+    if ids:
+        raise SystemExit(f"setup {name!r} has several endpoints ({', '.join(ids)}); name one")
+    raise SystemExit(f"no setup {name!r} in {path}; have: {', '.join(sorted(aliases))}")
 
 
 def _build_anthropic(setup: dict[str, Any]) -> Any:

@@ -50,7 +50,8 @@
   breach signals with status), prior art (Clio, OWASP, detection
   economics), corpus (benign manifest + seeded attacks)
 - src/resgraph/sentinel/ — the detection surface: corpus.py (benign +
-  seeded attacks), cli.py (resgraph-sentinel)
+  seeded attacks), rules.py (layer 1), profile.py (layer 2 + sampler),
+  scan.py (funnel + confusion), cli.py (resgraph-sentinel)
 - evals/sentinel/ — the committed corpus: benign-manifest.json (runs by
   reference) + attacks.jsonl (deterministic, ground-truthed)
 - scripts/egress-pilot.sh — the D35 measurement: can compose block

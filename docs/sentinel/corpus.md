@@ -69,3 +69,14 @@ resgraph-sentinel corpus stats                  # the combined-stream shape
 
 Both files are committed; regeneration is a reviewable diff, not a
 runtime step.
+
+## The layers' first measurement (W3)
+
+`resgraph-sentinel scan` on the committed corpus: layer 1 catches
+20/20 seeded attacks with zero benign flags (each rule's tp/fp
+reported individually); layer 2 flags the volumetric attacks and 9/361
+benign rows (~2.5%, the Tukey-fence novelty channel); the funnel
+admits 29/381 runs to layer 3. The division of labor is measured, not
+designed: text/insert attacks are invisible to features (layer 1's
+job), volume is invisible to signatures (layer 2's). Decision record:
+D37; floors asserted in tests/test_sentinel_layers.py.

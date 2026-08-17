@@ -51,7 +51,8 @@
   economics), corpus (benign manifest + seeded attacks)
 - src/resgraph/sentinel/ — the detection surface: corpus.py (benign +
   seeded attacks), rules.py (layer 1), profile.py (layer 2 + sampler),
-  scan.py (funnel + confusion), cli.py (resgraph-sentinel)
+  scan.py (funnel + confusion), classifier.py (layer 3 + call cap),
+  queue.py (review queue + flywheel), cli.py (resgraph-sentinel)
 - evals/sentinel/ — the committed corpus: benign-manifest.json (runs by
   reference) + attacks.jsonl (deterministic, ground-truthed)
 - scripts/egress-pilot.sh — the D35 measurement: can compose block

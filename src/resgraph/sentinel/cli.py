@@ -211,6 +211,7 @@ def gate_cmd() -> None:
     """The CI recall gate (the D29b shape pointed at the detector):
     exit 1 if any seeded or confirmed attack goes uncaught, any rule
     flags benign traffic, or the benign FP budget is breached."""
+    from . import queue as q
     from . import scan
 
     report = scan.scan_corpus()
@@ -218,6 +219,13 @@ def gate_cmd() -> None:
     for attack_type, (caught, total) in report.recall_by_type().items():
         if caught != total:
             failures.append(f"recall floor: {attack_type} {caught}/{total}")
+    flagged = {v.run_key for v in report.verdicts if v.reaches_l3}
+    scanned = {v.run_key for v in report.verdicts}
+    for key in sorted(q.load_confirmed()):
+        if key not in scanned:
+            failures.append(f"confirmed catch not in the scanned stream: {key}")
+        elif key not in flagged:
+            failures.append(f"confirmed catch would now be missed: {key}")
     for name, counts in report.per_rule().items():
         if counts["fp"]:
             failures.append(f"rule {name} flags benign traffic ({counts['fp']})")

@@ -25,7 +25,7 @@ from collections.abc import Callable, Iterator, Mapping
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import yaml
 from fastapi import FastAPI, HTTPException
@@ -40,7 +40,14 @@ from resgraph.gateway.accounting import StreamAccount
 from resgraph.gateway.budget import FallForwardBudget
 from resgraph.gateway.cache import ResponseCache, cache_key
 from resgraph.gateway.dispatch import Backend, ProbeResult, QueueFull, choose
-from resgraph.gateway.registry import capability_mismatch, catalog_rows, endpoint_price, expand
+from resgraph.gateway.registry import (
+    capability_mismatch,
+    catalog_rows,
+    endpoint_price,
+    expand,
+    load_policy,
+    policy_allows,
+)
 from resgraph.gateway.relay import StreamEvent, StreamFactory, parse_chat_sse, relay
 from resgraph.gateway.router import (
     DEFAULT_REGISTRY,
@@ -54,6 +61,7 @@ from resgraph.gateway.router import (
 log = logging.getLogger("resgraph.gateway")
 
 MODELS_PATH = Path("evals/models.yaml")
+POLICY_PATH = Path("evals/gateway-policy.yaml")
 PROVIDER_LIMITS: Mapping[str, tuple[int, int]] = {"anthropic": (8, 16)}
 DEFAULT_LIMITS = (1, 4)
 PROBE_SLOW_S = 5.0
@@ -72,6 +80,15 @@ class GenerateIn(BaseModel):
     pin: str | None = None
     stream: bool = False
     cache_responses: bool = True
+    # the caller contract (D42): hard constraints refuse loudly, soft
+    # preferences deprioritize, narrowing never broadens
+    caller: str | None = None  # attribution-only until W4 binds it to a key
+    max_price: float | None = None  # hard: effective per-mtok ceiling
+    preferred_max_latency: float | None = None  # soft: TTFT p50 seconds
+    preferred_min_throughput: float | None = None  # soft: tps p50
+    only: list[str] | None = None
+    ignore: list[str] | None = None
+    sort: Literal["price", "latency", "throughput"] | None = None
 
 
 class UsageOut(BaseModel):
@@ -111,6 +128,7 @@ class Gateway:
     last_probe: dict[str, float] = field(default_factory=dict)
     # routing lottery, not cryptography; injectable for deterministic tests
     rng: random.Random = field(default_factory=random.Random)  # nosec B311
+    policy: dict[str, list[str]] = field(default_factory=dict)
 
     def client(self, alias: str) -> Any:
         if alias not in self.clients:
@@ -385,24 +403,121 @@ def _no_streamable_fallback(gw: Gateway, decision_model: str, unstreamable: froz
     return True
 
 
+def _policy_filter(gw: Gateway, caller: str | None, eids: list[str]) -> list[str]:
+    """The operator plane: a caller with a policy entry reaches only what
+    it names; a caller without one is unrestricted. Policy binds pins too
+    — operator authority outranks every caller word. NOTE: `caller` is
+    self-declared attribution until the identity workstream binds it to a
+    key; the mechanism is real, the authentication arrives with W4."""
+    if caller is None or caller not in gw.policy:
+        return eids
+    allowed = gw.policy[caller]
+    kept = [e for e in eids if policy_allows(allowed, e, gw.setups[e])]
+    if not kept:
+        raise HTTPException(
+            403, detail=f"policy for caller {caller!r} allows none of these endpoints"
+        )
+    return kept
+
+
+def _narrow(req: GenerateIn, eids: list[str]) -> list[str]:
+    """Caller narrowing: `only`/`ignore` shrink the candidate set and can
+    never grow it — an `only` naming something outside the routed
+    candidates adds nothing (narrow-never-broaden, the suppressor shape)."""
+    kept = list(eids)
+    if req.only:
+        sel = set(req.only)
+        kept = [e for e in kept if sel & {e, e.split("@", 1)[0]}]
+    if req.ignore:
+        drop = set(req.ignore)
+        kept = [e for e in kept if not (drop & {e, e.split("@", 1)[0]})]
+    if not kept:
+        raise HTTPException(400, detail="only/ignore narrowed the candidate set to nothing")
+    return kept
+
+
+def _price_ceiling(gw: Gateway, req: GenerateIn, eids: list[str]) -> list[str]:
+    """`max_price` is HARD: if nothing fits the ceiling, refuse loudly
+    with the cheapest available price named — never serve above a stated
+    ceiling (their crispest design idea, kept verbatim)."""
+    if req.max_price is None:
+        return eids
+    priced = {e: endpoint_price(gw.setups[e], PRICES_PER_MTOK) or 0.0 for e in eids}
+    kept = [e for e in eids if priced[e] <= req.max_price]
+    if not kept:
+        cheapest = min(priced.values())
+        raise HTTPException(
+            400,
+            detail=f"max_price {req.max_price}/mtok refused: cheapest "
+            f"admitted endpoint costs {cheapest}/mtok",
+        )
+    return kept
+
+
+def _misses_preference(gw: Gateway, req: GenerateIn, eid: str) -> bool:
+    """Soft preferences deprioritize on EVIDENCE only: an unmeasured
+    endpoint cannot miss a preference (nothing is held against a window
+    that has seen no traffic). Checked at p50 — the number form of their
+    API; the per-percentile object form is a recorded subset (D42)."""
+    b = gw.backend(eid)
+    if req.preferred_max_latency is not None:
+        p50 = b.ttft.percentile(50)
+        if p50 is not None and p50 > req.preferred_max_latency:
+            return True
+    if req.preferred_min_throughput is not None:
+        p50 = b.tps.percentile(50)
+        if p50 is not None and p50 < req.preferred_min_throughput:
+            return True
+    return False
+
+
+def _strict_sort(gw: Gateway, req: GenerateIn, eids: list[str]) -> list[str]:
+    """A `sort` override is the either/or rule: the caller's list or the
+    market lottery, never a blend — load balancing is disabled entirely
+    (the documented behavior, adopted as-is)."""
+    if req.sort == "price":
+        return sorted(eids, key=lambda e: endpoint_price(gw.setups[e], PRICES_PER_MTOK) or 0.0)
+    if req.sort == "latency":
+        # unmeasured sorts last under a strict sort: the caller asked for
+        # proven speed, and an empty window proves nothing
+        return sorted(
+            eids,
+            key=lambda e: (
+                gw.backend(e).ttft.percentile(50) is None,
+                gw.backend(e).ttft.percentile(50) or 0.0,
+            ),
+        )
+    return sorted(
+        eids,
+        key=lambda e: (
+            gw.backend(e).tps.percentile(50) is None,
+            -(gw.backend(e).tps.percentile(50) or 0.0),
+        ),
+    )
+
+
 def _endpoint_plan(gw: Gateway, decision: Any, req: GenerateIn) -> tuple[str, list[str]]:
     """Resolve the decision's target into (first endpoint, remaining
-    within-alias candidates), applying capability admission per request.
+    within-alias candidates), applying the full constraint pipeline:
+    policy (403) → narrowing (400) → capability (400) → price ceiling
+    (400) → health tiers → strict sort or the price lottery with soft
+    preferences deprioritizing.
 
-    A pin binds to a single endpoint: pinning an alias with several
-    endpoints is refused as ambiguous — serving location is part of what a
-    measured run pins (quantization differs per endpoint), so the gateway
-    must not choose it silently. Other traffic gets health-then-latency
-    ordering among the alias's admitted endpoints."""
+    A pin binds to a single endpoint (D40) and composes with the HARD
+    constraints only — policy, capability, price ceiling all refuse
+    loudly on a pin; narrowing, sort, and soft preferences are no-ops on
+    a set of one."""
     target = decision.model
     wants_tools = bool(req.tools)
     if decision.source == "pin":
         if target in gw.setups:
+            _policy_filter(gw, req.caller, [target])
             reason = capability_mismatch(
                 gw.setups[target], wants_tools=wants_tools, max_tokens=req.max_tokens
             )
             if reason is not None:
                 raise HTTPException(400, detail=f"pinned {target!r} cannot serve: {reason}")
+            _price_ceiling(gw, req, [target])
             return target, []
         ids = gw.aliases.get(target)
         if ids and len(ids) > 1:
@@ -416,6 +531,7 @@ def _endpoint_plan(gw: Gateway, decision: Any, req: GenerateIn) -> tuple[str, li
         candidates = gw.candidates(target)
         if not candidates:
             raise HTTPException(400, detail=f"unknown model alias {target!r}")
+    candidates = _narrow(req, _policy_filter(gw, req.caller, candidates))
     admitted, reasons = [], []
     for eid in candidates:
         reason = capability_mismatch(
@@ -427,23 +543,31 @@ def _endpoint_plan(gw: Gateway, decision: Any, req: GenerateIn) -> tuple[str, li
             reasons.append(f"{eid}: {reason}")
     if not admitted:
         raise HTTPException(400, detail="no endpoint can serve this request: " + "; ".join(reasons))
+    admitted = _price_ceiling(gw, req, admitted)
     up = [e for e in admitted if gw.backend(e).health.state != "down"] or admitted
-    ordered = _order_candidates(gw, up)
+    if req.sort is not None:
+        ordered = _strict_sort(gw, req, up)
+    else:
+        ordered = _order_candidates(gw, up, misses=lambda e: _misses_preference(gw, req, e))
     return ordered[0], ordered[1:]
 
 
-def _order_candidates(gw: Gateway, eids: list[str]) -> list[str]:
+def _order_candidates(
+    gw: Gateway, eids: list[str], misses: Callable[[str], bool] | None = None
+) -> list[str]:
     """Free endpoints first (cheap-by-default, D30), ordered by the
     dispatch sort key; priced endpoints follow, grouped by
-    (soft-deprioritized, health) and price-weighted-sampled within each
-    group (D41): health prioritizes, cost weights."""
+    (misses-preference, soft-deprioritized, health) and
+    price-weighted-sampled within each group (D41): preferences and
+    health prioritize, cost weights."""
+    missed = misses or (lambda e: False)
     free = [e for e in eids if not endpoint_price(gw.setups[e], PRICES_PER_MTOK)]
     priced = [e for e in eids if e not in free]
-    free.sort(key=lambda e: gw.backend(e).sort_key())
-    groups: dict[tuple[bool, bool], list[str]] = {}
+    free.sort(key=lambda e: (missed(e), *gw.backend(e).sort_key()))
+    groups: dict[tuple[bool, bool, bool], list[str]] = {}
     for e in priced:
         b = gw.backend(e)
-        k = (b.errors.soft_deprioritized(), b.health.state != "healthy")
+        k = (missed(e), b.errors.soft_deprioritized(), b.health.state != "healthy")
         groups.setdefault(k, []).append(e)
     ordered = list(free)
     for k in sorted(groups):
@@ -642,8 +766,11 @@ def create_app(
     stream_factory: StreamFactory | None = None,
     fallback_budget: FallForwardBudget | None = None,
     ignore_probes: bool = False,
+    policy_path: Path | None = None,
 ) -> FastAPI:
     table, aliases = expand(yaml.safe_load(models_path.read_text()) or {})
+    resolved_policy_path = policy_path or POLICY_PATH
+    policy = load_policy(resolved_policy_path.read_text()) if resolved_policy_path.exists() else {}
     for name, setup in table.items():
         cadence = setup.get("probe_interval_s")
         if cadence is not None and float(cadence) <= 0:
@@ -655,6 +782,7 @@ def create_app(
         registry=DEFAULT_REGISTRY if registry is None else registry,
         aliases=aliases,
         fallback_budget=fallback_budget,
+        policy=policy,
     )
     factory = _default_stream_factory(gw) if stream_factory is None else stream_factory
     # a custom factory declares no unstreamable providers: the eager

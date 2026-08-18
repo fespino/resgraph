@@ -1,0 +1,18 @@
+# The operator plane (D42): per-caller allow-lists the gateway enforces
+# on every request carrying that caller name — including pins (operator
+# authority outranks every caller word). A caller listed here reaches
+# ONLY what its `only` names (aliases, endpoint ids, or providers); a
+# caller not listed is unrestricted. Policy composes with the caller's
+# own narrowing by intersection: both sides can only shrink the set.
+#
+# NOTE: `caller` is self-declared attribution until the identity
+# workstream binds it to an API key — the mechanism is real, the
+# authentication arrives with per-caller keys.
+#
+# No callers are governed yet; the schema, when one is:
+#
+# callers:
+#   replay-harness:
+#     only: [qwen-local-1.5b]
+#   analyst:
+#     only: [haiku, ollama]

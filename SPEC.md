@@ -2273,6 +2273,64 @@ QueueFull rejections in the error window (admission is our state, not
 the endpoint's failure); a cryptographic RNG for the lottery (routing
 is not adversarial; determinism-by-seed is what the tests need).
 
+## D42 — The caller contract and the operator plane (gateway phase, #266)
+
+Two people narrow what a request may reach, and they are not the same
+person: the caller states preferences about its own traffic; the
+operator states rules about someone else's. Both compose by
+intersection — narrow-never-broaden on both sides (the suppressor
+shape) — and they differ in what failure means: a caller constraint
+that can't be met is a 400 the caller can fix; an operator policy
+refusal is a 403 the caller cannot.
+
+- **The hard/soft split, adopted verbatim from the validated
+  vocabulary** (their crispest design idea): `max_price` (effective
+  per-mtok ceiling) REFUSES loudly with the cheapest admitted price
+  named — never serve above a stated ceiling; `preferred_max_latency`
+  / `preferred_min_throughput` only DEPRIORITIZE, on evidence only —
+  an unmeasured endpoint cannot miss a preference, because nothing is
+  held against a window that has seen no traffic. Checked at p50
+  (number form; the per-percentile object form of their API is a
+  recorded subset). A missed preference ranks worse than a
+  soft-deprioritized backend: the caller's stated need outranks our
+  own recent-error signal within a tier.
+- **Caller narrowing**: `only` / `ignore` (endpoint ids or aliases)
+  shrink the candidate set and can never grow it; narrowing to
+  nothing is a 400 that says so. `sort` ("price" | "latency" |
+  "throughput") is the either/or rule adopted as-is: a sort override
+  DISABLES the lottery entirely — the caller's list or the market
+  mechanism, never a blend (tested with a poisoned RNG that raises if
+  the lottery runs). Under a strict latency/throughput sort,
+  unmeasured sorts LAST — the caller asked for proven speed, and an
+  empty window proves nothing (the deliberate inverse of default
+  routing, where unmeasured sorts first to earn measurement).
+- **The operator plane**: `evals/gateway-policy.yaml` — per-caller
+  allow-lists (aliases, endpoint ids, or providers; the operator
+  names things at whatever grain they govern). A governed caller
+  reaches only what its entry names, 403 otherwise; an unlisted
+  caller is unrestricted (the operator has said nothing, not
+  "nothing allowed"). **Policy binds pins**: operator authority
+  outranks every caller word. Pins compose with the hard constraints
+  only (policy, capability, price ceiling all refuse loudly on a
+  pin); narrowing, sort, and soft preferences are no-ops on a set of
+  one.
+- **Honesty note, recorded here on purpose**: `caller` is
+  self-declared attribution until the identity workstream binds it to
+  an API key — the enforcement mechanism is real and tested, the
+  authentication arrives with per-caller keys (#267). A policy
+  against a self-declared name governs cooperating callers, not
+  adversarial ones.
+
+**Rejected:** policy entries as deny-lists (an allow-list fails closed
+when a new model lands; a deny-list fails open — the operator's
+silence must not authorize by accident); soft preferences that
+exclude (that is what hard constraints are for; two vocabularies for
+one behavior blur both); blending a sort override with the lottery
+(neither party could predict the result — the documented either/or is
+the honest contract); a default-deny posture for unlisted callers
+(this gateway serves its own laptop; default-deny arrives with real
+identity, or it is security theater against a header).
+
 ## Phase contracts
 - The generator MUST emit D2 messages exactly and expose `--seed`
   for reproducibility.

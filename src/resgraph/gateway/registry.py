@@ -9,6 +9,8 @@ world is unchanged. Endpoint ids are ``alias@name``; ``@`` is reserved.
 
 from typing import Any
 
+import yaml
+
 CAPABILITIES_KEY = "capabilities"
 
 
@@ -58,6 +60,29 @@ def capability_mismatch(setup: dict[str, Any], *, wants_tools: bool, max_tokens:
     if window is not None and max_tokens > int(window):
         return f"max_tokens {max_tokens} > declared context_window {window}"
     return None
+
+
+def load_policy(text: str) -> dict[str, list[str]]:
+    """The operator plane: per-caller allow-lists from the policy file.
+    Each entry names what a caller MAY reach — aliases, endpoint ids, or
+    providers; everything else is refused. A caller with no entry is
+    unrestricted (the operator has said nothing, not \"nothing allowed\")."""
+    doc = yaml.safe_load(text) or {}
+    callers = doc.get("callers") or {}
+    out: dict[str, list[str]] = {}
+    for name, entry in callers.items():
+        allowed = (entry or {}).get("only")
+        if not allowed:
+            raise SystemExit(f"policy for caller {name!r} needs a non-empty 'only' list")
+        out[name] = list(allowed)
+    return out
+
+
+def policy_allows(allowed: list[str], eid: str, setup: dict[str, Any]) -> bool:
+    """An endpoint matches an allow-entry by endpoint id, alias, or
+    provider — the operator names things at whatever grain they govern."""
+    alias = eid.split("@", 1)[0]
+    return any(entry in (eid, alias, setup.get("provider")) for entry in allowed)
 
 
 def endpoint_price(setup: dict[str, Any], prices: dict[str, Any]) -> float | None:

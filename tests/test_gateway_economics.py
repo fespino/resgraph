@@ -74,3 +74,17 @@ def test_the_measured_cost_delta_vs_latency_first_routing():
     ratio = lottery_price / latency_first_price
     # expectation: (36·1 + 9·2 + 4·3) / 49 / 3 = 66/147 ≈ 0.449
     assert ratio == pytest.approx(0.449, abs=0.02)
+
+
+def test_the_sampler_survives_rounding_overshoot():
+    """The defensive else: if accumulated weights undershoot the drawn
+    point (float addition), the last candidate is taken, never dropped."""
+
+    class _Over:
+        def random(self):
+            return 1.5  # beyond any [0,1) draw: forces draw > sum(weights)
+
+    gw = _gw(dict(PRICES))
+    gw.rng = _Over()
+    ordered = server._sample_by_inverse_square_price(gw, list(gw.aliases["m"]))
+    assert sorted(ordered) == sorted(gw.aliases["m"])  # all served, none lost

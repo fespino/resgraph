@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  {% if page.title and not page.is_homepage %}
+  <title>{{ page.title }} &mdash; {{ config.site_name }}</title>
+  {% else %}
+  <title>{{ config.site_name }}</title>
+  {% endif %}
+  {% if config.site_description %}
+  <meta name="description" content="{{ config.site_description }}">
+  {% endif %}
+  <link rel="stylesheet" href="{{ 'css/site.css'|url }}">
+</head>
+<body>
+  <header class="site-header">
+    <a class="site-title" href="{{ nav.homepage.url|url }}">{{ config.site_name }}</a>
+  </header>
+  <main class="content">
+{{ page.content }}
+  </main>
+  <footer class="site-footer">
+    <a href="{{ config.repo_url }}">github</a>
+  </footer>
+</body>
+</html>

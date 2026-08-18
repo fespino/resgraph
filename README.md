@@ -3,6 +3,8 @@
 [![CI](https://github.com/fespino/resgraph/actions/workflows/ci.yml/badge.svg)](https://github.com/fespino/resgraph/actions/workflows/ci.yml)
 [![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/fespino/resgraph/badge)](https://scorecard.dev/viewer/?uri=github.com/fespino/resgraph)
 
+Docs and build-in-public write-ups: <https://fespino.github.io/resgraph/>
+
 A mini referential data platform, built in public: a synthetic cloud-
 infrastructure world streams updates into a graph hot store and an
 Iceberg cold store, queryable by traversal and time travel — with agents,

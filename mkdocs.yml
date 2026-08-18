@@ -1,0 +1,51 @@
+# Built with ProperDocs (MkDocs 1.x continuation); the legacy config
+# filename is kept because the content is meant to stay portable across
+# the whole MkDocs lineage. Build: uv run properdocs build --strict -f mkdocs.yml
+site_name: resgraph
+site_url: https://fespino.github.io/resgraph/
+site_description: >-
+  A mini referential data platform, built in public: streaming graph hot
+  store, Iceberg cold store, agents and serving on top. Honest benchmarks only.
+repo_url: https://github.com/fespino/resgraph
+
+theme:
+  name: null
+  custom_dir: site_theme
+  static_templates:
+    - 404.html
+
+hooks:
+  - tools/site_hooks.py
+
+markdown_extensions:
+  - toc:
+      permalink: false
+  - tables
+  - fenced_code
+  - codehilite:
+      guess_lang: false
+
+nav:
+  - Home: index.md
+  - Writing: writing/index.md
+  - Engineering:
+      - Security posture: security-posture.md
+      - Stream contract: stream-contract.md
+      - Planner vocabulary: planner-vocabulary.md
+      - Capacity: capacity.md
+      - Prompt audit: prompt-audit.md
+      - Evals compaction runbook: evals-compaction-runbook.md
+  - Drills:
+      - Runbook: drills/README.md
+      - Premortem template: drills/premortem-template.md
+      - Postmortem template: drills/postmortem-template.md
+  - Sentinel:
+      - Threat model: sentinel/threat-model.md
+      - Detection economics: sentinel/detection-economics.md
+      - Corpus: sentinel/corpus.md
+      - Prior art: sentinel/prior-art.md
+  - Incidents:
+      - INC-001 hot-store loss: incidents/INC-001-hotstore-loss.md
+      - INC-002 degraded drill misfire: incidents/INC-002-degraded-drill-misfire.md
+      - INC-003 analyst degraded cold: incidents/INC-003-analyst-degraded-cold.md
+      - INC-004 gateway failover: incidents/INC-004-gateway-failover.md

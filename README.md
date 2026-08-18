@@ -29,8 +29,8 @@ flowchart LR
 
 Part I — the data foundation — is complete (phases 0–6); Part II — the
 AI layer — has landed the MCP surface, the analyst + its eval harness,
-the safe runtime, and the serving gateway (phases 7–10). Each phase is
-tagged at its end state:
+the safe runtime, the serving gateway, and misuse detection over the
+audit trail (phases 7–11). Each phase is tagged at its end state:
 
 | Phase | What landed | Tag |
 |---|---|---|
@@ -45,11 +45,15 @@ tagged at its end state:
 | 8 | Analyst agent + eval harness: planted ground truth, 8 pre-registered iterations, zero fabrications ever | `phase-8-analyst` |
 | 9 | Safe runtime: permission tiers, approval gate + audit at rest, budgets, honest degradation (INC-002/-003) | `phase-9-safe-runtime` |
 | 10 | Serving gateway: task-class routing with recorded source, honest stream failure, two measured cache layers, the failover drill (INC-004) | `phase-10-token-path` |
+| 10.5 | Institutional memory as a log-structured store: archive/history/working-set split, fed-context sha pinned per run | `phase-10.5-institutional-memory` |
+| 11 | Misuse detection (resgraph-sentinel): three cost-ordered layers over the audit trail, benign FP rate as the headline, review queue whose labels close loops in code, CI recall gate | `phase-11-sentinel` |
 
 Each increment lands via issue → PR, citing the SPEC decisions
-(D-numbers) it implements. Next: serving day-2 economics — a
-fall-forward spend budget calibrated by INC-004's measured $/hour, and
-health probes that don't spend (#206, #209).
+(D-numbers) it implements. Next: the gateway phase (#263) — closing
+the measured distance between this miniature and a production API
+gateway (one model/many endpoints, percentile routing windows,
+price-weighted sampling, per-caller billing), each workstream
+doc-validated against the real thing before any code.
 
 ## Quickstart: to a live dashboard
 
@@ -159,6 +163,8 @@ README never carries a number that file can't back.
   compacted per the checkpoint-plus-log rule (D34).
 - [docs/incidents/](docs/incidents/) — incident reports, starting with
   the induced hot-store loss.
+- [docs/sentinel/](docs/sentinel/) — the misuse-detection memos: threat
+  model, corpus design, detection economics (cost per correct verdict).
 - [docs/security-posture.md](docs/security-posture.md) — the controls,
   each enforced, alarmed, or measured.
 - [docs/blog/posts/](docs/blog/posts/) — the build, written up as it

@@ -18,6 +18,7 @@ where a stream adapter exists (the chat-completions backends); an
 anthropic-setup stream answers 501 until its adapter lands."""
 
 import logging
+import random
 import threading
 import time
 from collections.abc import Callable, Iterator, Mapping
@@ -39,7 +40,7 @@ from resgraph.gateway.accounting import StreamAccount
 from resgraph.gateway.budget import FallForwardBudget
 from resgraph.gateway.cache import ResponseCache, cache_key
 from resgraph.gateway.dispatch import Backend, ProbeResult, QueueFull, choose
-from resgraph.gateway.registry import capability_mismatch, catalog_rows, expand
+from resgraph.gateway.registry import capability_mismatch, catalog_rows, endpoint_price, expand
 from resgraph.gateway.relay import StreamEvent, StreamFactory, parse_chat_sse, relay
 from resgraph.gateway.router import (
     DEFAULT_REGISTRY,
@@ -108,6 +109,8 @@ class Gateway:
     cache: ResponseCache = field(default_factory=ResponseCache)
     fallback_budget: FallForwardBudget | None = None
     last_probe: dict[str, float] = field(default_factory=dict)
+    # routing lottery, not cryptography; injectable for deterministic tests
+    rng: random.Random = field(default_factory=random.Random)  # nosec B311
 
     def client(self, alias: str) -> Any:
         if alias not in self.clients:
@@ -230,8 +233,11 @@ def _call(gw: Gateway, alias: str, req: GenerateIn) -> tuple[list[dict[str, Any]
         out = int(getattr(resp.usage, "output_tokens", 0) or 0)
         account.content(at=now, tokens=out)
         account.finish(at=now, reported_output_tokens=out)
+        backend.errors.observe(True)
         if account.ttft is not None:
-            backend.ttft_ewma.update(account.ttft)
+            backend.ttft.observe(account.ttft)
+            if account.tokens_per_second is not None:
+                backend.tps.observe(account.tokens_per_second)
         usage = UsageOut(
             input_tokens=int(getattr(resp.usage, "input_tokens", 0) or 0),
             output_tokens=out,
@@ -271,6 +277,7 @@ def _next_alias(gw: Gateway, chain: list[str], *, ignore_budget: bool = False) -
 
 def _record_hop(gw: Gateway, alias: str, exc: Exception, chain: list[str]) -> None:
     failed_backend = gw.backend(alias).name
+    gw.backend(alias).errors.observe(False)
     chain.append(f"{failed_backend}:{alias}")
     log.warning(
         "[gateway:fallback] attempted=%s backend=%s error_kind=%s chain=%s",
@@ -421,14 +428,50 @@ def _endpoint_plan(gw: Gateway, decision: Any, req: GenerateIn) -> tuple[str, li
     if not admitted:
         raise HTTPException(400, detail="no endpoint can serve this request: " + "; ".join(reasons))
     up = [e for e in admitted if gw.backend(e).health.state != "down"] or admitted
-    up.sort(
-        key=lambda e: (
-            gw.backend(e).health.state != "healthy",
-            gw.backend(e).ttft_ewma.value is not None,
-            gw.backend(e).ttft_ewma.value or 0.0,
-        )
-    )
-    return up[0], up[1:]
+    ordered = _order_candidates(gw, up)
+    return ordered[0], ordered[1:]
+
+
+def _order_candidates(gw: Gateway, eids: list[str]) -> list[str]:
+    """Free endpoints first (cheap-by-default, D30), ordered by the
+    dispatch sort key; priced endpoints follow, grouped by
+    (soft-deprioritized, health) and price-weighted-sampled within each
+    group (D41): health prioritizes, cost weights."""
+    free = [e for e in eids if not endpoint_price(gw.setups[e], PRICES_PER_MTOK)]
+    priced = [e for e in eids if e not in free]
+    free.sort(key=lambda e: gw.backend(e).sort_key())
+    groups: dict[tuple[bool, bool], list[str]] = {}
+    for e in priced:
+        b = gw.backend(e)
+        k = (b.errors.soft_deprioritized(), b.health.state != "healthy")
+        groups.setdefault(k, []).append(e)
+    ordered = list(free)
+    for k in sorted(groups):
+        ordered.extend(_sample_by_inverse_square_price(gw, groups[k]))
+    return ordered
+
+
+def _sample_by_inverse_square_price(gw: Gateway, eids: list[str]) -> list[str]:
+    """Weighted order without replacement, weight 1/price² — the
+    documented market mechanism: at $1/$2/$3 the cheapest is 9× likelier
+    than the priciest to go first, and the expensive one never starves.
+    A lottery, not a sort: a hard sort starves the endpoints it ranks
+    last, and a starved endpoint is one you learn nothing about."""
+    pool = list(eids)
+    out: list[str] = []
+    while pool:
+        weights = [1.0 / (endpoint_price(gw.setups[e], PRICES_PER_MTOK) or 1.0) ** 2 for e in pool]
+        draw = gw.rng.random() * sum(weights)
+        acc = 0.0
+        for e, w in zip(pool, weights, strict=True):
+            acc += w
+            if draw <= acc:
+                out.append(e)
+                pool.remove(e)
+                break
+        else:
+            out.append(pool.pop())
+    return out
 
 
 def _open_stream(
@@ -650,7 +693,17 @@ def create_app(
         prices where the pricing table knows the wire model. No mutable
         \"latest\" aliases, by decision — pins are the platform's point."""
         routed_aliases = {r.model for r in [*gw.registry.values(), GLOBAL_DEFAULT_MODEL]}
-        return {"data": catalog_rows(gw.setups, gw.aliases, routed_aliases, PRICES_PER_MTOK)}
+        stats: dict[str, Any] = {}
+        for eid, setup in gw.setups.items():
+            key = eid if "@" in eid else setup.get("provider", "default")
+            b = gw.backends.get(key)  # only materialized state; never create
+            if b is not None:
+                stats[eid] = {
+                    "ttft_last_5m": b.ttft.snapshot(),
+                    "tps_last_5m": b.tps.snapshot(),
+                    "soft_deprioritized": b.errors.soft_deprioritized(),
+                }
+        return {"data": catalog_rows(gw.setups, gw.aliases, routed_aliases, PRICES_PER_MTOK, stats)}
 
     @app.post("/v1/generate", response_model=GenerateOut)  # registration is the use
     def generate(req: GenerateIn) -> GenerateOut | StreamingResponse:  # pyright: ignore[reportUnusedFunction]

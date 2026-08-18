@@ -115,8 +115,11 @@ def relay(
             reconciliation = account.finish(
                 at=clock(), reported_output_tokens=usage["output_tokens"]
             )
+            backend.errors.observe(True)
             if account.ttft is not None:
-                backend.ttft_ewma.update(account.ttft)
+                backend.ttft.observe(account.ttft)
+                if account.tokens_per_second is not None:
+                    backend.tps.observe(account.tokens_per_second)
             owned = False
             backend.release()
             end_payload = {

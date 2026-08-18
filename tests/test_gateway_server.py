@@ -391,17 +391,19 @@ def test_both_request_shapes_feed_the_same_ttft_series(tmp_path, monkeypatch):
         stream_factory=ok_stream,
     )
     client = TestClient(app)
-    ewma = client.app.state.gateway.backend("qwen-local-1.5b").ttft_ewma
+    window = client.app.state.gateway.backend("qwen-local-1.5b").ttft
     samples: list[float] = []
-    original = ewma.update
-    monkeypatch.setattr(ewma, "update", lambda s: (samples.append(s), original(s))[1])
+    original = window.observe
+    monkeypatch.setattr(
+        window, "observe", lambda v, now=None: (samples.append(v), original(v, now))[1]
+    )
 
     assert _gen(client, model="qwen-local-1.5b").status_code == 200
     assert _gen(client, model="qwen-local-1.5b", stream=True).status_code == 200
     # One sample per request shape, same series: dispatch ranks streamed and
-    # non-streamed traffic on one recency-weighted view per backend.
+    # non-streamed traffic on one rolling percentile view per backend.
     assert len(samples) == 2
-    assert ewma.value is not None
+    assert window.percentile(50) is not None
 
 
 def test_a_probe_round_probes_only_declared_setups(harness, caplog):

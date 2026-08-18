@@ -65,6 +65,11 @@ openai:
 #         provider: llamacpp
 #         base_url: http://localhost:8081/v1
 #         quant: Q8_0
+#         # optional per-endpoint price (input+output rates per mtok);
+#         # overrides the wire model's pricing-table entry — the same
+#         # weights can price differently per serving location. Unpriced
+#         # endpoints are the free tier and preempt the price lottery.
+#         price_per_mtok: {input: 0.5, output: 1.5}
 
 # A self-hosted model, on localhost or a remote GPU — same client, only the URL
 # changes. tool_choice: required forces a tool call (the constrained-decoding

@@ -60,11 +60,26 @@ def capability_mismatch(setup: dict[str, Any], *, wants_tools: bool, max_tokens:
     return None
 
 
+def endpoint_price(setup: dict[str, Any], prices: dict[str, Any]) -> float | None:
+    """One endpoint's effective price per mtok (input + output rates).
+    A per-endpoint ``price_per_mtok`` override wins (the same weights can
+    price differently per serving location — electricity vs market);
+    otherwise the wire model's pricing-table entry; no price on file is
+    unmetered, the shared convention."""
+    override = setup.get("price_per_mtok")
+    if override:
+        return float(override.get("input", 0)) + float(override.get("output", 0))
+    model = setup.get("model")
+    pair = prices.get(model) if model else None
+    return (pair[0] + pair[1]) if pair else None
+
+
 def catalog_rows(
     table: dict[str, dict[str, Any]],
     aliases: dict[str, list[str]],
     routed_aliases: set[str],
     prices: dict[str, Any],
+    stats: dict[str, dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     """The /v1/models rows, from the registry as the single source: the
     alias vocabulary, each endpoint's serving facts, declared capabilities,
@@ -88,6 +103,9 @@ def catalog_rows(
                         if price is not None
                         else None
                     ),
+                    # rolling-window percentiles, null until measured — an
+                    # unmeasured endpoint is a fact, not a zero
+                    "stats": (stats or {}).get(eid),
                 }
             )
         rows.append(

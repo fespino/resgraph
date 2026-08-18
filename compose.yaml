@@ -55,7 +55,7 @@ services:
     # this comparison). Not started by default:
     #   docker compose --profile bench up -d postgres
     profiles: ["bench"]
-    image: postgres:18-alpine@sha256:9a8afca54e7861fd90fab5fdf4c42477a6b1cb7d293595148e674e0a3181de15
+    image: postgres:18-alpine@sha256:d3e1620b530c944afa6e887d22eb899824da68e19c52024bf98f5220c88a65b2
     environment: {POSTGRES_PASSWORD: resgraph}
     # 5433 on the host: developer machines often run their own postgres
     # on 5432, which wins the localhost race against the container.
@@ -66,7 +66,7 @@ services:
     # API on 11434; models.yaml's qwen-local-* setups point here.
     #   docker compose --profile local up -d
     profiles: ["local"]
-    image: ollama/ollama:0.12.6@sha256:a61a8fd395dbb931cc8cb1b5da7a2510746575c87113fdc45b647ee59ef7f808
+    image: ollama/ollama:0.32.13@sha256:77f1a2a54460f0380f2611e1464233d9b82cb6e58afc8f60abec0061049d2d82
     # matches the context_window the qwen-local-* setups declare; the
     # server default is the knob Ollama's OpenAI endpoint cannot set per-call
     environment: {OLLAMA_CONTEXT_LENGTH: "8192"}
@@ -82,7 +82,7 @@ services:
     # up leaves a ready worker instead of a manual pull step. Override the size
     # for a RAM-tight host: OLLAMA_MODEL=qwen2.5:1.5b docker compose --profile local up
     profiles: ["local"]
-    image: ollama/ollama:0.12.6@sha256:a61a8fd395dbb931cc8cb1b5da7a2510746575c87113fdc45b647ee59ef7f808
+    image: ollama/ollama:0.32.13@sha256:77f1a2a54460f0380f2611e1464233d9b82cb6e58afc8f60abec0061049d2d82
     depends_on:
       ollama: {condition: service_healthy}
     environment: {OLLAMA_HOST: "ollama:11434"}

@@ -193,6 +193,28 @@ def test_v1_models_serves_the_catalog_from_the_registry(tmp_path):
     assert haiku_price == {"input_per_mtok": 1.0, "output_per_mtok": 5.0}
 
 
+def test_v1_models_stats_appear_after_traffic_and_never_materialize_state(tmp_path):
+    app = _app(tmp_path, TWO_ENDPOINTS)
+    client = TestClient(app)
+    before = {
+        e["id"]: e["stats"]
+        for row in client.get("/v1/models").json()["data"]
+        for e in row["endpoints"]
+    }
+    assert all(s is None for s in before.values())  # a catalog read creates no dispatch state
+    client.post(
+        "/v1/generate", json={"messages": [{"role": "user", "content": "x"}], "model": "qwen"}
+    )
+    after = {
+        e["id"]: e["stats"]
+        for row in client.get("/v1/models").json()["data"]
+        for e in row["endpoints"]
+    }
+    served = [s for s in after.values() if s is not None]
+    assert served and served[0]["ttft_last_5m"]["p50"] >= 0
+    assert served[0]["soft_deprioritized"] is False
+
+
 def test_load_setup_resolves_endpoints_and_refuses_ambiguity(tmp_path):
     path = tmp_path / "models.yaml"
     path.write_text(yaml.safe_dump(TWO_ENDPOINTS))
@@ -201,3 +223,12 @@ def test_load_setup_resolves_endpoints_and_refuses_ambiguity(tmp_path):
     assert load_setup("haiku", path)["provider"] == "anthropic"
     with pytest.raises(SystemExit, match="name one"):
         load_setup("qwen", path)
+
+
+def test_a_fully_down_alias_still_names_its_first_endpoint(tmp_path):
+    app = _app(tmp_path, TWO_ENDPOINTS)
+    gw = app.state.gateway
+    for eid in gw.aliases["qwen"]:
+        gw.backend(eid).health.observe("fail")
+    # the walk decides what down means; selection must not return None
+    assert gw.serving_endpoint("qwen") == "qwen@ollama"

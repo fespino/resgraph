@@ -2226,6 +2226,53 @@ pin-the-weights word (`pin_model`: exact model, serving free to
 float) — parked with its trigger in #286, not built while no
 multi-endpoint alias exists in the committed catalog.
 
+## D41 — Routing economics: percentile windows, the price lottery, soft outage deprioritization (gateway phase, #265)
+
+The "cost, speed, and capability" clause done with measured mechanisms
+(each validated against OpenRouter's documented behavior in the #263
+pass, then built to our own receipts):
+
+- **Speed is a percentile set, not an average.** Per-backend rolling
+  5-minute windows of TTFT and tokens/sec, read as p50/p75/p90/p99
+  (nearest-rank; empty window reads None — an unmeasured backend is a
+  fact, not a zero). Replaces the single EWMA everywhere it was used:
+  selection key (p50), the QueueFull drain estimate, and both the
+  streamed and non-streamed observation points feed one window per
+  backend. Motivated by our own load-test finding: measured TTFT is
+  bimodal (0.5 s warm-prefix vs ~12 s cold prefill), and the mean of a
+  bimodal distribution describes no request that ever happened.
+  `/v1/models` exposes each endpoint's snapshots (`ttft_last_5m`,
+  `tps_last_5m`) — stats are read from materialized dispatch state
+  only, never created by a catalog read.
+- **A 30-second error window DEPRIORITIZES; only the health machine
+  eliminates.** ≥3 events with ≥50% failures in-window ranks a backend
+  below quiet ones (including quiet *degraded* ones — a backend
+  failing half its recent attempts is worse evidence than a slow
+  probe), but it stays eligible: deprioritize-not-eliminate is the
+  soft form beside the hard down/readmit machine, and a backend
+  erroring should earn less traffic, not zero.
+- **Cost is a lottery, not a sort.** Within an alias's admitted
+  endpoints: the FREE tier preempts entirely (cheap-by-default, D30 —
+  free is a tier, not a weight; an unpriced endpoint in an
+  inverse-square lottery would carry infinite weight); priced
+  endpoints group by (soft-deprioritized, health) and are sampled
+  inverse-square by price within each group — health prioritizes,
+  cost weights. Per-endpoint `price_per_mtok` overrides the wire
+  model's table entry (the same weights can price differently per
+  serving location). The measured receipt is committed as the seeded
+  test suite: at $1/$2/$3 the first-pick shares match 36/49, 9/49,
+  4/49, and the share-weighted price is 0.449× latency-first routing's
+  worst case — the cost clause as a number.
+
+**Rejected:** keeping the EWMA beside the windows (two speed opinions
+per backend diverge; the windows are strictly more honest); a hard
+price sort (starves the endpoints it ranks last, and a starved
+endpoint is one you learn nothing about — the lottery is the
+documented market mechanism for exactly this reason); counting our own
+QueueFull rejections in the error window (admission is our state, not
+the endpoint's failure); a cryptographic RNG for the lottery (routing
+is not adversarial; determinism-by-seed is what the tests need).
+
 ## Phase contracts
 - The generator MUST emit D2 messages exactly and expose `--seed`
   for reproducibility.

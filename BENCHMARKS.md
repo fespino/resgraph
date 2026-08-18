@@ -397,3 +397,24 @@ lookups; the recorded run has 4 turns) — bounded at one request and
 not attributable from the run row, noted rather than explained away.
 Cost delta in dollars: $0 on the local class by construction; the
 provider class re-prices its prefix at 0.1× on the replay leg.
+
+## Routing economics: the price lottery's measured cost delta (D41)
+
+Methodology: deterministic policy simulation, no hardware dependency —
+seeded lottery (seed 7), 6,000 first-pick draws over three priced
+endpoints at $1/$2/$3 effective per-mtok, committed as
+`tests/test_gateway_economics.py` (the test IS the receipt; re-run it
+to reproduce the numbers exactly). No live traffic, no model calls:
+this measures the selection mechanism, not a serving stack. Run
+2026-08-18.
+
+| policy | first-pick shares (cheap/mid/steep) | share-weighted price | vs latency-first worst case |
+|---|---|---|---|
+| inverse-square price lottery | 73.5% / 18.4% / 8.2% (≈36/49, 9/49, 4/49) | ≈$1.35/mtok | **0.449×** |
+| latency-first, priciest fastest | 0% / 0% / 100% | $3.00/mtok | 1.0× |
+
+The comparison is latency-first routing's *worst case* (the expensive
+endpoint is the fastest) — the honest frame, since it is exactly the
+case price-weighting exists for. The lottery also never starves the
+expensive endpoint (8.2% of traffic keeps it measured), which a hard
+price sort would.

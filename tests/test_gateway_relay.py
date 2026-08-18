@@ -67,7 +67,7 @@ def test_happy_stream_relays_and_accounts():
     assert end["tokens_per_s"] == pytest.approx(1.0)
     assert end["reconciliation_ok"] is True
     assert backend.in_flight == 0
-    assert backend.ttft_ewma.value == 1.0
+    assert backend.ttft.percentile(50) == 1.0
 
 
 def test_death_after_tokens_surfaces_and_never_restarts():

@@ -67,9 +67,11 @@ def test_the_error_window_deprioritizes_then_forgets():
     e.observe(True, now=2.0)
     e.observe(False, now=3.0)
     assert e.soft_deprioritized(now=4.0)  # 3/4 failed in-window
-    assert not e.soft_deprioritized(now=40.0)  # the window forgot
-    e.observe(True, now=40.0)  # observing also evicts the aged events
+    e.observe(True, now=40.0)  # observing evicts the aged events itself
     assert len(e.events) == 1
+    assert not e.soft_deprioritized(now=40.0)  # the window forgot
+    assert not e.soft_deprioritized(now=80.0)  # the check itself also evicts
+    assert len(e.events) == 0
 
 
 def test_admission_is_bounded_and_carries_a_drain_estimate():

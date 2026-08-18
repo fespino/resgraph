@@ -236,8 +236,8 @@ def _call(gw: Gateway, alias: str, req: GenerateIn) -> tuple[list[dict[str, Any]
         backend.errors.observe(True)
         if account.ttft is not None:
             backend.ttft.observe(account.ttft)
-            if account.tokens_per_second is not None:
-                backend.tps.observe(account.tokens_per_second)
+        # tps is a stream measurement (relay): one non-streamed timestamp
+        # has no emission window to rate
         usage = UsageOut(
             input_tokens=int(getattr(resp.usage, "input_tokens", 0) or 0),
             output_tokens=out,

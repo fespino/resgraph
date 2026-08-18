@@ -70,7 +70,7 @@ The two alarms are deliberately asymmetric:
   block merges forever), and CodeQL is newer here — it becomes
   required once it has stable run history.
 - **Private vulnerability reporting** — the reporting channel in
-  [SECURITY.md](../SECURITY.md).
+  [SECURITY.md](https://github.com/fespino/resgraph/blob/main/SECURITY.md).
 - **Vulnerability alerts + automated security fixes** — Dependabot's
   security half, distinct from its weekly version bumps.
 

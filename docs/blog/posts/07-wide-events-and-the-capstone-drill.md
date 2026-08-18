@@ -199,9 +199,12 @@ the whole incident.
      the drill series permanently. In Grafana (localhost:3000), set
      the time range to 2026-08-01 19:25–19:40 UTC so the capture
      shows the T+172s detection and the 21s rebuild cited in the
-     prose. Save as docs/blog/images/07-dashboard-under-load.png -->
+     prose. Save as docs/blog/images/07-dashboard-under-load.png,
+     then restore the embed below:
 
 ![The overview dashboard during the drill: lag spikes when the store dies, the freshness SLO ratio crosses its burn threshold, and the rebuild shows as a cliff back to zero.](../images/07-dashboard-under-load.png)
+-->
+
 
 The fourth run passed end to end, and the numbers opened this post.
 One more is worth showing your work for: the incident consumed the

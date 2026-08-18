@@ -136,6 +136,144 @@ misuse-detection phase needed an LLM classifier (D38): an instrument
 stays pinned on its reference model rather than following cost
 downhill.
 
+## The failure taxonomy: not all wrong is equally wrong
+
+Three ways a trial goes bad, in ascending order of severity:
+
+- **A miss** — the report names the wrong cause. Bad, counted,
+  survivable: misses are what pass rates measure.
+- **An honest deferral** — the report says "I cannot determine the
+  cause from what I can see." This can be the *correct* answer: the
+  item set includes **control scenarios** where no cause is planted
+  (`ground_truth: null`, distractors only), and on those, deferring is
+  the pass and a confident accusation is the failure. A real committed
+  row shows the shape: on `control-s42000`, honesty graded
+  `passed: false` with the detail `high-confidence accusations:
+  ['vm-000012']` — the analyst accused a resource in a world where
+  nothing was guilty.
+- **A fabrication** — the report cites evidence that does not exist:
+  an event never emitted, a relationship never present. This is the
+  one sin with zero tolerance, and the CI gate blocks on any
+  fabrication *regardless of labels* — even a baseline refresh cannot
+  wave one through. The value judgment behind it: a miss makes the
+  analyst less useful; a fabrication makes it dangerous, because a
+  confident lie with a fake receipt is exactly what a reviewer will
+  trust. Being wrong is a performance problem; making things up is a
+  trust problem, and trust is the product.
+
+## One item, end to end
+
+Everything above, on one concrete item — `ambiguous-s42006` from the
+committed set (`evals/scenarios/base.jsonl`), abridged:
+
+**The scenario** (the generator wrote both the problem and the key):
+
+```json
+{"id": "ambiguous-s42006",
+ "description": "connection_errors on db-000003; ambiguous cause planted
+                 on sg-000001 at depth 1 among 4 distractors",
+ "alert": {"resource_id": "db-000003", "symptom": "connection_errors"},
+ "ground_truth": {"causal_resource": "sg-000001",
+                  "mechanism_path": ["sg-000001", "db-000003"]},
+ "tags": ["ambiguous", "depth:1", "rival:host-000003"]}
+```
+
+A security group was changed one hop upstream of the alerting
+database, four distractor changes landed around the same time, and one
+rival (`host-000003`) looks plausible on purpose. The answer key says
+`sg-000001`, via the stated path.
+
+**The trial**: the runner rebuilds this world from seed 42006, loads
+the stores, and hands the analyst only the alert — never the key. The
+analyst walks the graph with its tools (fetch the resource, traverse
+neighbors, pull change history), then writes a structured report:
+probable causes ranked, the evidence per cause, and what it could not
+verify.
+
+**The grading**: `found_top1` — is `sg-000001` the report's first
+cause? `found_top3` — is it in the top three? `evidence` — do the
+cited events actually exist in this world? `honesty` — did it accuse
+only what its evidence supports, and state its gaps? `discipline` —
+did it investigate within budget (tool calls, cache behavior) rather
+than brute-force the world? Then the judge reads the narrative prose
+and scores 1–5 for clarity — never touching correctness.
+
+**The row** (the field names are the real schema; the values below are
+illustrative — read any file under `evals/runs/` for actual rows):
+
+```json
+{"run_id": "20260803T121152Z", "scenario_id": "ambiguous-s42006",
+ "trial": 0, "model": "...", "judge_model": "...",
+ "dims": {"found_top1": {"passed": true,  "detail": "sg-000001 ranked first"},
+          "evidence":   {"passed": true,  "detail": "cited events verified"},
+          "honesty":    {"passed": true,  "detail": "no unsupported accusation"},
+          "discipline": {"passed": false, "detail": "cache hit 0.71 < 0.9"},
+          "narrative":  {"passed": true,  "detail": "score=4"}},
+ "tool_calls": 9, "turns": 4, "latency_s": 41.2,
+ "tokens": {"input": 25113, "output": 1802, "cache_read": 21400},
+ "cache_fingerprint": "…", "git_ref": "…", "tags": ["ambiguous", "depth:1"]}
+```
+
+Note the shape of a partial result: this trial found the cause,
+grounded it, and stayed honest — and still failed one dimension
+(`discipline`, a cache-efficiency floor). Dimensions fail
+independently and each carries its own `detail`, so a run file is
+diagnosable row by row without re-running anything.
+
+## Running them yourself
+
+The CLI is `resgraph-evals` (all commands via `uv run`). The stores
+must be up first: `docker compose up -d`.
+
+**A $0 run** — local worker, judge skipped (the judge is the one paid
+grader; `--no-judge` drops dimension 5 and grades the other four):
+
+```bash
+uv run resgraph-evals run --worker qwen-local-1.5b --no-judge
+```
+
+`--worker` names a setup in `evals/models.yaml`; the name is recorded
+per row and becomes the arm label. Trials default to 3. One JSONL file
+lands in `evals/runs/`.
+
+**Aggregate it** (prints pass@k / pass^k per dimension, diffed against
+the committed baseline if present):
+
+```bash
+uv run resgraph-evals report evals/runs/<file>.jsonl
+```
+
+**Verify it measured something** — the pre-comparison sanity gate
+(row counts, item counts, trial floors, environment fingerprint); a
+non-zero exit means "do not compare this yet":
+
+```bash
+uv run resgraph-evals verify evals/runs/<file>.jsonl --min-trials 3
+```
+
+**Gate it against the baseline** (what CI runs; D29b block rules —
+fabrications block unconditionally, pass^k drop >2pp or any slice
+drop >5pp blocks, k<3 is declined):
+
+```bash
+uv run resgraph-evals gate evals/runs/<file>.jsonl
+```
+
+**Compare arms** (same item set, one variable changed; exits 3 rather
+than fake a comparison if the arms measured different items):
+
+```bash
+uv run resgraph-evals arms haiku=runA.jsonl qwen=runB.jsonl --baseline haiku
+```
+
+**The line not to cross casually**: any invocation naming a paid
+worker or judge is a paid run, and a paid run is a deploy — it goes
+through the registration discipline below first (pre-mortem, EVALS.md
+entry, one-item pilot). The harness helps you keep the promise:
+`--max-cost` halts a run at a spend ceiling resume-ready, per-item
+cost/time ceilings degrade a row rather than burn on, and the judge
+has its own daily spend breaker.
+
 ## The baseline
 
 A **baseline** is a certified run: the full item set on the pinned

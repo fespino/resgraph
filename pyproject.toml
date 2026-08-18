@@ -71,6 +71,7 @@ dev = [
     "psycopg[binary]>=3.3.4",
     "pyarrow-stubs>=20.0.0.20260625",
     "pygments>=2.20.0",
+    "pymdown-extensions>=11.0.1",
     "pyright[nodejs]>=1.1.411",
     "pytest>=9.1.1",
     "pytest-cov>=7.1.0",

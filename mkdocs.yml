@@ -21,9 +21,12 @@ markdown_extensions:
   - toc:
       permalink: false
   - tables
-  - fenced_code
-  - codehilite:
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: false
       guess_lang: false
+      use_pygments: true
+  - pymdownx.inlinehilite
 
 nav:
   - Home: index.md

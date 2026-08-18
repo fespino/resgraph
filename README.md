@@ -157,6 +157,9 @@ README never carries a number that file can't back.
   rejections and reversal conditions (D-numbers, cited from PRs).
 - [BENCHMARKS.md](BENCHMARKS.md) — methodology + hardware for every
   number above.
+- [docs/evals-explained.md](docs/evals-explained.md) — how the evals
+  work, from the ground up: planted ground truth, runs and trials,
+  the graders, the pinned judge, baselines, arms, and the CI gate.
 - [EVALS.md](EVALS.md) — the eval protocol and its spend ledger:
   pre-registrations before any paid run, every run's verdict recorded;
   the closed record lives in [EVALS-HISTORY.md](EVALS-HISTORY.md),

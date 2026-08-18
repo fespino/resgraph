@@ -4,7 +4,7 @@
 - src/resgraph/schema.py — D2 update-message schema (pydantic)
 - src/resgraph/gen/ — deterministic world generator (D5–D7) + causal-scenario planting (D25): world, churn, scenarios, sinks, CLI
 - src/resgraph/analyst/ — the triage agent (D22–D23) and its safe runtime (D26–D28): harness loop, report models, prompts + cache audit, registry-derived Anthropic tool surface, remediation step machine, approval gate, the privileged `apply_remediation` executor (compensating D2 updates onto the ingest stream), audit store + the `resgraph-analyst` CLI (`triage`, `audit`)
-- src/resgraph/evals/ — the analyst's eval harness (D24): deterministic graders, pinned judge, store-isolated runner, report, judge spend breaker (D29a), provider adapter for a pluggable worker (D29c); datasets + runs live in evals/
+- src/resgraph/evals/ — the analyst's eval harness (D24): deterministic graders, pinned judge, store-isolated runner, report, judge spend breaker (D29a), provider adapter for a pluggable worker (D29c); datasets + runs live in evals/; ground-up explainer in docs/evals-explained.md
 - BENCHMARKS.md — measured numbers with hardware + method (D4)
 - EVALS.md — the working set of the iteration log (D24, D34): protocol
   rules, the paid-run ledger, open registrations; the model-fed slice is

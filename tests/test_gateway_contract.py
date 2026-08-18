@@ -74,7 +74,7 @@ def _app(tmp_path, policy: dict | None = None, setups: dict | None = None):
         ppath.write_text(yaml.safe_dump(policy))
     return server.create_app(
         models_path=models,
-        client_factory=lambda setup: _Client(setup),
+        client_factory=_Client,
         registry={},
         ignore_probes=True,
         policy_path=ppath,

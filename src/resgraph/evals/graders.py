@@ -5,6 +5,8 @@ from the production cold query, the event-log sequence set) and the
 graders only compare — a grader bug is a platform bug, one fix serves
 both. The fifth dimension (narrative judge) lives in judge.py and
 never grades correctness.
+
+Decisions: D24 (SPEC.md).
 """
 
 import json

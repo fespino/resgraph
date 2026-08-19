@@ -3,6 +3,8 @@
 Nothing here decides placement — that happened at plan time. This module
 runs the steps: hot Cypher, cold DuckDB reconstruction, ephemeral BFS,
 and the residual filter that the plan already flagged.
+
+Decisions: D16 (SPEC.md).
 """
 
 from collections import deque

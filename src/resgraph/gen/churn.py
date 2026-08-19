@@ -1,4 +1,7 @@
-"""Deterministic churn engine — simulated clock (D6), op mix + skew (D7)."""
+"""Deterministic churn engine — simulated clock (D6), op mix + skew (D7).
+
+Decisions: D7 (SPEC.md).
+"""
 
 from datetime import UTC, datetime, timedelta
 

@@ -5,6 +5,8 @@ operational. state_at(T) becomes synthesized full-statement upserts fed
 through the snapshot loader, carrying each resource's own last-applied
 sequence — so the D3 watermark survives the rebuild and a resumed
 stream ingest skips everything at or below it.
+
+Decisions: D12 (SPEC.md).
 """
 
 from datetime import datetime

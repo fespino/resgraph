@@ -12,6 +12,8 @@ skip can be discussed by number afterwards); `no` rejects.
 The decision is itself an audit record: approver, plan hash, which
 steps, and time-to-decision. A 900ms approval of a five-step plan is
 a reviewable fact, not a lost keystroke.
+
+Decisions: D26 (SPEC.md).
 """
 
 import hashlib

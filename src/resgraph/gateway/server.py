@@ -15,7 +15,10 @@ once tokens flow, the relay's rules apply — a zero-token death restarts
 silently (it is an init failure), a death after tokens surfaces a
 structured `stream_error` and never resumes elsewhere. Streaming is served
 where a stream adapter exists (the chat-completions backends); an
-anthropic-setup stream answers 501 until its adapter lands."""
+anthropic-setup stream answers 501 until its adapter lands.
+
+Decisions: D30–D33, D40–D43 (SPEC.md).
+"""
 
 import logging
 import random

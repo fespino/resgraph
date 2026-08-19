@@ -4,6 +4,8 @@ Pure over two `report.aggregate` summaries; no I/O, no API calls. Block
 rules and their rationale are recorded in SPEC.md (D29b). The
 `eval-baseline-refresh` label override is enforced by the CI job, not
 here; fabrications block regardless.
+
+Decisions: D29b (SPEC.md).
 """
 
 from dataclasses import dataclass, field

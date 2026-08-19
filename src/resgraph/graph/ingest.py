@@ -32,6 +32,8 @@ TODO(#31): all of this assumes a SINGLE producer assigns each resource's
 sequences monotonically (true for the generator). With multiple writers
 per resource the watermark can't arbitrate — sequence assignment needs
 epochs/fencing. Second iteration, tracked in issue #31.
+
+Decisions: D3, D10 (SPEC.md).
 """
 
 from typing import Any, assert_never

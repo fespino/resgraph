@@ -6,6 +6,8 @@ individually against the corpus (a rule you can't measure is a rule
 you can't tune). Thresholds are measured against the committed benign
 corpus, recorded in D37, and owned by the flywheel's retune cadence —
 not by this file's edit history.
+
+Decisions: D37 (SPEC.md).
 """
 
 import json

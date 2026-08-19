@@ -6,6 +6,8 @@ code. Placement is a table lookup: type and generator-known
 attr fields are claimable by both stores; the route decides which one
 runs them; everything else is a residual filter, applied in Python and
 flagged in the plan.
+
+Decisions: D16 (SPEC.md).
 """
 
 from dataclasses import dataclass, field

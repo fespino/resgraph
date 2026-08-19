@@ -10,6 +10,8 @@ judge rows would poison comparisons against fully-judged baselines.
 Laptop-honest atomicity: one process, a JSON file rewritten per
 charge. The day a second concurrent runner exists, this moves to a
 real atomic counter alongside D27's served-store reversal.
+
+Decisions: D29a (SPEC.md).
 """
 
 import json

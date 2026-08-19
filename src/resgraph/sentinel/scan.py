@@ -4,6 +4,8 @@ Pure measurement over committed data: per-rule and per-layer confusion
 against ground truth, and the funnel count (what would reach the paid
 layer 3). The benign false-positive rate is printed first — it is the
 headline, not attack recall.
+
+Decisions: D37, D39 (SPEC.md).
 """
 
 from dataclasses import dataclass

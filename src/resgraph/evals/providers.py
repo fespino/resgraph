@@ -9,6 +9,8 @@ translates that vocabulary to and from the chat-completions shape
 (``tool_calls`` on the assistant message, ``role:tool`` messages carrying
 results). The transport is the only I/O; the translators are pure so the whole
 adapter is exercised offline against fixtures.
+
+Decisions: D29c (SPEC.md).
 """
 
 import json

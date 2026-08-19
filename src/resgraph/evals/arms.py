@@ -7,6 +7,8 @@ run of the same item set under one changed variable (worker model, or
 the skill on/off). The money metric is worker cost divided by the
 triages that actually passed at k; latency rides alongside it, because a
 cheaper worker that is far slower is a different trade, not a free win.
+
+Decisions: D29c (SPEC.md).
 """
 
 from collections import defaultdict

@@ -16,6 +16,8 @@ philosophy at the turn boundary — never mid-call, the same reason
 D28's cancel never lands mid-step: a breach injects one final
 "conclude now" turn whose answer is the report. An exception is not
 a conclusion.
+
+Decisions: D22, D23 (SPEC.md).
 """
 
 import hashlib

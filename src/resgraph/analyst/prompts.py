@@ -11,6 +11,8 @@ body — the playbook was written once, and the agent's prefix is its
 second consumer after MCP. Loading it through the skill loader keeps
 its validation: a drifted skill file fails at prompt build, not
 silently at run time.
+
+Decisions: D23 (SPEC.md).
 """
 
 import json

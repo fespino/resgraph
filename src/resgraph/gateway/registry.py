@@ -5,6 +5,8 @@ the routable unit (where it runs). A setup MAY declare ``endpoints:`` —
 named partial setups merged over the parent — and selection happens among
 them; a setup without the key is its own single endpoint, so the 1:1
 world is unchanged. Endpoint ids are ``alias@name``; ``@`` is reserved.
+
+Decisions: D40 (SPEC.md).
 """
 
 from typing import Any

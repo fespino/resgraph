@@ -10,7 +10,10 @@ the accounting is wrong, and that is a test failure, not a rounding note.
 A dead stream gets a verdict, not a retry: tokens already reached the client,
 so a replay could diverge and splice two answers. Only a death at zero tokens
 emitted — observably identical to an init failure — is eligible for one
-silent restart elsewhere."""
+silent restart elsewhere.
+
+Decisions: D31, D33 (SPEC.md).
+"""
 
 from dataclasses import dataclass
 

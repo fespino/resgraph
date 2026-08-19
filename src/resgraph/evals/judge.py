@@ -4,6 +4,8 @@ The judge never grades correctness — dimensions 1–4 own it and they
 never hallucinate. Pinned: model and template are part of the eval
 environment; changing either is a labeled baseline-refresh event.
 Hardened: report content arrives inside tags declared as data.
+
+Decisions: D24 (SPEC.md).
 """
 
 import re

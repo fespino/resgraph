@@ -8,7 +8,10 @@ model server can 200 its health endpoint while generation has collapsed.
 
 Speed is read as rolling percentiles (measured TTFT here is bimodal;
 a mean describes no request that happened), and a short error window
-deprioritizes a flaky backend without eliminating it."""
+deprioritizes a flaky backend without eliminating it.
+
+Decisions: D30, D41 (SPEC.md).
+"""
 
 import time
 from collections import deque

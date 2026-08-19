@@ -2,6 +2,8 @@
 
 A skill that references a tool the registry doesn't know, or skips a
 required section, fails at startup — never silently at runtime.
+
+Decisions: D21 (SPEC.md).
 """
 
 from dataclasses import dataclass

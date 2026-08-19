@@ -3,6 +3,8 @@
 The neo4j driver on purpose: Memgraph speaks Bolt, so the driver, the
 sessions, and the Cypher are Neo4j skills verbatim — D1's
 transferability argument made concrete.
+
+Decisions: D1 (SPEC.md).
 """
 
 import logging

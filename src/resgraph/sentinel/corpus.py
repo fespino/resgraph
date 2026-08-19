@@ -6,6 +6,8 @@ rows — the generator plants the malice the way it plants the cause
 dimension except the planted one, carries its ground truth in a
 ``sentinel`` object, and rebuilds byte-for-byte from the manifest, so
 the committed corpus is drift-guarded by a rebuild test.
+
+Decisions: D36 (SPEC.md).
 """
 
 import copy

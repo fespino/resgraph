@@ -3,6 +3,8 @@
 Targets MCP spec revision 2026-07-28. All five tools are single-shot
 reads — no session state, no handles — which is the stateless-
 compatible shape that revision asks for.
+
+Decisions: D19 (SPEC.md).
 """
 
 import threading

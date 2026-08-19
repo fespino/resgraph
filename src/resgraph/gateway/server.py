@@ -28,7 +28,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 import yaml
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Header, HTTPException
 from fastapi.responses import StreamingResponse
 from prometheus_client import make_asgi_app
 from pydantic import BaseModel
@@ -37,6 +37,14 @@ from resgraph import obs
 from resgraph.evals.pricing import PRICES_PER_MTOK, estimate_cost
 from resgraph.evals.providers import build_client
 from resgraph.gateway.accounting import StreamAccount
+from resgraph.gateway.accounts import (
+    ACCOUNTS_PATH,
+    UsageLedger,
+    Wallet,
+    load_accounts,
+    mgmt_authorized,
+    resolve_account,
+)
 from resgraph.gateway.budget import FallForwardBudget
 from resgraph.gateway.cache import ResponseCache, cache_key
 from resgraph.gateway.dispatch import Backend, ProbeResult, QueueFull, choose
@@ -80,8 +88,7 @@ class GenerateIn(BaseModel):
     pin: str | None = None
     stream: bool = False
     cache_responses: bool = True
-    # the caller contract (D42): hard constraints refuse loudly, soft
-    # preferences deprioritize, narrowing never broadens
+    # hard constraints refuse loudly; soft preferences deprioritize
     caller: str | None = None  # attribution-only until W4 binds it to a key
     max_price: float | None = None  # hard: effective per-mtok ceiling
     preferred_max_latency: float | None = None  # soft: TTFT p50 seconds
@@ -106,6 +113,7 @@ class GenerateOut(BaseModel):
     fallback_chain: list[str]
     latency_s: float
     usage: UsageOut
+    cost_usd: float = 0.0
     cached: bool = False
 
 
@@ -129,6 +137,9 @@ class Gateway:
     # routing lottery, not cryptography; injectable for deterministic tests
     rng: random.Random = field(default_factory=random.Random)  # nosec B311
     policy: dict[str, list[str]] = field(default_factory=dict)
+    accounts: dict[str, dict[str, Any]] = field(default_factory=dict)
+    wallet: Wallet = field(default_factory=Wallet)
+    usage_ledger: UsageLedger = field(default_factory=UsageLedger)
 
     def client(self, alias: str) -> Any:
         if alias not in self.clients:
@@ -403,6 +414,37 @@ def _no_streamable_fallback(gw: Gateway, decision_model: str, unstreamable: froz
     return True
 
 
+def _identify(gw: Gateway, req: GenerateIn, presented_key: str | None) -> str | None:
+    """A valid key authenticates the account; a contradicting caller
+    field is a 400; an unknown key is a 401, never anonymous."""
+    if presented_key is None:
+        return req.caller
+    account = resolve_account(gw.accounts, presented_key)
+    if account is None:
+        raise HTTPException(401, detail="unknown API key")
+    if req.caller is not None and req.caller != account:
+        raise HTTPException(
+            400, detail=f"caller field {req.caller!r} contradicts the key's account {account!r}"
+        )
+    return account
+
+
+def _check_balance(gw: Gateway, account: str | None) -> None:
+    """The wallet's refusal: 402 `payment_required` — "you spent YOUR
+    balance", a different sentence from budget_503's "you hit OUR
+    cap". Only authenticated accounts with a grant are metered."""
+    if account is None or account not in gw.accounts:
+        return
+    granted = gw.accounts[account]["granted_usd"]
+    state = gw.wallet.state(account, granted)
+    if state.remaining_usd <= 0:
+        raise HTTPException(
+            402,
+            detail=f"payment_required: account {account!r} spent its balance "
+            f"(${state.spent_usd:.4f} of ${granted:.4f} granted)",
+        )
+
+
 def _policy_filter(gw: Gateway, caller: str | None, eids: list[str]) -> list[str]:
     """The operator plane: a caller with a policy entry reaches only what
     it names; a caller without one is unrestricted. Policy binds pins too
@@ -455,10 +497,7 @@ def _price_ceiling(gw: Gateway, req: GenerateIn, eids: list[str]) -> list[str]:
 
 
 def _misses_preference(gw: Gateway, req: GenerateIn, eid: str) -> bool:
-    """Soft preferences deprioritize on EVIDENCE only: an unmeasured
-    endpoint cannot miss a preference (nothing is held against a window
-    that has seen no traffic). Checked at p50 — the number form of their
-    API; the per-percentile object form is a recorded subset (D42)."""
+    """An unmeasured endpoint cannot miss a preference; checked at p50."""
     b = gw.backend(eid)
     if req.preferred_max_latency is not None:
         p50 = b.ttft.percentile(50)
@@ -503,10 +542,8 @@ def _endpoint_plan(gw: Gateway, decision: Any, req: GenerateIn) -> tuple[str, li
     (400) → health tiers → strict sort or the price lottery with soft
     preferences deprioritizing.
 
-    A pin binds to a single endpoint (D40) and composes with the HARD
-    constraints only — policy, capability, price ceiling all refuse
-    loudly on a pin; narrowing, sort, and soft preferences are no-ops on
-    a set of one."""
+    A pin composes with the hard constraints only; narrowing, sort, and
+    soft preferences are no-ops on a set of one."""
     target = decision.model
     wants_tools = bool(req.tools)
     if decision.source == "pin":
@@ -555,11 +592,8 @@ def _endpoint_plan(gw: Gateway, decision: Any, req: GenerateIn) -> tuple[str, li
 def _order_candidates(
     gw: Gateway, eids: list[str], misses: Callable[[str], bool] | None = None
 ) -> list[str]:
-    """Free endpoints first (cheap-by-default, D30), ordered by the
-    dispatch sort key; priced endpoints follow, grouped by
-    (misses-preference, soft-deprioritized, health) and
-    price-weighted-sampled within each group (D41): preferences and
-    health prioritize, cost weights."""
+    """Free endpoints first, then priced grouped by (misses-preference,
+    soft-deprioritized, health) and price-sampled within each group."""
     missed = misses or (lambda e: False)
     free = [e for e in eids if not endpoint_price(gw.setups[e], PRICES_PER_MTOK)]
     priced = [e for e in eids if e not in free]
@@ -767,10 +801,17 @@ def create_app(
     fallback_budget: FallForwardBudget | None = None,
     ignore_probes: bool = False,
     policy_path: Path | None = None,
+    accounts_path: Path | None = None,
+    wallet: Wallet | None = None,
+    usage_ledger: UsageLedger | None = None,
 ) -> FastAPI:
     table, aliases = expand(yaml.safe_load(models_path.read_text()) or {})
     resolved_policy_path = policy_path or POLICY_PATH
     policy = load_policy(resolved_policy_path.read_text()) if resolved_policy_path.exists() else {}
+    resolved_accounts_path = accounts_path or ACCOUNTS_PATH
+    accounts = (
+        load_accounts(resolved_accounts_path.read_text()) if resolved_accounts_path.exists() else {}
+    )
     for name, setup in table.items():
         cadence = setup.get("probe_interval_s")
         if cadence is not None and float(cadence) <= 0:
@@ -783,6 +824,9 @@ def create_app(
         aliases=aliases,
         fallback_budget=fallback_budget,
         policy=policy,
+        accounts=accounts,
+        wallet=wallet or Wallet(),
+        usage_ledger=usage_ledger or UsageLedger(),
     )
     factory = _default_stream_factory(gw) if stream_factory is None else stream_factory
     # a custom factory declares no unstreamable providers: the eager
@@ -833,8 +877,25 @@ def create_app(
                 }
         return {"data": catalog_rows(gw.setups, gw.aliases, routed_aliases, PRICES_PER_MTOK, stats)}
 
+    @app.get("/v1/usage")  # registration is the use
+    def usage(  # pyright: ignore[reportUnusedFunction]
+        caller: str | None = None, x_mgmt_key: str | None = Header(default=None)
+    ) -> dict[str, Any]:
+        """The usage surface, served from the meter's own records —
+        per (day, account, endpoint): requests, tokens, cost. Gated by
+        the management key when one is configured: the key that spends
+        is not the key that administers."""
+        if not mgmt_authorized(x_mgmt_key):
+            raise HTTPException(403, detail="management key required for the usage surface")
+        return {"data": gw.usage_ledger.aggregate(account=caller)}
+
     @app.post("/v1/generate", response_model=GenerateOut)  # registration is the use
-    def generate(req: GenerateIn) -> GenerateOut | StreamingResponse:  # pyright: ignore[reportUnusedFunction]
+    def generate(  # pyright: ignore[reportUnusedFunction]
+        req: GenerateIn, x_api_key: str | None = Header(default=None)
+    ) -> GenerateOut | StreamingResponse:
+        account = _identify(gw, req, x_api_key)
+        req = req.model_copy(update={"caller": account})
+        _check_balance(gw, account)
         decision = resolve(pin=req.pin, model=req.model, task_class=req.task_class)
         first, within = _endpoint_plan(gw, decision, req)
 
@@ -918,7 +979,16 @@ def create_app(
                         "task_class": req.task_class or "none",
                     },
                 )
-                return hit.model_copy(update={"cached": True})
+                gw.usage_ledger.record(
+                    account=account,
+                    endpoint=hit.model,
+                    model=gw.setups[hit.model].get("model"),
+                    input_tokens=hit.usage.input_tokens,
+                    output_tokens=hit.usage.output_tokens,
+                    cost_usd=0.0,  # a cache hit spends no backend tokens
+                    cached=True,
+                )
+                return hit.model_copy(update={"cached": True, "cost_usd": 0.0})
         (content, usage, latency), alias, chain = _serve_with_walk(
             gw,
             decision,
@@ -927,6 +997,7 @@ def create_app(
             first=first,
             more=within,
         )
+        served_cost = _cost_of(gw, alias, usage)
         out = GenerateOut(
             content=content,
             model=alias,
@@ -935,6 +1006,17 @@ def create_app(
             fallback_chain=chain,
             latency_s=latency,
             usage=usage,
+            cost_usd=served_cost,
+        )
+        if account is not None and account in gw.accounts:
+            gw.wallet.charge(account, served_cost)
+        gw.usage_ledger.record(
+            account=account,
+            endpoint=alias,
+            model=gw.setups[alias].get("model"),
+            input_tokens=usage.input_tokens,
+            output_tokens=usage.output_tokens,
+            cost_usd=served_cost,
         )
         if chain and gw.fallback_budget is not None and _paid(gw, alias):
             fallforward_cost = _cost_of(gw, alias, usage)

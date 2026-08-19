@@ -18,6 +18,7 @@ wheels/
 # Data
 *.duckdb
 data/
+.claude/
 
 # properdocs build output
 site/

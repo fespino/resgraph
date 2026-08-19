@@ -6,12 +6,9 @@ result does to health — lives here as plain state machines so the whole policy
 is exercised without a server. Health is a generation probe, not a TCP ping: a
 model server can 200 its health endpoint while generation has collapsed.
 
-Speed is a percentile set, not an average (D41): per-backend rolling
-windows of TTFT and tokens/sec — our own measured TTFT is bimodal, and
-the mean of a bimodal distribution describes no request that ever
-happened. A separate 30-second error window DEPRIORITIZES a flaky
-backend without eliminating it — a backend erroring on half its recent
-attempts should earn less traffic, not zero."""
+Speed is read as rolling percentiles (measured TTFT here is bimodal;
+a mean describes no request that happened), and a short error window
+deprioritizes a flaky backend without eliminating it."""
 
 import time
 from collections import deque

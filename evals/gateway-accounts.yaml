@@ -1,0 +1,15 @@
+# Billing accounts: identity + wallet. Each account names the
+# environment variable holding its API key (the secret NEVER lives in
+# this file) and its prepaid grant in USD. A request presenting the key
+# (x-api-key header) is authenticated as the account; its spend is
+# decremented from the grant by the meter, and an empty balance refuses
+# with 402 payment_required — "you spent YOUR balance", distinct from
+# budget_503's "you hit OUR cap". A top-up is a granted_usd edit here:
+# a reviewable diff. Spend state lives in data/gateway-balances.json.
+#
+# No accounts are configured yet; the schema, when one is:
+#
+# accounts:
+#   replay-harness:
+#     key_env: RESGRAPH_KEY_REPLAY
+#     granted_usd: 5.00

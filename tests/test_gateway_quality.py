@@ -153,6 +153,12 @@ def test_the_builder_refuses_a_malformed_spec(tmp_path):
     assert r.exit_code != 0
 
 
+def test_a_bare_request_takes_the_global_default_untouched(tmp_path):
+    out = _gen(TestClient(_app(tmp_path)))  # no pin, no model, no task_class
+    assert out.status_code == 400  # global default alias is not in this catalog
+    assert "qwen-local-1.5b" in out.json()["detail"]
+
+
 def test_pins_and_overrides_outrank_quality_routing(tmp_path):
     client = TestClient(_app(tmp_path))
     assert _gen(client, task_class="judgment", model="static").json()["source"] == "override"

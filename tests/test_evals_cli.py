@@ -39,6 +39,13 @@ def test_report_renders_a_run_file(tmp_path):
     assert result.exit_code == 0
     assert "pass^k 1.00" in result.output
     assert "control" in result.output
+    # with a baseline present, the report diffs against it
+    from resgraph.evals.report import aggregate
+
+    base = tmp_path / "baseline.json"
+    base.write_text(json.dumps(aggregate(rows)))
+    diffed = runner.invoke(app, ["report", str(f), "--baseline", str(base)])
+    assert diffed.exit_code == 0
 
 
 def _stub_run(monkeypatch, tmp_path, captured):

@@ -210,4 +210,5 @@ def test_the_screen_log_is_not_forgeable_by_the_caller_field(tmp_path, caplog):
     assert out.status_code == 200
     screen_logs = [r.getMessage() for r in caplog.records if "[gateway:screen]" in r.getMessage()]
     assert len(screen_logs) == 1
-    assert "\n" not in screen_logs[0]  # the newline is escaped, not emitted
+    assert "\n" not in screen_logs[0]  # the newline is stripped, not emitted
+    assert "forged line" in screen_logs[0]  # the rest of the value survives, inline

@@ -80,10 +80,10 @@ def test_a_key_authenticates_and_a_bad_key_never_falls_through(tmp_path, monkeyp
 
 def test_an_unset_key_env_never_authenticates(tmp_path, monkeypatch):
     monkeypatch.delenv("TEST_KEY_REPLAY", raising=False)
-    out = _gen(TestClient(_app(tmp_path)), key="", model="free")
-    # empty header -> no key presented; a real probe with any value:
-    out = _gen(TestClient(_app(tmp_path)), key="anything", model="free")
-    assert out.status_code == 401  # absence of a secret is not a wildcard
+    no_key = _gen(TestClient(_app(tmp_path)), key="", model="free")
+    assert no_key.status_code == 200  # empty header: no key presented, anonymous
+    probe = _gen(TestClient(_app(tmp_path)), key="anything", model="free")
+    assert probe.status_code == 401  # absence of a secret is not a wildcard
 
 
 def test_the_wallet_charges_paid_traffic_and_refuses_402_when_spent(tmp_path, monkeypatch):

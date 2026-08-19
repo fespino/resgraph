@@ -27,7 +27,7 @@
 | src/resgraph/evals/\_\_init\_\_.py           |        0 |        0 |    100% |           |
 | src/resgraph/evals/arms.py                   |       42 |        0 |    100% |           |
 | src/resgraph/evals/breaker.py                |       47 |        0 |    100% |           |
-| src/resgraph/evals/cli.py                    |      132 |        1 |     99% |       128 |
+| src/resgraph/evals/cli.py                    |      150 |        0 |    100% |           |
 | src/resgraph/evals/context.py                |       12 |        0 |    100% |           |
 | src/resgraph/evals/faults.py                 |       23 |        0 |    100% |           |
 | src/resgraph/evals/gate.py                   |      167 |        4 |     98% |154, 205, 217, 235 |
@@ -48,10 +48,11 @@
 | src/resgraph/gateway/cache.py                |       39 |        0 |    100% |           |
 | src/resgraph/gateway/cli.py                  |        9 |        0 |    100% |           |
 | src/resgraph/gateway/dispatch.py             |       97 |        0 |    100% |           |
+| src/resgraph/gateway/quality.py              |       22 |        0 |    100% |           |
 | src/resgraph/gateway/registry.py             |       68 |        0 |    100% |           |
 | src/resgraph/gateway/relay.py                |       77 |        0 |    100% |           |
-| src/resgraph/gateway/router.py               |       24 |        0 |    100% |           |
-| src/resgraph/gateway/server.py               |      517 |        0 |    100% |           |
+| src/resgraph/gateway/router.py               |       26 |        0 |    100% |           |
+| src/resgraph/gateway/server.py               |      550 |        0 |    100% |           |
 | src/resgraph/gen/\_\_init\_\_.py             |        0 |        0 |    100% |           |
 | src/resgraph/gen/churn.py                    |       65 |        4 |     94% |50-52, 111 |
 | src/resgraph/gen/cli.py                      |       75 |       13 |     83% |89-94, 105-110, 149-150 |
@@ -92,7 +93,7 @@
 | src/resgraph/tools/context.py                |        9 |        0 |    100% |           |
 | src/resgraph/tools/http.py                   |       21 |        0 |    100% |           |
 | src/resgraph/tools/registry.py               |       24 |        0 |    100% |           |
-| **TOTAL**                                    | **5596** |  **132** | **98%** |           |
+| **TOTAL**                                    | **5671** |  **131** | **98%** |           |
 
 
 ## Setup coverage badge

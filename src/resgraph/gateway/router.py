@@ -8,7 +8,10 @@ decision so cost questions are answered by a field, not a hunt.
 models.yaml — never raw provider ids: where an alias runs is its setup's
 provider and base_url, so local vs remote stays transparent here. Backend
 concerns — which queue, which adapter, health/EWMA tie-breaking — are
-resolved from the setup at dispatch, never inferred from the name."""
+resolved from the setup at dispatch, never inferred from the name.
+
+Decisions: D30 (SPEC.md).
+"""
 
 from collections.abc import Mapping
 from dataclasses import dataclass

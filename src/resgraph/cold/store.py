@@ -3,6 +3,8 @@
 The whole cold path is in-process: a SQLite-backed catalog and a
 filesystem warehouse under one directory (default ./data/cold,
 RESGRAPH_COLD_DIR to override).
+
+Decisions: D11, D12 (SPEC.md).
 """
 
 import contextlib

@@ -7,6 +7,8 @@ resource ids by construction, so the hot store is wiped and reloaded
 and the cold store gets a throwaway catalog for every item. Nothing
 leaks between scenarios; determinism comes from the generator, not
 from cleanup discipline.
+
+Decisions: D24 (SPEC.md).
 """
 
 import json

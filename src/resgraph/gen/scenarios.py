@@ -14,6 +14,8 @@ through phantom nodes are deliberately out of scope at v1.
 
 The `description` field is for dataset readers; an agent under
 evaluation sees only the alert.
+
+Decisions: D25 (SPEC.md).
 """
 
 from dataclasses import dataclass

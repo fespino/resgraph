@@ -3,6 +3,8 @@
 `type=vm AND attrs.zone=z1 AND attrs.cpu>=4` parses into Predicates;
 OR, grouping, and functions are rejected at the boundary. Parse, don't
 validate: downstream code only ever sees well-formed Predicates.
+
+Decisions: D15 (SPEC.md).
 """
 
 import re

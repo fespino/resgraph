@@ -2,6 +2,8 @@
 
 The consumer is a language model: overflow answers with a prose hint
 that teaches the next move, never an error.
+
+Decisions: D20 (SPEC.md).
 """
 
 from collections.abc import Sequence

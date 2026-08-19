@@ -6,6 +6,8 @@ the others' anomaly), z-scores per feature, and an IQR gate on the
 aggregate set from the benign corpus itself: cheap, explainable, no
 training job. The stratified sampler is pure policy with an injected
 window id, so stream-mode sampling is testable offline.
+
+Decisions: D37 (SPEC.md).
 """
 
 import hashlib

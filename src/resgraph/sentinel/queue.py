@@ -6,6 +6,8 @@ The reviewer sees the triggering evidence, not the haystack; every
 decision closes a loop in code — a false positive becomes a scoped
 rule exclusion plus a must-stay-clean regression entry, a confirmed
 catch joins the recall floor.
+
+Decisions: D39 (SPEC.md).
 """
 
 import json

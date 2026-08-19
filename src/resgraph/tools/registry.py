@@ -1,6 +1,8 @@
 """TOOL_REGISTRY — the single grep-able source of truth for the tool
 surface. Both transports derive from it; the drift guard asserts
 nothing exists outside it.
+
+Decisions: D19 (SPEC.md).
 """
 
 from collections.abc import Callable

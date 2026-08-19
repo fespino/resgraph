@@ -2446,6 +2446,54 @@ availability); score expiry/max-age (nothing rots yet at this scale —
 recorded as the natural next constraint when tables refresh per
 baseline event).
 
+## D45 — The protective seat: in-line screening and the sunset gate (gateway phase, #269)
+
+Two request-path protections, each landing differently on this stack.
+
+- **In-line screening: the same rules, a second seat — and it
+  observes, never blocks.** The sentinel's five injection signatures
+  (measured against the benign corpus: zero false hits in 361 runs)
+  now also run over every request's own text before it is served,
+  at a tested latency budget (p50 < 1 ms — the budget is a test, so
+  a heavier rule set fails CI, not the SLO). A match logs, counts
+  (`gateway_screen_flags_total`), and rides the audit trail; the
+  request serves regardless. Blocking was REJECTED as a structural
+  mismatch, not a soft preference: this platform's traffic carries
+  adversarial text as data by design — the analyst reads planted
+  alert text, and the injection evals depend on it arriving intact —
+  so an in-line block would break the exact workload the gateway
+  exists to serve. The gateways sell filter-and-block; our honest
+  version is flag-and-serve with the post-hoc seat keeping the
+  whole-run view. Catch parity is pinned by test: the detection
+  corpus's own planted payload is flagged at request time by the
+  same signatures that catch it post-hoc.
+- **The sunset gate: lifecycle metadata without remapping.** An
+  endpoint MAY declare `lifecycle: {deprecated, sunset}` (ISO dates,
+  validated at load). Deprecated serves with a logged warning; past
+  sunset it refuses **410 Gone** with the dates named — for routed
+  traffic and pins alike — and nothing is ever substituted under a
+  retired name: pins are the platform's thesis, and a name that
+  quietly becomes a different model is the failure this exists to
+  prevent. A multi-endpoint alias survives its endpoint (the sunset
+  endpoint leaves the candidate set; siblings serve). Neither
+  reference gateway documents this shape — the marketing continuity
+  pitch resolves to routing-policy failover or mutable "latest"
+  aliases — so this half is beyond-both, built on our own pinning
+  discipline.
+- **Blast radius over the registry**: `resgraph-gateway lifecycle
+  [--today YYYY-MM-DD]` answers "what breaks at sunset" — per
+  lifecycled endpoint: its state, the task classes routed or floored
+  to its alias, and the callers whose policy names it. The clock is
+  overridable for what-if questions.
+
+**Rejected:** blocking on screen match (above — breaks the served
+workload); automatic remapping at sunset (the entire point is that it
+never happens); per-request date parsing beyond ISO-day lexical
+comparison (days are the honest grain for deprecation; hours would be
+precision theater); screening tool arguments and responses in-line
+(the post-hoc seat owns whole-run views; the request seat owns what
+callers send — one boundary per seat).
+
 ## Phase contracts
 - The generator MUST emit D2 messages exactly and expose `--seed`
   for reproducibility.

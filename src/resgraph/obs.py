@@ -124,6 +124,10 @@ GATEWAY_CACHE_TOKENS_SAVED = _meter.create_counter(
 GATEWAY_COST = _meter.create_histogram(
     "gateway_cost_usd", description="estimated cost per request, by task class, backend, source"
 )
+GATEWAY_SCREEN_FLAGS = _meter.create_counter(
+    "gateway_screen_flags_total",
+    description="requests whose text matched an injection signature (observed, never blocked)",
+)
 GATEWAY_FALLBACK_SPEND = _meter.create_counter(
     "gateway_fallback_spend_usd", description="money the failure path spent falling forward"
 )
@@ -272,6 +276,7 @@ def _refresh_instruments() -> None:
     global GATEWAY_TTFT, GATEWAY_TOKENS_PER_S, GATEWAY_REQUESTS, GATEWAY_FALLBACK_CHAIN
     global GATEWAY_STREAM_ERRORS, GATEWAY_CACHE_HITS, GATEWAY_CACHE_MISSES
     global GATEWAY_CACHE_TOKENS_SAVED, GATEWAY_COST, GATEWAY_FALLBACK_SPEND
+    global GATEWAY_SCREEN_FLAGS
     _meter = otel_metrics.get_meter("resgraph")
     READ = _meter.create_counter("ingest_read", description="entries read from the stream")
     APPLIED = _meter.create_counter("ingest_applied", description="messages applied")
@@ -325,6 +330,10 @@ def _refresh_instruments() -> None:
     )
     GATEWAY_COST = _meter.create_histogram(
         "gateway_cost_usd", description="estimated cost per request, by task class, backend, source"
+    )
+    GATEWAY_SCREEN_FLAGS = _meter.create_counter(
+        "gateway_screen_flags_total",
+        description="requests whose text matched an injection signature (observed, never blocked)",
     )
     GATEWAY_FALLBACK_SPEND = _meter.create_counter(
         "gateway_fallback_spend_usd", description="money the failure path spent falling forward"

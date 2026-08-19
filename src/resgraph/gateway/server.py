@@ -1000,10 +1000,10 @@ def create_app(
         flagged = screen(req.messages, req.system)
         if flagged:
             # observe, never block: this platform's own traffic carries
-            # adversarial text as data by design
-            # %r: the caller field is request data; a raw newline in it
-            # could forge log lines in the security log itself
-            log.warning("[gateway:screen] request matches %s (caller=%r)", flagged, account)
+            # adversarial text as data by design. The caller field is
+            # request data: strip newlines so it cannot forge log lines
+            safe_caller = (account or "anonymous").replace("\r", "").replace("\n", "")
+            log.warning("[gateway:screen] request matches %s (caller=%s)", flagged, safe_caller)
             obs.GATEWAY_SCREEN_FLAGS.add(1, {"caller": account or "anonymous"})
         decision = None
         if req.pin is None and req.model is None:

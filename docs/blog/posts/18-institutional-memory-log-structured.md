@@ -21,6 +21,60 @@ a history that hides its misses selects worse questions each round.
 
 Then the notebook became model input, and the feature became a bill.
 
+<!-- more -->
+
+!!! info "The resgraph series"
+    This is the nineteenth post about
+    [**resgraph**](https://github.com/fespino/resgraph), a mini data
+    platform I am building for learning purposes.
+    Browse the repository exactly as it stood when this was written:
+    [`phase-10.5-institutional-memory`](https://github.com/fespino/resgraph/tree/phase-10.5-institutional-memory).
+    Every snippet below is copied from that tag, trimmed only for
+    length.
+
+In this phase: a maintenance half-phase between the serving work
+and the next build. The eval notebook splits into an archive that
+is never fed to a model and a working set that is — with the
+boundary enforced in code and fingerprinted per run.
+
+The platform so far, with this post's piece highlighted:
+
+```mermaid
+flowchart TD
+    loop["<b>the dev loop</b><br/>CI gates, review, the decision log<br/>#00 #01"]
+    gen["<b>generator</b><br/>a deterministic synthetic cloud, seeded<br/>#02"]
+    hot["<b>hot graph</b><br/>current state, benchmarked<br/>#03"]
+    ing["<b>ingest</b><br/>one watermark, three guarantees<br/>#04"]
+    cold["<b>cold history</b><br/>every past state, on two clocks<br/>#05"]
+    query["<b>query layer</b><br/>one API over both stores<br/>#06"]
+    obs["<b>observability</b><br/>wide events + SLOs<br/>#07"]
+    mcp["<b>MCP server</b><br/>the agent's tool surface<br/>#08"]
+    evals["<b>analyst + evals</b><br/>triage judged on planted ground truth<br/>#09 #10 #11"]
+    runtime["<b>safe runtime</b><br/>typed approvals + the audit trail<br/>#12"]
+    drills["<b>drills</b><br/>paid runs verified before they spend<br/>#13"]
+    seam["<b>worker seam</b><br/>models are config, not code<br/>#14"]
+    gw["<b>gateway</b><br/>routing, budgets, failover, caching<br/>#15 #16 #17"]
+    providers(["model providers"])
+    ledger["<b>evals ledger</b><br/>institutional memory, log-structured<br/>#18 ◀"]
+
+    loop -.->|every change ships through it| gen
+    gen -->|seeded events| ing
+    ing --> hot
+    ing --> cold
+    hot --> query
+    cold --> query
+    query -.->|wide events| obs
+    query --> mcp
+    mcp -->|tools| evals
+    evals -->|every run lands in the trail| runtime
+    drills -.-> evals
+    seam -.-> evals
+    evals -->|model calls| gw
+    gw --> providers
+    ledger -.-> evals
+    class ledger thispost
+```
+
 One of the registered experiments asks a model to propose the next
 harness iteration itself: given the rules, the evidence, and the
 current prompt, propose exactly one change, with a falsifiable
@@ -35,9 +89,9 @@ It costs money on every proposal call, forever, on a file that only
 grows. It dilutes attention — the ~3k tokens of rules that actually
 constrain a proposal were buried under ~20k tokens of archaeology.
 And the closed history includes the complete forensic record of how
-our own graders were gamed and patched over eight iterations —
-handing that dossier to a model whose job is to propose changes *to
-the harness that grades it* is an unforced error.
+the platform's own graders were gamed and patched over eight
+iterations — handing that dossier to a model whose job is to propose
+changes *to the harness that grades it* is an unforced error.
 
 The fix was already in the repository. It just hadn't been applied
 to the repository's own memory.
@@ -52,8 +106,8 @@ The notebook was serving two roles with opposite requirements:
   non-negotiable.
 - **The context role** wants a small, current working set: the
   protocol rules that bind *now*, the registrations that are open
-  *now*, the base rates that keep predictions honest. This role is
-  what gets fed to a model.
+  *now*, the base rates that keep predictions calibrated. This role
+  is what gets fed to a model.
 
 Below some size, one file serves both. Past it, every line added for
 the archive degrades the context, and every deletion proposed for
@@ -78,6 +132,29 @@ same architecture:
 | `EVALS.md` | the working set — protocol rules, the full paid-run ledger, the environment pin, every open registration | the marked slice only |
 | `docs/evals-compaction-runbook.md` | the procedure — so the next compaction is a checklist, not a judgment call | never |
 
+The runbook opens with the invariants that make the table safe to
+operate:
+
+```markdown
+- **Archive before edit.** A byte-exact snapshot of EVALS.md lands in
+  `docs/evals-archive/EVALS-<date>-<gitref>.md`, committed on its own,
+  BEFORE any working-file change.
+- **Nothing is rewritten, only moved.** Closed material transfers to
+  EVALS-HISTORY.md verbatim, appended in original order. No AI
+  summarization on this path.
+- **What stays in the working file:** the protocol rules, the paid-run
+  ledger in full (the base-rate instrument), the environment pin, and
+  every OPEN registration verbatim. Open means the registered run has
+  not happened and the experiment is live — a parked issue counts as
+  live; a closed issue's registration is closed with it.
+- **Pointers, both directions.** The working file's history index
+  names what moved and where; EVALS-HISTORY.md's head names the
+  archive snapshot. "Redo" is one file open, not archaeology.
+- **Never fed:** EVALS-HISTORY.md and the archive snapshots are for
+  humans and audits; only the working file (its context-core slice)
+  reaches a model.
+```
+
 The split itself was file surgery, not editing: a script partitioned
 the 1,642 lines by section, moved the closed ranges, and *asserted*
 that kept-plus-moved equals the archived original byte for byte. The
@@ -85,14 +162,14 @@ assertion output went in the pull request. Nothing was reworded —
 which is the property that makes the whole operation reviewable in
 minutes and reversible by concatenation.
 
-Fed context: 23,404 tokens before, ~3,380 after. An 86% cut with
+The fed context went from 23,404 tokens to ~3,380 — an 86% cut with
 zero drift risk, because drift requires rewriting and nothing was
 rewritten.
 
 ## What a model is actually fed, and why each part
 
-This is the part worth being precise about, because "we feed the
-model our docs" hides all the decisions.
+This part needs precision, because "we feed the model our docs"
+hides all the decisions.
 
 Exactly **one** consumer feeds notebook content to a model:
 `scripts/propose_iteration.py`, and it runs only during a registered
@@ -132,11 +209,11 @@ Each part has a reason to exist, and the reasons are different:
   signal triage before hypothesis, one change, an adversarial
   pre-mortem sentence, a prediction with its invalidating result. It
   cannot follow a format it cannot see.
-- **The ledger is fed because base rates keep predictions honest.**
-  The paid-run ledger records every run against its registered
-  objective — including the misses. A proposer that can see
-  "10 of 15 objectives met" writes different predictions than one
-  fed only success stories. This is the same reason the ledger
+- **The ledger is fed because base rates keep predictions
+  calibrated.** The paid-run ledger records every run against its
+  registered objective — including the misses. A proposer that can
+  see "10 of 15 objectives met" writes different predictions than
+  one fed only success stories. This is the same reason the ledger
   exists for humans.
 - **Open registrations are fed so a proposal cannot collide** with
   an experiment that is registered and pending — two changes aimed
@@ -150,26 +227,53 @@ Each part has a reason to exist, and the reasons are different:
   text to add or replace; you cannot quote what you cannot read.
 
 And what is deliberately *not* fed: the closed history. Not the
-eight iterations, not the honest review of our own mistakes, not the
-mutation-testing record of how the graders were verified, not the
-forensics of every patched loophole. If the working set is the
-briefing, the history is the case files — and the case files
-include the security audit.
+eight iterations, not the honest-review section's account of the
+author's mistakes, not the mutation-testing record of how the
+graders were verified, not the forensics of every patched loophole.
+If the working set is the briefing, the history is the case files —
+and the case files include the security audit.
 
 ## The boundary is enforced, not hoped for
 
-Two mechanisms keep this from decaying.
+Two mechanisms keep this from decaying, and both fit in one small
+module:
 
-**The markers.** The fed regions of `EVALS.md` sit between
-`<!-- context-core -->` markers, and the extraction function refuses
+```python
+# src/resgraph/evals/context.py
+"""The fed slice of the institutional-memory working file (D34).
+
+What a model is fed is part of the experimental configuration: the
+context-core markers in EVALS.md bound the fed regions, and the
+fingerprint of the exact fed text lands in the proposal artifact — the
+same envpin discipline that pins prompt fingerprints and store digests."""
+
+_REGION = re.compile(r"<!-- context-core -->\n(.*?)<!-- /context-core -->", re.DOTALL)
+
+
+def context_core(path: Path = EVALS_PATH) -> str:
+    """The concatenated marked regions — never the whole file. Loud when
+    no markers exist: silently feeding everything is how the working
+    set decays back into the archive."""
+    regions = _REGION.findall(path.read_text())
+    if not regions:
+        raise SystemExit(f"{path}: no context-core markers; refusing to feed the whole file")
+    return "".join(regions)
+
+
+def context_fingerprint(text: str) -> str:
+    return hashlib.sha256(text.encode()).hexdigest()
+```
+
+**The markers** delimit the fed regions, and the extraction refuses
 an unmarked file loudly rather than falling back to reading
-everything. That default matters: the failure mode of context
-hygiene is never a dramatic break, it is a quiet regression to
-feed-it-all the first time someone reorganizes the file. The
-navigation index that points humans at the history sits *between*
-the marked regions, in the file but outside the prompt.
+everything.
+That default matters: the failure mode of context hygiene is never a
+dramatic break, it is a quiet regression to feed-it-all the first
+time someone reorganizes the file. The navigation index that points
+humans at the history sits *between* the marked regions, in the file
+but outside the prompt.
 
-**The fingerprint.** The SHA-256 of the exact fed slice — and of the
+**The fingerprint** — the SHA-256 of the exact fed slice, and of the
 full assembled prompt — is stamped into every proposal artifact's
 header, next to the token counts. What a model is fed is part of the
 experimental configuration, the same way the prompt prefix and the
@@ -201,13 +305,14 @@ experiment here gets.
 
 ## Two lessons that traveled
 
-**Section titles rot; the tracker is the authority.** Classifying
-what was "open" for the split, five of six sections titled
+**Section titles rot; the tracker is the authority.** The split
+required classifying what was "open", and five of six sections
+titled
 "registered, run pending" turned out to be closed — the runs had
 happened, the outcomes were recorded *inside the sections*, and
 nobody had updated the headings. Deciding by title would have kept
 ~500 lines of closed history in the fed working set. The runbook now
-says it plainly: check the issue state for every pending title.
+says it plainly: "titles go stale; the issue is the authority."
 
 **A default you didn't choose is a decision you didn't make** — the
 context edition. Feeding the whole file was never decided; it was
@@ -228,7 +333,9 @@ index the archive, fetch what the task needs, and inherit a new
 obligation to fingerprint *what was retrieved* per call, not just
 what was on disk. The reversal condition is written into the
 decision record: this design holds while the working set fits in
-~10k tokens. And when multiple agents write memory concurrently, the
+~10k tokens.
+
+And when multiple agents write memory concurrently, the
 single-writer append-only file becomes a real log system with the
 usual ordering problems — at which point institutional memory is not
 *like* a log-structured store; it simply is one, and gets operated

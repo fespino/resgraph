@@ -22,21 +22,21 @@
 }
 
 :root {
-  --bg: #fdfdfb;
+  --bg: #fbfcfd;
   --fg: #1f1f1e;
   --muted: #6e6e68;
-  --rule: #e4e4de;
-  --link: #35526b;
-  --code-bg: #f4f4f0;
+  --rule: #e1e4ea;
+  --link: #6a8603;
+  --code-bg: #f1f3f7;
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #191918;
+    --bg: #17191e;
     --fg: #dddbd4;
     --muted: #8f8d85;
-    --rule: #33332f;
-    --link: #94b0c6;
-    --code-bg: #222220;
+    --rule: #2f333a;
+    --link: #c8ff00;
+    --code-bg: #1f2228;
   }
 }
 
@@ -136,18 +136,24 @@ img {
   max-width: 100%;
 }
 
+/* tables may break out of the 44rem text column: natural width up to
+   3× the container, viewport-capped, centered on the column; anything
+   wider still scrolls internally */
 table {
   border-collapse: collapse;
   margin: 0 0 1.4em;
-  width: 100%;
   display: block;
   overflow-x: auto;
   font-size: 0.9em;
+  width: max-content;
+  max-width: min(calc(100vw - 3rem), 132rem);
+  margin-left: 50%;
+  transform: translateX(-50%);
 }
 th,
 td {
   border-bottom: 1px solid var(--rule);
-  padding: 0.4em 0.8em 0.4em 0;
+  padding: 0.4em 0.8em 0.4em 0.6em;
   text-align: left;
 }
 
@@ -356,4 +362,97 @@ pre code {
 }
 .site-footer a {
   color: var(--muted);
+}
+
+/* Admonitions (!!! blocks) — accent left border + tinted title bar,
+   per-type accent colors; mid-tone accents hold in light and dark. */
+.admonition {
+  margin: 1.75rem 0;
+  border: 1px solid var(--rule);
+  border-left: 4px solid var(--adm, var(--link));
+  border-radius: 6px;
+  background: var(--code-bg);
+  font-size: 0.95em;
+  overflow: hidden;
+}
+.admonition > .admonition-title {
+  margin: 0;
+  padding: 0.45rem 1rem;
+  font-weight: 600;
+  color: var(--adm, var(--link));
+  background: color-mix(in srgb, var(--adm, var(--link)) 12%, transparent);
+}
+.admonition > :not(.admonition-title) {
+  margin: 0.75rem 1rem;
+}
+.admonition.note,
+.admonition.info {
+  --adm: var(--link);
+}
+.admonition.tip {
+  --adm: #4a7a52;
+}
+.admonition.warning {
+  --adm: #a8762a;
+}
+.admonition.danger {
+  --adm: #a84a3f;
+}
+
+/* devlog lists: no bullets — the monospace chapter number is the bullet */
+ul.devlog-list {
+  list-style: none;
+  padding-left: 0;
+}
+ul.devlog-list li {
+  margin: 0.3em 0;
+}
+.chapno {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.85em;
+  color: var(--muted);
+  margin-right: 0.55em;
+}
+ul.devlog-list a {
+  display: block;
+  padding: 0.1em 0.45em;
+  margin: 0 -0.45em;
+  border-radius: 4px;
+}
+ul.devlog-list a:hover {
+  text-decoration: none;
+  background: color-mix(in srgb, var(--link) 12%, transparent);
+}
+
+/* masthead: the project half fades to the theme accent on hover;
+   the owner half never changes — reused across projects, each with
+   its own --link */
+.site-title .site-project {
+  transition: color 0.25s ease;
+}
+.site-title:hover .site-project {
+  color: var(--link);
+}
+
+/* striped tables */
+tbody tr:nth-child(even) {
+  background: var(--code-bg);
+}
+
+/* mermaid charts (the series map): centered, responsive, and the
+   current post's node picked out in the accent color */
+div.mermaid {
+  display: flex;
+  justify-content: center;
+  margin: 1.6rem 0;
+  overflow-x: auto;
+}
+div.mermaid svg {
+  max-width: 100%;
+  height: auto;
+}
+div.mermaid g.thispost rect,
+div.mermaid g.thispost polygon {
+  stroke: var(--link) !important;
+  stroke-width: 2.5px !important;
 }

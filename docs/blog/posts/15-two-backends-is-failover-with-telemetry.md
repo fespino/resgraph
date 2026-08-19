@@ -20,13 +20,63 @@ gateway: one process fronting both backends behind one endpoint, the
 [routing pattern](https://www.anthropic.com/research/building-effective-agents)
 applied to model selection.
 
-The title is the first honest thing the build produced. With two
-backends that differ 10× in latency and infinitely in cost (one is
-free, one is per-token), symmetric load balancing is a category
-error — there is no "balance" between a laptop GPU and a metered
-API. What this actually is: failover with telemetry. The structure
-generalizes to N backends; the balancing claim would not, so it is
-not made.
+With two backends that differ 10× in latency and infinitely in cost
+(one is free, one is per-token), symmetric load balancing is a
+category error — there is no "balance" between a laptop GPU and a
+metered API. What this actually is: failover with telemetry. The
+structure generalizes to N backends; the balancing claim would not,
+so it is not made.
+
+<!-- more -->
+
+!!! info "The resgraph series"
+    This is the sixteenth post about
+    [**resgraph**](https://github.com/fespino/resgraph), a mini data
+    platform I am building for learning purposes. The
+    gateway is not yet under a phase tag — browse it
+    [on `main`](https://github.com/fespino/resgraph/tree/main/src/resgraph/gateway);
+    snippets below are from `main` at the time of writing, trimmed
+    only for length.
+
+In this phase: the serving layer — the gateway's routing vocabulary,
+its streaming semantics, the meter that prices every call, and the
+load test that found the knee.
+
+The platform so far, with this post's piece highlighted:
+
+```mermaid
+flowchart TD
+    loop["<b>the dev loop</b><br/>CI gates, review, the decision log<br/>#00 #01"]
+    gen["<b>generator</b><br/>a deterministic synthetic cloud, seeded<br/>#02"]
+    hot["<b>hot graph</b><br/>current state, benchmarked<br/>#03"]
+    ing["<b>ingest</b><br/>one watermark, three guarantees<br/>#04"]
+    cold["<b>cold history</b><br/>every past state, on two clocks<br/>#05"]
+    query["<b>query layer</b><br/>one API over both stores<br/>#06"]
+    obs["<b>observability</b><br/>wide events + SLOs<br/>#07"]
+    mcp["<b>MCP server</b><br/>the agent's tool surface<br/>#08"]
+    evals["<b>analyst + evals</b><br/>triage judged on planted ground truth<br/>#09 #10 #11"]
+    runtime["<b>safe runtime</b><br/>typed approvals + the audit trail<br/>#12"]
+    drills["<b>drills</b><br/>paid runs verified before they spend<br/>#13"]
+    seam["<b>worker seam</b><br/>models are config, not code<br/>#14"]
+    gw["<b>gateway</b><br/>routing, budgets, failover<br/>#15 ◀"]
+    providers(["model providers"])
+
+    loop -.->|every change ships through it| gen
+    gen -->|seeded events| ing
+    ing --> hot
+    ing --> cold
+    hot --> query
+    cold --> query
+    query -.->|wide events| obs
+    query --> mcp
+    mcp -->|tools| evals
+    evals -->|every run lands in the trail| runtime
+    drills -.-> evals
+    seam -.-> evals
+    evals -->|model calls| gw
+    gw --> providers
+    class gw thispost
+```
 
 ## Vocabulary before code: three questions, three real bugs
 
@@ -57,7 +107,27 @@ Selection resolves by precedence — `pin` (exact alias, no fallback,
 no substitution), explicit `model` override (fallback allowed),
 `task_class` default, global default — and the tier that won is
 recorded on every response and every metric:
-`source ∈ {pin, override, task_class_default, global_default}`.
+`source ∈ {pin, override, task_class_default, global_default}`. The
+resolver is a straight fall-through, each tier stamping its source:
+
+```python
+# src/resgraph/gateway/router.py (resolve)
+if pin:
+    return RouteDecision(
+        model=pin,
+        source="pin",
+        fallback_allowed=False,
+        rationale="pinned: exact model, no fallback, no substitution",
+    )
+if model:
+    return RouteDecision(model=model, source="override", fallback_allowed=True, ...)
+if task_class is not None:
+    route = table.get(task_class)
+    if route is None:
+        raise ValueError(f"unknown task_class {task_class!r}; have: {sorted(table)}")
+    return RouteDecision(model=route.model, source="task_class_default", ...)
+return RouteDecision(model=g.model, source="global_default", ...)
+```
 
 That one field is the difference between "why did this call cost
 40×?" being a query and being an investigation. The pin tier exists
@@ -115,19 +185,31 @@ translation, built on one split:
   streaming version of a fabrication, disqualifying, not a
   trade-off. The gateway emits a structured `stream_error` event
   (tokens emitted, backend, reason) and the *client* decides; the
-  analyst treats it like a budget cutoff — degraded, honest. The
+  analyst treats it like a budget cutoff — degraded, stated. The
   rule is enforced by construction: no resume path exists in the
-  codebase to misuse.
+  codebase to misuse. The relay's docstring carries the whole
+  split:
 
-One integration bug is worth confessing because of who caught it and
-how: the first streaming implementation quietly *bypassed* the
+    ```python
+    # src/resgraph/gateway/relay.py
+    """Relay one opened stream to SSE. A zero-token death restarts silently
+    via ``reopen`` (which walks like an init failure and returns the next
+    opened stream, or None when the walk is exhausted); a death after any
+    token surfaces a ``stream_error`` and ends the stream. The admitted
+    backend slot is released on every exit, including a client disconnect
+    closing the generator mid-stream."""
+    ```
+
+One integration bug got through, and a question caught it: the
+first streaming
+implementation quietly *bypassed* the
 provider seam with a duplicated payload builder — which had already
 dropped the channel that carries per-worker request kwargs. Caught
 not by a test but by the question "is this well integrated with the
 seam?"; streaming moved inside the seam client, one payload builder
 for both shapes. Duplication is where integration bugs incubate.
 
-## The meter prices, and the meter's own honesty bugs
+## The meter prices, and the meter's own accounting bugs
 
 The gateway is the uniquely correct place to meter cost: it is the
 one component that sees every call with its usage, task class,
@@ -141,10 +223,10 @@ objective catches the prompt edit that doubles per-task tokens on
 day one. In a per-token economy, a cost regression *is* a
 reliability regression.
 
-Availability got the honesty definition encoded in a rule:
-served-or-*explicitly*-failed over total, proven by test to hold 1.0
-under 429s and surfaced stream errors — an honest refusal is
-availability; a spliced retry would count as success and be a lie.
+Availability is defined as served-or-*explicitly*-failed over total,
+proven by test to hold 1.0 under 429s and surfaced stream errors —
+an explicit refusal counts as availability; a spliced retry would
+count as success and be a lie.
 
 Then the meter itself went through review, and all three findings
 were on vocabulary edges, none on the happy path:
@@ -155,7 +237,7 @@ were on vocabulary edges, none on the happy path:
   failures they exist to show.
 - **An unrecorded outcome class is a lie of omission.** Client
   disconnects released the admission slot and vanished from the
-  books; they are now an honest outcome in the availability
+  books; they are now a named outcome in the availability
   vocabulary. Silence is not success.
 - **A hit-only cache meter flatters itself.** Hits were recorded for
   both cache layers, misses for neither, and the dashboard ratio
@@ -168,7 +250,7 @@ where vocabulary is incomplete — missing labels, uncounted outcomes,
 one-sided ratios — because the happy path gets tested by
 construction and the edges accumulate silent wrongness.
 
-## The load test ran twice, because the first run's numbers were dishonest
+## The load test ran twice, because the first run measured artifacts
 
 Capacity numbers are the easiest place in the phase to lie by
 accident, and the first run managed two accidents before any number
@@ -178,7 +260,25 @@ client ignored the gateway's own Retry-After, hammering 51
 rejections per second into the books — a load test that ignores the
 server's stated contract is testing a client that shouldn't exist.
 
-The second run's findings, each one a prediction confirmed in our
+The second run's method is the first run's two lessons applied,
+plus the cache trap registered at design time: analyst-shaped
+streamed requests (the analyst's ~3.6k-token system prefix plus the
+registry's five tool blocks, ≈ 4.4k tokens of prefix;
+`max_tokens` 64), `cache_responses: false` with a per-request nonce
+so no cache layer sits in the measurement path, one warmup request
+loading the model off the clock, and a client that honors
+`Retry-After`. Steps run 45 seconds at concurrency 1, 2, 4, 8 — not
+the 10-minute steps a fleet test would use, so n per step is small
+and stated rather than averaged away:
+
+| c | n | ok | 429 | TTFT p50 | TTFT p95 | agg tokens/s |
+|---|---|----|-----|----------|----------|--------------|
+| 1 | 10 | 10 | 0 | 0.54 s | 11.7 s | 6.1 |
+| 2 | 15 | 15 | 0 | 2.7 s | 33.2 s | **8.7** |
+| 4 | 9 | 9 | 0 | 22.7 s | 26.0 s | 5.3 |
+| 8 | 97 | 9 | 88 | 18.7 s | 27.8 s | 5.7 |
+
+The findings follow, each one a prediction confirmed in the run's
 own data:
 
 - **The knee sits between concurrency 2 and 4, and it belongs to the
@@ -187,10 +287,10 @@ own data:
   never appears in the curve; the throughput lever lives behind it.
 - **Beyond the knee, degradation is loud and flat** — 88 orderly
   429s with drain-derived Retry-After, zero errors, throughput held.
-  Bounded queues with admission control, doing exactly what they
-  were built for: request cost is unknown at admission (the output
-  length isn't in the request), so a full queue refuses rather than
-  scaling the pool.
+  The bounded queue (an in-flight cap of 4 for the local backend)
+  does exactly what it was built for: request cost is unknown at
+  admission (the output length isn't in the request), so a full
+  queue refuses rather than scaling the pool.
 - **TTFT at low concurrency is bimodal** — 0.54 s with KV reuse
   versus ~11.7 s cold prefill of the 4.4k-token prefix. The mean of
   a bimodal TTFT describes no request that ever happened; the
@@ -203,22 +303,26 @@ must be audited against every measurement path, and this platform
 has three the caches would silently corrupt); the run was $0 *by
 construction*, because the pin makes the paid backend unreachable —
 the measured-run posture as a safety property, not only a
-comparability one; and the objectives math stayed honest — the local
-backend's SLOs derive from measured × 1.5, and the paid backend's
-are deliberately unset, because two pilot samples are not a
-baseline.
+comparability one; and the objectives math stayed anchored to
+measurement — the local backend's SLOs derive from the healthy
+region at measured × 1.5 (TTFT p95 ≤ 50 s from the measured 33.2 s;
+an aggregate throughput floor of ≥ 5 tokens/s), and the paid
+backend's are deliberately unset, because two pilot samples are not
+a baseline.
 
-One labeling note that is really a methodology note: on an 8.6 GB
-laptop the local backend runs a 1.5B model — adequate for the bulk
+One labeling note is really a methodology note: on an 8.6 GB
+laptop (an Apple M3, with the ollama model server in a container VM
+capped at ~3.8 GiB) the local backend runs a 1.5B model
+(qwen2.5:1.5b, Q4_K_M) — adequate for the bulk
 and classification duty it serves and as the killable region for the
 failover drill, useless for triage. The gateway measures serving
 *shapes* at laptop scale (knees, refusal behavior, failover
 semantics), not triage quality, and every number is labeled with its
-hardware. No fleet extrapolation.
+hardware, with no fleet extrapolation.
 
 ## What breaks at 1000×
 
-The title's honesty is also its scaling limit. At N heterogeneous
+The title's restraint is also its scaling limit. At N heterogeneous
 backends the structure holds — precedence, recorded source, health
 walks — but choice within a tier becomes real scheduling, and the
 EWMA-of-TTFT heuristic gives way to actual queue-state feedback; the
@@ -229,7 +333,7 @@ debugging convenience and becomes the substrate of cost attribution
 — at fleet volume, "which tier chose this backend and what did it
 cost" is the input to routing-policy reviews, budget enforcement,
 and the argument between teams about who pays for fall-forward. And
-the mid-stream honesty rule gets more expensive exactly where it
+the mid-stream fabrication rule gets more expensive exactly where it
 matters more: at scale the temptation to resume dead streams grows
 with their frequency, and the defensible line stays the one drawn
 here — a structured error the client handles beats a spliced
@@ -247,6 +351,5 @@ the build landed as
 [#208](https://github.com/fespino/resgraph/pull/208) (entrypoint and
 probes), [#212](https://github.com/fespino/resgraph/pull/212)
 (metrics), and [#215](https://github.com/fespino/resgraph/pull/215)
-(the load test); the capacity write-up with the method and hardware
-is
-[docs/capacity.md](https://github.com/fespino/resgraph/blob/main/docs/capacity.md).
+(the load test); the raw load-test rows are
+[docs/capacity-load-results.json](https://github.com/fespino/resgraph/blob/main/docs/capacity-load-results.json).

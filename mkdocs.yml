@@ -1,11 +1,12 @@
 # Built with ProperDocs (MkDocs 1.x continuation); the legacy config
 # filename is kept because the content is meant to stay portable across
 # the whole MkDocs lineage. Build: uv run properdocs build --strict -f mkdocs.yml
-site_name: resgraph
+site_name: f.espino / resgraph
 site_url: https://fespino.github.io/resgraph/
 site_description: >-
-  A mini referential data platform, built in public: streaming graph hot
-  store, Iceberg cold store, agents and serving on top. Honest benchmarks only.
+  A mini data platform built for learning: streaming graph hot store,
+  Iceberg cold store, an investigating agent with its eval harness, and a
+  serving gateway — every number with hardware and methodology.
 repo_url: https://github.com/fespino/resgraph
 
 theme:
@@ -21,7 +22,12 @@ markdown_extensions:
   - toc:
       permalink: false
   - tables
-  - pymdownx.superfences
+  - admonition
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_div_format
   - pymdownx.highlight:
       anchor_linenums: false
       guess_lang: false
@@ -30,7 +36,7 @@ markdown_extensions:
 
 nav:
   - Home: index.md
-  - Writing: writing/index.md
+  - Devlog: writing/index.md
   - Engineering:
       - Security posture: security-posture.md
       - Stream contract: stream-contract.md

@@ -2395,6 +2395,57 @@ stands until an operator needs it); deriving /v1/usage from Prometheus
 (the metrics are for dashboards; the billing surface reads the
 billing records).
 
+## D44 — Eval-driven routing: the arms table at request time (gateway phase, #268)
+
+Routing by "quality" is the axis every gateway advertises and almost
+none grounds, because grounding it requires evals with planted ground
+truth and calibrated judges. This platform already paid for those, so
+the routing policy consumes them: a task-class route MAY declare
+measured candidate aliases and a pass^k floor, and the gateway then
+routes among the candidates whose measured pass^k clears the floor —
+a routing decision made of eval decisions.
+
+- **The quality table is generated, never hand-written.**
+  `resgraph-evals routing-table alias=run_file ...` derives each entry
+  (pass^k, cost per passed triage) from run files via the arms
+  machinery, stamping the run path and the run's own date; the
+  gateway's loader refuses any entry lacking that provenance — a
+  routing table with no provenance is an opinion. Committed at
+  `evals/routing-quality.yaml` (schema-only until multi-arm run files
+  are committed; fabricating scores to have some was rejected).
+- **Floors before weights, so cheap never buys wrong.** Eligibility
+  first (measured pass^k ≥ the declared floor; an UNMEASURED candidate
+  is ineligible — the floor is a guarantee and a guarantee cannot rest
+  on an absent measurement: no eval, no route). Then, among the
+  eligible: a free arm above the floor preempts (picked by pass^k);
+  priced arms run the inverse-square lottery weighted by measured
+  cost per passed triage — both numbers from the same run.
+- **Degrade, never refuse.** No eligible candidate falls back to the
+  class's static default with a logged warning — quality routing must
+  not turn a servable request into a refusal. Pins and explicit
+  overrides outrank it entirely. The served source is
+  `quality_route`, and the decision rationale carries the winning
+  entry's run and date.
+- **The measured comparison** (fixture arms mirroring the measured
+  shapes — a strong arm at real cost vs a cheap arm that rarely
+  passes): over the same 200-request stream, price-only routing picks
+  the cheapest cost-per-passed arm and solves ~10; the floored policy
+  solves 180 — an 18× delivery difference that per-call price
+  comparison is structurally blind to. Committed as the seeded test.
+- **A latent wiring bug fixed en route**: `generate` resolved
+  task-class defaults against the module's DEFAULT_REGISTRY instead of
+  the gateway's injected registry — invisible until a test's registry
+  disagreed with the default's aliases; every prior suite's setups
+  happened to contain them. The router now receives `gw.registry`.
+
+**Rejected:** hand-written quality scores (the builder exists so the
+table can only come from runs); admitting unmeasured candidates to a
+floored class (breaks the guarantee the floor states); refusing when
+nothing clears the floor (a routing optimization must not reduce
+availability); score expiry/max-age (nothing rots yet at this scale —
+recorded as the natural next constraint when tables refresh per
+baseline event).
+
 ## Phase contracts
 - The generator MUST emit D2 messages exactly and expose `--seed`
   for reproducibility.

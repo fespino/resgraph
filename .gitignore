@@ -18,3 +18,4 @@ wheels/
 # Data
 *.duckdb
 data/
+.claude/

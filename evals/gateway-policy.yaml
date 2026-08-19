@@ -1,4 +1,4 @@
-# The operator plane (D42): per-caller allow-lists the gateway enforces
+# The operator plane: per-caller allow-lists the gateway enforces
 # on every request carrying that caller name — including pins (operator
 # authority outranks every caller word). A caller listed here reaches
 # ONLY what its `only` names (aliases, endpoint ids, or providers); a

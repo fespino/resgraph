@@ -2331,6 +2331,69 @@ the honest contract); a default-deny posture for unlisted callers
 (this gateway serves its own laptop; default-deny arrives with real
 identity, or it is security theater against a header).
 
+## D43 — Billing is meter + identity + wallet (gateway phase, #267)
+
+The meter existed (per-call cost sliced by class, backend, source —
+D33's cost-per-task SLO machinery); billing is that meter plus knowing
+WHO consumed and letting them prepay. Validated against OpenRouter's
+documented semantics in the #263 pass, which converged with the design
+unprompted: their 402 `payment_required` / 503 split is exactly the
+"you spent YOUR balance" vs "you hit OUR cap" distinction `budget_503`
+already drew, and their management-key vs inference-key split is the
+spend/administer capability boundary adopted here.
+
+- **Identity**: named accounts in `evals/gateway-accounts.yaml`; each
+  entry names the ENV VAR holding its key (an inline key in the file
+  is refused at load — the secrets discipline `api_key_env`
+  established). A request presents `x-api-key`; a valid key
+  authenticates the account name in constant time; an unknown key is
+  a 401, never anonymous fallthrough; a `caller` field contradicting
+  the key is a 400. No key presented → `caller` stays self-declared
+  attribution (D42's recorded honesty gap, now closed for keyed
+  traffic; anonymous traffic remains allowed — this gateway serves
+  its own laptop, and D42's default-deny rejection stands).
+- **Wallet**: a prepaid grant per account (in the accounts file — a
+  top-up is a reviewable diff), decremented by the meter's own cost;
+  cumulative, not daily (a wallet is not a ledger that resets). Empty
+  → 402 `payment_required` with the overdraft visible. **The check is
+  pre-serve, so the last request may overshoot**: a request's cost is
+  unknown at admission (output length is not in the request — the
+  same fact that bounds the queues), so the wallet admits while
+  remaining > 0 and the final spend can exceed the grant by one
+  request's cost. Bounded overshoot accepted and visible in the
+  refusal detail; pre-metering by estimated cost was rejected
+  (estimating output length is guessing, and a guessed refusal is
+  worse than a bounded overshoot).
+- **The usage surface**: `GET /v1/usage` aggregates the usage
+  ledger's own appended rows — per (day, account, endpoint): request
+  count, tokens, cost — and nothing else; a surface that derives from
+  anything the serve path didn't write is a second bookkeeper that
+  can disagree with the first. Gated by a management key when one is
+  configured (`RESGRAPH_GATEWAY_MGMT_KEY`); open when not (laptop
+  default). An inference key is never a management key.
+- **The cost echo is always on**: every response carries `cost_usd`
+  (their deprecated opt-in flag validated the always-on form; a row
+  that knows its cost returns it). Cache hits echo and record $0 —
+  a hit spends no backend tokens. Free traffic is metered in the
+  usage ledger but never decrements a wallet.
+- **Test hygiene, structural**: the wallet and usage ledger default
+  to `data/` paths, and the first test run of this feature wrote 4.8
+  KB of fake rows into the real ledger — the CallCap-ledger failure
+  shape again. An autouse conftest fixture now redirects both to
+  per-test directories (the same pattern the telemetry fixture set),
+  so no future test can write production billing state regardless of
+  what it constructs. Reversal/refactor candidate recorded: a single
+  data-root env var for every `data/` writer would replace both
+  fixtures with one.
+
+**Rejected:** pre-metering by estimated output (guessing dressed as a
+refusal); balances as daily ledgers (prepaid grants don't reset at
+midnight); keys in the accounts file (the secrets discipline is one
+rule everywhere); requiring keys for all traffic (D42's rejection
+stands until an operator needs it); deriving /v1/usage from Prometheus
+(the metrics are for dashboards; the billing surface reads the
+billing records).
+
 ## Phase contracts
 - The generator MUST emit D2 messages exactly and expose `--seed`
   for reproducibility.

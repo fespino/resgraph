@@ -138,3 +138,15 @@ qwen-replay-gateway:
   base_url: http://localhost:8080
   pin: qwen-local-1.5b
   model: qwen2.5:1.5b
+
+# An endpoint MAY declare its lifecycle (ISO dates). Deprecated serves
+# with a logged warning; past sunset it refuses 410 — never a silent
+# remap: pins are the platform's thesis, and a retired name keeps its
+# meaning instead of quietly becoming a different model.
+# `resgraph-gateway lifecycle --today 2026-12-01` answers what breaks.
+#
+#   some-alias:
+#     ...
+#     lifecycle:
+#       deprecated: "2026-09-01"
+#       sunset: "2026-12-01"

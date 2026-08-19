@@ -27,6 +27,7 @@ import time
 from collections.abc import Callable, Iterator, Mapping
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
 
@@ -57,8 +58,10 @@ from resgraph.gateway.registry import (
     catalog_rows,
     endpoint_price,
     expand,
+    lifecycle_state,
     load_policy,
     policy_allows,
+    validate_lifecycle,
 )
 from resgraph.gateway.relay import StreamEvent, StreamFactory, parse_chat_sse, relay
 from resgraph.gateway.router import (
@@ -70,6 +73,7 @@ from resgraph.gateway.router import (
     TaskClass,
     resolve,
 )
+from resgraph.gateway.screen import screen
 
 log = logging.getLogger("resgraph.gateway")
 
@@ -585,6 +589,26 @@ def _strict_sort(gw: Gateway, req: GenerateIn, eids: list[str]) -> list[str]:
     )
 
 
+def _refuse_sunset(gw: Gateway, eid: str, today: str, *, pinned: bool) -> None:
+    """410 Gone past sunset — never a silent remap: the name keeps its
+    meaning and the refusal names the dates."""
+    state = lifecycle_state(gw.setups[eid], today)
+    if state == "sunset":
+        lc = gw.setups[eid].get("lifecycle") or {}
+        who = "pinned " if pinned else ""
+        raise HTTPException(
+            410,
+            detail=f"{who}{eid!r} is past its sunset ({lc.get('sunset')}); "
+            "nothing is substituted under a retired name",
+        )
+    if state == "deprecated":
+        log.warning(
+            "[gateway:lifecycle] %s is deprecated (sunset %s)",
+            eid,
+            (gw.setups[eid].get("lifecycle") or {}).get("sunset", "unscheduled"),
+        )
+
+
 def _endpoint_plan(gw: Gateway, decision: Any, req: GenerateIn) -> tuple[str, list[str]]:
     """Resolve the decision's target into (first endpoint, remaining
     within-alias candidates), applying the full constraint pipeline:
@@ -596,9 +620,11 @@ def _endpoint_plan(gw: Gateway, decision: Any, req: GenerateIn) -> tuple[str, li
     soft preferences are no-ops on a set of one."""
     target = decision.model
     wants_tools = bool(req.tools)
+    today = datetime.now(UTC).date().isoformat()
     if decision.source == "pin":
         if target in gw.setups:
             _policy_filter(gw, req.caller, [target])
+            _refuse_sunset(gw, target, today, pinned=True)
             reason = capability_mismatch(
                 gw.setups[target], wants_tools=wants_tools, max_tokens=req.max_tokens
             )
@@ -620,6 +646,24 @@ def _endpoint_plan(gw: Gateway, decision: Any, req: GenerateIn) -> tuple[str, li
             raise HTTPException(400, detail=f"unknown model alias {target!r}")
     candidates = _narrow(req, _policy_filter(gw, req.caller, candidates))
     admitted, reasons = [], []
+    live = []
+    for eid in candidates:
+        state = lifecycle_state(gw.setups[eid], today)
+        if state == "sunset":
+            reasons.append(f"{eid}: sunset since {gw.setups[eid]['lifecycle']['sunset']}")
+            continue
+        if state == "deprecated":
+            log.warning(
+                "[gateway:lifecycle] serving deprecated %s (sunset %s)",
+                eid,
+                (gw.setups[eid].get("lifecycle") or {}).get("sunset", "unscheduled"),
+            )
+        live.append(eid)
+    if not live:
+        raise HTTPException(
+            410, detail="every candidate endpoint is past sunset: " + "; ".join(reasons)
+        )
+    candidates = live
     for eid in candidates:
         reason = capability_mismatch(
             gw.setups[eid], wants_tools=wants_tools, max_tokens=req.max_tokens
@@ -868,6 +912,7 @@ def create_app(
         load_accounts(resolved_accounts_path.read_text()) if resolved_accounts_path.exists() else {}
     )
     for name, setup in table.items():
+        validate_lifecycle(name, setup)
         cadence = setup.get("probe_interval_s")
         if cadence is not None and float(cadence) <= 0:
             # wait(0) spins: a hot probe loop, and a spend bug on a priced setup
@@ -952,6 +997,12 @@ def create_app(
         account = _identify(gw, req, x_api_key)
         req = req.model_copy(update={"caller": account})
         _check_balance(gw, account)
+        flagged = screen(req.messages, req.system)
+        if flagged:
+            # observe, never block: this platform's own traffic carries
+            # adversarial text as data by design
+            log.warning("[gateway:screen] request matches %s (caller=%s)", flagged, account)
+            obs.GATEWAY_SCREEN_FLAGS.add(1, {"caller": account or "anonymous"})
         decision = None
         if req.pin is None and req.model is None:
             decision = _quality_route(gw, req.task_class)

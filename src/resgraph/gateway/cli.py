@@ -6,7 +6,7 @@ import typer
 import uvicorn
 
 from resgraph.gateway.budget import FallForwardBudget
-from resgraph.gateway.server import MODELS_PATH, create_app
+from resgraph.gateway.server import MODELS_PATH, POLICY_PATH, create_app
 
 app = typer.Typer(help="Serving gateway: routing, queues, streaming, health.", add_completion=False)
 
@@ -33,3 +33,35 @@ def serve(
         port=port,
         timeout_keep_alive=keep_alive,
     )
+
+
+@app.command()
+def lifecycle(
+    models_config: str = str(MODELS_PATH),
+    today: str = "",
+) -> None:
+    """Sunset blast radius over the registry: per lifecycled endpoint,
+    its state and who loses what — task classes routed or floored to
+    its alias, callers whose policy names it. --today overrides the
+    clock for what-if questions ("what breaks on 2026-12-01?")."""
+    from datetime import UTC, datetime
+
+    import yaml
+
+    from resgraph.gateway.registry import expand, load_policy, sunset_blast_radius
+    from resgraph.gateway.router import DEFAULT_REGISTRY
+
+    table, aliases = expand(yaml.safe_load(Path(models_config).read_text()) or {})
+    policy = load_policy(POLICY_PATH.read_text()) if POLICY_PATH.exists() else {}
+    day = today or datetime.now(UTC).date().isoformat()
+    routes = {str(k): v for k, v in DEFAULT_REGISTRY.items()}
+    rows = sunset_blast_radius(table, aliases, routes, policy, day)
+    if not rows:
+        typer.echo("no endpoint declares a lifecycle")
+        raise typer.Exit()
+    for r in rows:
+        typer.echo(
+            f"{r['endpoint']}: {r['state']}"
+            + (f" (sunset {r['sunset']})" if r.get("sunset") else "")
+            + f" | task_classes={r['task_classes'] or '-'} callers={r['callers'] or '-'}"
+        )

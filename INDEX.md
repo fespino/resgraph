@@ -62,9 +62,9 @@
   single source of truth, budgets, refs+fetch shaping, HTTP projection
 - src/resgraph/mcp/ — MCP server over the registry (stdio), server card,
   skills-as-prompts loader (D21)
-- src/resgraph/gateway/ — serving gateway (D30–D33, D40–D44): precedence router
+- src/resgraph/gateway/ — serving gateway (D30–D33, D40–D45): precedence router
   with recorded source, endpoint registry (one alias, many endpoints;
-  capability admission; `GET /v1/models`), caller/operator contract + billing (accounts, wallet, `GET /v1/usage`), eval-driven routing (quality table from runs), dispatch policy
+  capability admission; `GET /v1/models`), caller/operator contract + billing (accounts, wallet, `GET /v1/usage`), eval-driven routing (quality table from runs), in-line screening + sunset lifecycle, dispatch policy
   (queues/health/EWMA), stream relay + accounting, response cache
   (TTL/LRU, deterministic setups only), `resgraph-gateway serve` with
   health probes; metrics in obs.py, SLO rules + dashboard in observability/

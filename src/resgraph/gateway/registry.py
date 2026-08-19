@@ -9,6 +9,8 @@ world is unchanged. Endpoint ids are ``alias@name``; ``@`` is reserved.
 Decisions: D40 (SPEC.md).
 """
 
+import re
+from collections.abc import Mapping
 from typing import Any
 
 import yaml
@@ -87,6 +89,65 @@ def policy_allows(allowed: list[str], eid: str, setup: dict[str, Any]) -> bool:
     return any(entry in (eid, alias, setup.get("provider")) for entry in allowed)
 
 
+def lifecycle_state(setup: dict[str, Any], today: str) -> str:
+    """'active', 'deprecated', or 'sunset' from the setup's declared
+    lifecycle dates (ISO days, compared lexically). Metadata without
+    remapping: a sunset endpoint refuses loudly; nothing is ever
+    substituted under the same name."""
+    lc = setup.get("lifecycle") or {}
+    sunset = lc.get("sunset")
+    if sunset and today >= str(sunset):
+        return "sunset"
+    deprecated = lc.get("deprecated")
+    if deprecated and today >= str(deprecated):
+        return "deprecated"
+    return "active"
+
+
+def validate_lifecycle(alias: str, setup: dict[str, Any]) -> None:
+    lc = setup.get("lifecycle") or {}
+    for key in lc:
+        if key not in ("deprecated", "sunset"):
+            raise SystemExit(f"setup {alias!r}: unknown lifecycle key {key!r}")
+        if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", str(lc[key])):
+            raise SystemExit(f"setup {alias!r}: lifecycle.{key} must be an ISO date (YYYY-MM-DD)")
+    if lc.get("deprecated") and lc.get("sunset") and str(lc["sunset"]) < str(lc["deprecated"]):
+        raise SystemExit(f"setup {alias!r}: sunset precedes deprecated")
+
+
+def sunset_blast_radius(
+    table: dict[str, dict[str, Any]],
+    aliases: dict[str, list[str]],
+    class_routes: Mapping[str, Any],
+    policy: dict[str, list[str]],
+    today: str,
+) -> list[dict[str, Any]]:
+    """Per endpoint with a declared lifecycle: its state today and who
+    loses what at sunset — the task classes routed or floored to its
+    alias, and the callers whose policy names it."""
+    out = []
+    for eid, setup in table.items():
+        if not setup.get("lifecycle"):
+            continue
+        alias = eid.split("@", 1)[0]
+        classes = [
+            name
+            for name, route in class_routes.items()
+            if route.model == alias or alias in getattr(route, "candidates", ())
+        ]
+        callers = [c for c, allowed in policy.items() if policy_allows(allowed, eid, setup)]
+        out.append(
+            {
+                "endpoint": eid,
+                "state": lifecycle_state(setup, today),
+                **{k: v for k, v in (setup.get("lifecycle") or {}).items()},
+                "task_classes": sorted(classes),
+                "callers": sorted(callers),
+            }
+        )
+    return sorted(out, key=lambda r: r["endpoint"])
+
+
 def endpoint_price(setup: dict[str, Any], prices: dict[str, Any]) -> float | None:
     """One endpoint's effective price per mtok (input + output rates).
     A per-endpoint ``price_per_mtok`` override wins (the same weights can
@@ -130,6 +191,7 @@ def catalog_rows(
                         if price is not None
                         else None
                     ),
+                    "lifecycle": setup.get("lifecycle"),
                     # rolling-window percentiles, null until measured — an
                     # unmeasured endpoint is a fact, not a zero
                     "stats": (stats or {}).get(eid),

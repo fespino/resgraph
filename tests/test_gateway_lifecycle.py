@@ -120,10 +120,12 @@ def test_a_deprecated_endpoint_serves_with_a_warning(tmp_path, caplog):
             "lifecycle": {"deprecated": "2020-01-01", "sunset": "2099-01-01"},
         }
     }
+    client = TestClient(_app(tmp_path, setups))
     with caplog.at_level("WARNING", logger="resgraph.gateway"):
-        out = _gen(TestClient(_app(tmp_path, setups)), model="aging")
-    assert out.status_code == 200
-    assert any("deprecated" in r.message for r in caplog.records)
+        out = _gen(client, model="aging")
+        pinned = _gen(client, pin="aging")  # the pin path warns too
+    assert out.status_code == 200 and pinned.status_code == 200
+    assert sum("deprecated" in r.message for r in caplog.records) >= 2
 
 
 def test_a_sunset_endpoint_leaves_the_alias_but_siblings_serve(tmp_path):

@@ -20,6 +20,8 @@ tail breaks every hash after it — `verify_chain` names the first
 broken seq. The named residual: truncating the tail is silent, as in
 any head-pointerless hash chain; the answer to that is a second
 party holding the head, which D27 defers until there is one.
+
+Decisions: D27 (SPEC.md).
 """
 
 import hashlib

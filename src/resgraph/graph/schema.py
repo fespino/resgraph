@@ -2,6 +2,8 @@
 
 Nothing else until a measured query needs it: indexes are write-cost
 budgets, not decorations.
+
+Decisions: D8, D9 (SPEC.md).
 """
 
 import contextlib

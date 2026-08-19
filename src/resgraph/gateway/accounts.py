@@ -1,6 +1,9 @@
 """Billing: named accounts (keys in the environment), prepaid wallets
 decremented from the meter, and a usage surface over the meter's own
-records."""
+records.
+
+Decisions: D43 (SPEC.md).
+"""
 
 import hmac
 import json

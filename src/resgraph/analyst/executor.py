@@ -17,6 +17,8 @@ Two properties fall out of D2 and matter more than they look:
   resource moved past the sequence this step wrote, that snapshot no
   longer restores anything and the step reports itself irreversible
   rather than clobbering a third party's write.
+
+Decisions: D28 (SPEC.md).
 """
 
 import signal

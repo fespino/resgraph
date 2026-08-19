@@ -10,7 +10,10 @@ Identity is the full request semantics — alias + every request field — and a
 one-token difference is a different resource. Only deterministic requests are
 cacheable (a temperature-0 setup, non-streamed): caching a sampled response
 would replay one draw as if it were the answer. The clock is injected, so
-TTL behavior tests offline."""
+TTL behavior tests offline.
+
+Decisions: D32 (SPEC.md).
+"""
 
 import hashlib
 import json

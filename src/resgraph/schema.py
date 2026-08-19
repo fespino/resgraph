@@ -1,3 +1,8 @@
+"""The update-message schema.
+
+Decisions: D2 (SPEC.md).
+"""
+
 # Message Schema as defined in D2
 #
 # TODO — open D2 gaps, undecided (record in SPEC.md before enforcing here):

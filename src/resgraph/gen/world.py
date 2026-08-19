@@ -1,4 +1,7 @@
-"""Seedable world state + topology rules (D5)."""
+"""Seedable world state + topology rules (D5).
+
+Decisions: D5, D6, D7 (SPEC.md).
+"""
 
 from bisect import insort
 from dataclasses import dataclass, field

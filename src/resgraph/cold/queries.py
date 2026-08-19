@@ -5,6 +5,8 @@ events between the snapshot's watermark and T — highest sequence per
 resource wins, deletes mean absent. All reads dedupe on
 (resource_id, sequence): at-least-once appends make duplicate rows
 legal and identical (D12).
+
+Decisions: D13 (SPEC.md).
 """
 
 import json

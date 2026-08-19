@@ -2,6 +2,8 @@
 
 Direction convention (D8): edges point dependent -> dependency, so the
 blast radius of X is everything with a directed path TO X.
+
+Decisions: D8 (SPEC.md).
 """
 
 from typing import Any

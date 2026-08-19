@@ -9,7 +9,10 @@ and the stream ends — tokens already reached the client, and a replay could
 splice two answers, so no resume path exists.
 
 The clock is injected and the event iterators are plain iterators, so every
-rule here runs offline."""
+rule here runs offline.
+
+Decisions: D31 (SPEC.md).
+"""
 
 import json
 import time

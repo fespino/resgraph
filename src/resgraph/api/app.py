@@ -4,6 +4,8 @@ Every response says which store answered (`source`) and when
 (`fetched_at`); every list is capped at MAX_ROWS with `truncated` +
 `total_count`. `?explain=true` returns the plan without touching a
 store — laziness as an observable property, not a claim.
+
+Decisions: D15 (SPEC.md).
 """
 
 import json

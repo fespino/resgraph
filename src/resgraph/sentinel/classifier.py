@@ -5,6 +5,8 @@ is pinned (setup + temperature 0 + template hash stamped per verdict —
 a template change is a labeled baseline event, D38), and the daily
 call cap defers rather than drops: a deferred classification is still
 a classification; a dropped one is a blind spot.
+
+Decisions: D38 (SPEC.md).
 """
 
 import hashlib

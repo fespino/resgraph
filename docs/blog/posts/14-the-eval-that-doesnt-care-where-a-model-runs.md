@@ -23,18 +23,78 @@ because it only knew how to run one model.
 This post is about making an eval harness model-agnostic — the seam,
 the gate that had to learn what a worker is, and the three-arm
 experiment that then changed the product's default model. The
-punchline up front: an eval that only ever confirmed the frontier
+punchline comes first: an eval that only ever confirmed the frontier
 model would have been a press release. This one cost $28 across four
-paid runs and told us to switch to the model that is 8× cheaper —
-with one caveat we now design around.
+paid runs and changed the default to the model that is 8× cheaper —
+with one caveat, now designed around.
+
+<!-- more -->
+
+!!! info "The resgraph series"
+    This is the fifteenth post about
+    [**resgraph**](https://github.com/fespino/resgraph), a mini data
+    platform I am building for learning purposes.
+    Browse the repository exactly as it stood when this was written:
+    [`phase-10-token-path`](https://github.com/fespino/resgraph/tree/phase-10-token-path).
+    Every snippet below is copied from that tag, trimmed only for
+    length.
+
+In this phase: the analyst's eval suite, release gate, and certified
+baseline all exist — built in the previous three posts — and every
+one of them assumed a single hardcoded model. This phase makes the
+worker pluggable and then runs the three-arm experiment the
+pluggability exists for.
+
+The platform so far, with this post's piece highlighted:
+
+```mermaid
+flowchart TD
+    loop["<b>the dev loop</b><br/>CI gates, review, the decision log<br/>#00 #01"]
+    gen["<b>generator</b><br/>a deterministic synthetic cloud, seeded<br/>#02"]
+    hot["<b>hot graph</b><br/>current state, benchmarked<br/>#03"]
+    ing["<b>ingest</b><br/>one watermark, three guarantees<br/>#04"]
+    cold["<b>cold history</b><br/>every past state, on two clocks<br/>#05"]
+    query["<b>query layer</b><br/>one API over both stores<br/>#06"]
+    obs["<b>observability</b><br/>wide events + SLOs<br/>#07"]
+    mcp["<b>MCP server</b><br/>the agent's tool surface<br/>#08"]
+    evals["<b>analyst + evals</b><br/>triage judged on planted ground truth<br/>#09 #10 #11"]
+    runtime["<b>safe runtime</b><br/>typed approvals + the audit trail<br/>#12"]
+    drills["<b>drills</b><br/>paid runs verified before they spend<br/>#13"]
+    seam["<b>worker seam</b><br/>models are config, not code<br/>#14 ◀"]
+
+    loop -.->|every change ships through it| gen
+    gen -->|seeded events| ing
+    ing --> hot
+    ing --> cold
+    hot --> query
+    cold --> query
+    query -.->|wide events| obs
+    query --> mcp
+    mcp -->|tools| evals
+    evals -->|every run lands in the trail| runtime
+    drills -.-> evals
+    seam -.-> evals
+    class seam thispost
+```
 
 ## The seam: a worker is configuration, not code
 
 The change is easy to state: the eval *worker* — the model under
 test — became provider-pluggable. A worker is an entry in a config
-file (provider, model, endpoint, request arguments, seed), the
-harness resolves it by name, and nothing downstream branches on where
-the model runs. Two design rules did the real work:
+file, the harness resolves it by name, and nothing downstream
+branches on where the model runs:
+
+```yaml
+# evals/models.yaml
+opus:
+  provider: anthropic
+  model: claude-opus-4-8
+  extra_args:
+    thinking:
+      type: adaptive
+```
+
+Two design rules did the real work:
 
 - **Every result row embeds its resolved worker setup**, the same way
   it already embedded the git ref, the prompt fingerprint, and the
@@ -68,7 +128,18 @@ So the gate learned one distinction. The certified baseline now
 records the worker it was certified on; every aggregate records the
 single worker of its run; and the gate keys on the pair. In directory
 selection it *skips* a foreign-worker run the way it skips a
-companion dataset — named in the skipped list, visible, never silent.
+companion dataset — named in the skipped list, visible, never
+silent. The selection function's docstring carries the rule:
+
+```python
+# src/resgraph/evals/gate.py
+def gate_skip_reason(rows: list[dict[str, Any]], baseline_model: str | None = None) -> str:
+    """Empty when this run is a gate candidate; otherwise why it is not.
+    Companion sets, sub-k runs, and runs of a different worker than the
+    baseline are all "not a gate candidate" (D29b/D29c), so selection skips
+    past them to find the newest run it can verdict — a weaker local worker is
+    an `arms` comparison, not a regression against the certified baseline."""
+```
 Asked to compare one directly, it *declines* with a reason that
 points at the arms command, never a block. The practical consequence
 was the answer to "do we need to redo all the captured data to run a
@@ -78,13 +149,15 @@ labeled comparison.
 
 ## The instruments got fixed before the money moved
 
-A pattern ran through the whole cluster: every paid experiment kept
-getting postponed by an instrument fix the experiment itself
-demanded, and each fix was cheap code with no spend. The gate's run
-selection had gone quietly useless (once drill evidence was committed,
-"newest run" always picked a companion set, so the gate declined on
-every PR — honest, and useless; a check that always says the same
-thing has stopped being a check). The skill ledger's "invoked" stage
+A pattern ran through the phase: every paid experiment kept getting
+postponed by an instrument fix the experiment itself demanded, and
+each fix was cheap code with no spend. The gate's run selection had
+gone quietly useless: once drill evidence was committed, "newest
+run" always picked a companion set, so the gate declined on every
+PR — accurate, and useless; a check that always says the same thing
+has stopped being a check.
+
+The skill ledger's "invoked" stage
 was reading tool *names* when the question was about tool *arguments*
 — "used two tools" is not "followed the method" — and it had to be
 fixed before the paid run, because a ledger can only be sharp if the
@@ -93,9 +166,8 @@ used tools, one fingerprint, item and trial counts exact — earned its
 keep the same day it shipped by refusing a truncated 17-of-90 partial
 before it could be compared.
 
-There is a base rate behind that discipline, and it is worth stating
-the way it was stated internally: at one point mid-phase, 2 of 7 paid
-runs had met their registered objective. Each miss individually had a
+There is a base rate behind that discipline: at one point mid-phase,
+2 of 7 paid runs had met their registered objective. Each miss individually had a
 defensible story and genuine salvage; in sequence they read like a
 string of successes. The correction was procedural — postmortems lead
 with objective-met-or-not, a standing ledger of every paid run
@@ -103,7 +175,7 @@ against its registration — and the instrument fixes above are what
 that correction looks like in practice: verify the premise cheaply,
 before the run that spends on it.
 
-The same reset drew a scope line worth stating on its own: after the
+The same reset drew a scope line: after the
 arms merged, three new research threads opened in a single day, each
 individually interesting, and the correction was blunt — open issues
 are not a queue; the phase charter is. A research thread earns a
@@ -115,8 +187,8 @@ one is how excellent hygiene quietly stops shipping.
 
 The experiment itself was pre-registered with a pre-mortem per arm
 and a halt condition: any fabrication count above the baseline's
-stops certification. Same 30 items, three trials each, judge pinned
-throughout.
+stops certification. Every arm ran the same 30 items, three trials
+each, with the judge pinned throughout.
 
 **The cheap arm** ($1.62) hit the halt — 2 fabricated graph edges —
 so it produced a characterization, not a certification. The
@@ -126,9 +198,9 @@ causes, 0.92 on multi-hop chains), but on *control* items — where the
 honest answer is "there is no cause here" — it failed honesty on 15
 of 18 trials, naming high-confidence culprits out of nothing, and in
 several rows setting its own "no confident candidate" flag while
-still listing suspects. From this arm alone, the story wrote itself:
-the harness transfers pathfinding, not judgment; the frontier earns
-its cost on abstention.
+still listing suspects. From this arm alone, a story formed: the
+harness transfers pathfinding, not judgment; the frontier earns its
+cost on abstention.
 
 **The reference arm** ($12.80) is why that story never shipped.
 Running the frontier comparand inverted it:
@@ -212,7 +284,7 @@ The intended 7B model never loaded: it needs ~5.1 GiB and the
 container VM on an 8.6 GB laptop caps out at ~3.8. The seam turned
 that from a code failure into a deployment fact — "the local daily
 driver wants a ≥16 GB host" is a config statement, not a rewrite —
-and the config ships honestly: the 1.5B entry is labelled a seam
+and the config says so plainly: the 1.5B entry is labelled a seam
 smoke worker that fabricates. Committing a weak model is fine;
 presenting it as a viable analyst is not.
 
@@ -224,8 +296,8 @@ institutional. The single-number leaderboard is exactly what
 procurement wants, and the slice profile does not survive the slide
 deck — the counter is the one this experiment stumbled into:
 register the decision *rule* in advance, then check whether the rule
-survives contact with the slices, because ours didn't, and
-discovering that before the meeting is the whole game. Arms stop
+survives contact with the slices — this one didn't, and discovering
+that before the meeting is the whole game. Arms stop
 being an event and become a pipeline run per model release, at which
 point the reference arm's cost dominates the budget and the pinned
 judge becomes the scarce resource — the judge-drift question (who

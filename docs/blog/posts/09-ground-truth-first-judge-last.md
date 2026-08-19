@@ -28,27 +28,52 @@ trusting anything the agent appears to do.
 
 <!-- more -->
 
-This post is about **resgraph**, a mini referential data platform
-built in public. Part I built the pipeline: a deterministic
-generator streams infrastructure updates, a consumer applies them
-idempotently into a graph store, a cold store keeps full history in
-Iceberg, one query layer answers questions needing both, and an
-observability layer watches it all. Part II gives the platform its
-intended consumer: an agent. This phase adds an analyst that triages
-an alert the way an on-call engineer would — walk the dependencies,
-diff the window, read the change history, name ranked suspects with
-evidence (D22 in the spec: one agent, a 15-call tool budget, five
-read-only tools derived from the platform's tool registry, a
-structured report contract). But the agent is the second half of the
-phase. The first half, and this post, is the evaluation harness that
-grades it (D24) and the scenarios it is graded on (D25) — built and
-committed before the first graded run.
-
-!!! info "The repo at this phase"
+!!! info "The resgraph series"
+    This is the tenth post about
+    [**resgraph**](https://github.com/fespino/resgraph), a mini data
+    platform I am building for learning purposes.
     Browse the repository exactly as it stood when this was written:
     [`phase-8-analyst`](https://github.com/fespino/resgraph/tree/phase-8-analyst).
     The full run-by-run log this post draws on is
     [`EVALS.md`](https://github.com/fespino/resgraph/blob/phase-8-analyst/EVALS.md).
+    Every snippet below is copied from that tag, trimmed only for
+    length.
+
+In this phase: the platform gets its intended consumer — an agent.
+An analyst triages an alert the way an on-call engineer would: walk
+the dependencies, diff the window, read the change history, name
+ranked suspects with evidence (D22: one agent, a 15-call tool
+budget, five read-only tools derived from the platform's tool
+registry, a structured report contract). But the agent is the second
+half of the phase. The first half, and this post, is the evaluation
+harness that grades it (D24) and the scenarios it is graded on
+(D25) — built and committed before the first graded run.
+
+The platform so far, with this post's piece highlighted:
+
+```mermaid
+flowchart TD
+    loop["<b>the dev loop</b><br/>CI gates, review, the decision log<br/>#00 #01"]
+    gen["<b>generator</b><br/>a deterministic synthetic cloud, seeded<br/>#02"]
+    hot["<b>hot graph</b><br/>current state, benchmarked<br/>#03"]
+    ing["<b>ingest</b><br/>one watermark, three guarantees<br/>#04"]
+    cold["<b>cold history</b><br/>every past state, on two clocks<br/>#05"]
+    query["<b>query layer</b><br/>one API over both stores<br/>#06"]
+    obs["<b>observability</b><br/>wide events + SLOs<br/>#07"]
+    mcp["<b>MCP server</b><br/>the agent's tool surface<br/>#08"]
+    evals["<b>analyst + evals</b><br/>triage judged on planted ground truth<br/>#09 ◀"]
+
+    loop -.->|every change ships through it| gen
+    gen -->|seeded events| ing
+    ing --> hot
+    ing --> cold
+    hot --> query
+    cold --> query
+    query -.->|wide events| obs
+    query --> mcp
+    mcp -->|tools| evals
+    class evals thispost
+```
 
 ## The bar was written before the harness
 
@@ -105,7 +130,40 @@ two or three hops up the dependency chain), lets unrelated churn
 continue around it, then fires an alert downstream. The scenario
 spec records the planted cause, the mechanism path, and the exact
 event sequence number — so grading "did the agent find it?" is a
-string comparison, not an opinion.
+string comparison, not an opinion. The planted truth is a frozen
+model, not an annotation:
+
+```python
+# src/resgraph/gen/scenarios.py
+class GroundTruth(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    causal_sequence: int = Field(ge=0)
+    causal_resource: str
+    # Edge chain from cause to alert target; each consecutive pair is a
+    # dependency edge (dependent cites the resource before it).
+    mechanism_path: list[str] = Field(min_length=2)
+    scenario_type: ScenarioType
+```
+
+One detail carries the taxonomy's credibility, and it lives as a
+comment on the fault table:
+
+```python
+# src/resgraph/gen/scenarios.py
+# Fault values come from ATTR_POOLS, so causes and distractors share
+# surface templates: nothing about a change's shape says "planted".
+FAULT_CHOICES: dict[ResourceType, tuple[tuple[str, str | int | bool], ...]] = {
+    ResourceType.ASG: (("desired", 1), ("min", 0)),
+    ResourceType.CONTAINER: (("state", "exited"), ("state", "restarting")),
+    ResourceType.DB: (("state", "degraded"), ("connections", 200)),
+    ...
+}
+```
+
+Causes and distractors draw from the same attribute pools the
+ordinary churn uses — an agent cannot learn to spot planted changes
+by their surface, because there is no surface to spot.
 
 The taxonomy has seven shapes, and the distribution is an argument,
 not an accident:
@@ -123,11 +181,11 @@ not an accident:
 That last sentence was written into the spec as a prediction; the
 baseline priced it at 0 of 6 controls. More on that below.
 
-Two design choices are defenses against eval decay — a real
-pressure, not a hypothetical: Anthropic has
+Two design choices defend against eval decay: Anthropic has
 [measured](https://www.anthropic.com/engineering/AI-resistant-technical-evaluations)
 one of its own evaluations losing its discriminating power within
-a single model generation. The first defense: each scenario can be
+a single model generation. The first defense is that each scenario
+can be
 *re-skinned* — same causal structure, fresh resource names and
 identifiers — so the set can be regenerated if it ever leaks into
 training data or gets overfit by prompt iteration, and the check
@@ -138,8 +196,8 @@ leaks but because models simply got better at it, that slice has
 expired — its replacement comes from the generator's parameter
 space (deeper chains, harder shapes), not from fresh paint.
 
-The second defense: the scenarios are generated by code, not by an
-LLM. Microsoft's
+The second defense is that the scenarios are generated by code, not
+by an LLM. Microsoft's
 [STATE-Bench](https://github.com/microsoft/STATE-Bench) takes the
 other path and says so, LLM-synthesizing its tasks as a disclosed
 scaling trade-off — but a synthesized task's ground
@@ -148,7 +206,8 @@ harness exists precisely to avoid grading judgment with judgment.
 
 ## Graders first, judge last
 
-Five dimensions, and the design rule is in the title: four of them
+The harness grades five dimensions, and the design rule is in the
+title: four of them
 are deterministic code, and the LLM judge comes last, weighted
 smallest, grading the only thing code can't — whether the triage
 narrative is coherent and evidence-grounded prose.
@@ -166,6 +225,43 @@ narrative is coherent and evidence-grounded prose.
 - **narrative** — the judge, pinned to a model and a frozen prompt
   template.
 
+The first two are short enough to show, and they are the design rule
+made concrete — pure comparisons against what the platform itself
+says was true:
+
+```python
+# src/resgraph/evals/graders.py
+def grade_found(report: TriageReport, truth: GroundTruth) -> list[DimResult]:
+    seqs = [s.sequence for s in report.suspects]
+    detail = f"planted seq {truth.causal_sequence}, reported top-3 {seqs[:3]}"
+    return [
+        DimResult("found_top1", bool(seqs) and seqs[0] == truth.causal_sequence, detail),
+        DimResult("found_top3", truth.causal_sequence in seqs[:3], detail),
+    ]
+
+
+def grade_evidence(
+    report: TriageReport, edges: set[tuple[str, str]], log_sequences: set[int]
+) -> DimResult:
+    """edges: (dependent, dependency) pairs alive at incident time per
+    the production as-of query. Any failure here is a fabrication —
+    the run cited graph state or events that never existed."""
+    for i, s in enumerate(report.suspects):
+        for dependency, dependent in pairwise(s.mechanism_path):
+            if (dependent, dependency) not in edges:
+                return DimResult(
+                    "evidence",
+                    False,
+                    f"suspect {i}: edge {dependent}->{dependency} did not exist at incident time",
+                )
+```
+
+The graders module's own docstring states the propagation rule that
+makes this cheap to trust: "the graders only compare — a grader bug
+is a platform bug, one fix serves both." The evidence check runs the
+*production* as-of query, so there is no second implementation of
+truth to drift.
+
 The judge needed a pin of its own. An LLM grader's scores are only
 comparable across runs if everything that shapes its output is
 frozen: which model judges, the exact prompt template it grades
@@ -175,7 +271,7 @@ sampling toward determinism), and a fixed random seed. Then the
 first real call tested the contract: the API rejected the
 temperature parameter outright — deprecated for this model
 generation — and offers no seed at all. Two of the four pinned
-knobs were never ours to pin. The correction is a dated row in the
+knobs were never available to pin. The correction is a dated row in the
 spec, the working pin is model + template only, and the lesson
 generalizes: a contract isn't a pin until a real call has passed
 through it. What cannot be pinned stays variable — which is one
@@ -187,8 +283,9 @@ passes only if all three trials pass — the pass^k defined above.
 Trials exist because an agent run is stochastic, so a single pass
 can be the lucky edge of a distribution; the phase's later
 certification run caught exactly that, when a dimension that
-scored perfect in one run measured 0.78 under repetition. But
-trials don't start on day one — the process runs in two gears.
+scored perfect in one run measured 0.78 under repetition.
+
+But trials don't start on day one — the process runs in two gears.
 During iteration, every run is single: the baseline halts on fabricated
 evidence, the next run fixes that one contract, the run after
 fixes the cache design — each paid run exists to check one
@@ -197,8 +294,9 @@ bill to re-answer the same question. The trials belong to the
 other gear, certification: when an iteration finally produces a
 configuration worth keeping — fabrications holding at zero, no
 dimension failing outright — k=3 measures whether its numbers
-survive repetition before they are allowed to mean anything. The
-same split shows up at benchmark scale:
+survive repetition before they are allowed to mean anything.
+
+The same split shows up at benchmark scale:
 [STATE-Bench](https://github.com/microsoft/STATE-Bench) — the
 450-task enterprise benchmark from above — reports its headline
 results as a *pair*, pass@1 (can the agent do the task at all)
@@ -210,8 +308,8 @@ number is the one that costs k times more to know.
 ## The protocol that makes a run mean something
 
 The measurement discipline is adapted from Ryan Lopopolo's
-[harness-engineering evals doctrine](https://github.com/lopopolo/harness-engineering/tree/trunk/evals/README.md)
-(CC BY 4.0), whose core is pre-registration: before a run, write
+[harness-engineering evals doctrine](https://github.com/lopopolo/harness-engineering/tree/trunk/evals/README.md),
+whose core is pre-registration: before a run, write
 down the hypothesis, the single change, the predicted effect, and —
 the part that does the most work — the result that would *invalidate*
 the hypothesis. His
@@ -222,16 +320,16 @@ new evidence is waste."
 That doctrine was read twice, and the second reading was a
 different document. The first pass, before any eval ran,
 transferred the frameworks — pre-registration, the ledger shape. A
-re-read after four iterations found sentences we had walked past
-that turned out to be our run log written in advance: "a signal is
+re-read after four iterations found sentences I had walked past
+that turned out to be this project's run log written in advance: "a signal is
 a lead rather than a diagnosis," whose misdiagnosis classes are
 exactly the four things that happened to this project inside 24
 hours, and the consolidation-over-accumulation rule whose failure
-mode — competing instructions — one of our runs had just measured
-as a 0.21 recall bleed. Both became protocol rules the same day.
-The general lesson: pre-build reading transfers frameworks;
-post-experiment re-reading transfers judgment, because operational
-sentences only bind once you have paid for their absence.
+mode — competing instructions — one run had just measured as a 0.21
+recall bleed. Both became protocol rules the same day.
+Pre-build reading transfers frameworks; post-experiment re-reading
+transfers judgment, because operational sentences only bind once you
+have paid for their absence.
 
 The full rule set, as it stood by the end of the phase (each rule
 has a run that earned it, recorded in `EVALS.md`):
@@ -269,8 +367,8 @@ honesty 0.00  discipline 0.00   narrative 1.00    cache 0.68
 fabrications 2 → HALT
 ```
 
-Three findings, one per failure class, all from run one and the two
-registered iterations that followed.
+Three findings came out of it, one per failure class, all from run
+one and the two registered iterations that followed.
 
 **The predicted failure arrived on schedule.** All six controls got
 an accusation — and the confidence labels on those accusations were
@@ -287,7 +385,7 @@ way. The taxonomy's ~20% control share existed because of exactly
 this failure mode, and the baseline measured the design sentence —
 an agent never shown "nothing" learns to always accuse something —
 at its worst possible value, 0 of 6. What it took to actually fix
-it is the next post; it is the best story in the phase.
+it is the next post.
 
 **A fabricated path was subsidizing the accuracy score.** The two
 evidence failures were real edges cited in an orientation the output
@@ -306,8 +404,8 @@ this iteration a regression. It was the eval working: when honesty
 goes up and accuracy goes down, the accuracy was borrowing against
 the honesty.
 
-**The metric that couldn't be reached was the design review that
-worked.** Discipline scored 0/30, entirely on one check: cache hit
+**The metric that couldn't be reached surfaced what the design
+review missed.** Discipline scored 0/30, entirely on one check: cache hit
 rate ≥ 0.9 — the share of input tokens the API serves from its
 prompt cache at a fraction of full price, instead of re-processing
 them. The token columns showed why, and the wrong-looking number
@@ -341,6 +439,57 @@ and the waste is what the metric was built to catch. Cache hit
 stays reported, ungated. The unreachable target did its job by being
 unreachable: a metric you can't game surfaces the design error the
 design review missed.
+
+## The audit the cache saga left behind
+
+The saga's durable form is that same audit table, now carrying the
+row it was missing. Every section of the analyst's prompt gets a
+verdict, PREFIX (static, cached) or SUFFIX (runtime), under one
+rule (D23, the prompt-layout decision): a section goes to SUFFIX
+only if it genuinely differs on every run; nothing gets hedged out
+of the cache "because it might change." The table and `prompts.py`
+change together, and a test holds the section list in sync.
+
+| Section | Verdict | Position | Why |
+|---|---|---|---|
+| identity | PREFIX | system block 1 | never varies |
+| triage discipline (the skill body) | PREFIX | system block 1 | the committed playbook; changes only when the skill file does |
+| tool guidance | PREFIX | system block 1 | steering conventions, static — budget *numbers* stay out of the prompt entirely (D22: budgets live in the harness) |
+| output contract (report schema + rules) | PREFIX | system block 1, last section; the block carries the `cache_control` breakpoint | derived from `models.py` — changing the report contract is *supposed* to bust the cache, visibly |
+| worked example | PREFIX | system block 1, after the output contract | teaches the discrimination rules could not (the next post's arc); its illustrative ids are excluded from referential citability |
+| tool schemas (the registry) | implicit PREFIX | serialized by the API before the breakpoint | editing a tool name or schema busts the cache while `prompts.py` shows no diff — so `cache_fingerprint` hashes tool blocks + prefix into every run record |
+| world summary | SUFFIX | system block 2, after the breakpoint | per-run: counts, alert neighborhood, window bounds |
+| alert payload | user message | first user turn | per-run |
+| tool results, refusals, validation feedback | new messages | appended by the harness | the transcript only grows; nothing edits bytes before the breakpoint (message-order invariants are test-enforced) |
+| the transcript itself | moving breakpoint | one `cache_control` on the last block of the last message, re-placed each request | iteration 2's fix — marks are metadata, so moving one changes no content bytes |
+
+The metric the table protects is token-weighted: cache hit rate =
+Σ cache_read / Σ input per run, reported by every eval run —
+reported, not gated, since the gate moved to the re-read fraction
+above. Token-weighted rather than call-counted means one hard
+miss — a full prefix re-read — is visibly expensive.
+
+A rate drop then diagnoses down three branches, not two:
+
+1. **Fingerprint changed** — a registry or prompt edit busted the
+   cache; find the diff.
+2. **Fingerprint stable, prefix above the model's minimum** —
+   runtime behavior: a retry editing history, a message-order
+   violation.
+3. **Fingerprint stable, prefix below the model's minimum** — the
+   API caches nothing below a per-model floor (512–4,096 tokens
+   across model families) and returns **no error**. A shrunken
+   prefix stops caching silently; check estimated prefix tokens
+   before suspecting the harness.
+
+Two more API facts the eval runner leans on (the
+[prompt-caching docs](https://docs.claude.com/en/docs/build-with-claude/prompt-caching)):
+a cache entry only becomes usable after the first response
+*begins*, so parallel trials sharing a cold prefix would each pay
+the write — the runner is serial per scenario on purpose. And
+`usage.input_tokens` counts only tokens after the last breakpoint,
+which is why the harness sums all three usage fields before
+dividing.
 
 ## What I'd take to the next project
 

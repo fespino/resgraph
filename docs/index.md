@@ -1,46 +1,62 @@
 # resgraph
 
-A mini referential data platform, built in public. A synthetic
-cloud-infrastructure world streams updates into a graph hot store and
-an Iceberg cold store, queryable by traversal and time travel, with
-agents, serving, and compliance layers on top. Every benchmark number
-ships with hardware and methodology. The code lives on
-[GitHub](https://github.com/fespino/resgraph).
+resgraph is a mini data platform I am building for learning
+purposes. A synthetic cloud-infrastructure world streams updates
+into a graph hot store and an Iceberg cold store, queryable by
+traversal and time travel; on top sit an investigating agent, the
+eval harness that grades it, and a serving gateway.
 
-## Writing
+The goal is to practice, at laptop scale, the disciplines a serious
+data-and-AI platform runs on — decision logs, measured benchmarks,
+evals, drills, budgets — and to write down what each one costs and
+buys. Every number ships with its hardware and methodology. The
+code lives on [GitHub](https://github.com/fespino/resgraph).
 
-Notes written as the work was done — see also the
-[writing index](writing/index.md) with excerpts, or browse by tag from
-any post.
+## The map
 
-- [Anatomy of a seven-billion-dollar paragraph](blog/posts/19-anatomy-of-a-seven-billion-dollar-paragraph.md) — 2026-08-18
-- [Institutional memory is a log-structured store](blog/posts/18-institutional-memory-log-structured.md) — 2026-08-16
-- [Day-2 of serving: the drill's findings became the backlog](blog/posts/17-day-2-of-serving.md) — 2026-08-16
-- [Cache the investigation, never the answer](blog/posts/16-cache-the-investigation-never-the-answer.md) — 2026-08-16
-- [Two backends is failover with telemetry, not load balancing](blog/posts/15-two-backends-is-failover-with-telemetry.md) — 2026-08-16
-- [The eval that doesn't care where a model runs](blog/posts/14-the-eval-that-doesnt-care-where-a-model-runs.md) — 2026-08-16
-- [The drill that measured nothing](blog/posts/13-the-drill-that-measured-nothing.md) — 2026-08-16
-- [The controls come before the capability](blog/posts/12-controls-before-capability.md) — 2026-08-16
-- [Who grades the graders?](blog/posts/11-who-grades-the-graders.md) — 2026-08-04
-- [Goodhart's law operates inside a prompt](blog/posts/10-goodhart-inside-a-prompt.md) — 2026-08-04
-- [Ground truth first, judge last](blog/posts/09-ground-truth-first-judge-last.md) — 2026-08-04
-- [An MCP server is an API with opinions](blog/posts/08-an-mcp-server-is-an-api-with-opinions.md) — 2026-08-04
-- [Wide events, derived SLOs, and the drill that closed Part I](blog/posts/07-wide-events-and-the-capstone-drill.md) — 2026-08-03
-- [The query layer: predicate and projection push-down across two stores](blog/posts/06-pushdown-across-two-stores.md) — 2026-08-02
-- [Cold history: time travel runs on event time, not commit time](blog/posts/05-cold-history-two-clocks.md) — 2026-08-01
-- [One watermark, three guarantees](blog/posts/04-one-watermark-three-guarantees.md) — 2026-07-31
-- [The benchmark that proved my graph database was 40× slower — until it proved me wrong](blog/posts/03-hot-graph-honest-benchmark.md) — 2026-07-31
-- [A deterministic synthetic cloud, and a 45× lesson in measuring before believing](blog/posts/02-a-deterministic-synthetic-cloud.md) — 2026-07-29
-- [Decisions with reversal conditions: a spec that fights back](blog/posts/01-decisions-with-reversal-conditions.md) — 2026-07-27
-- [Security from the first commit, not as an afterthought](blog/posts/00-security-from-the-first-commit.md) — 2026-07-27
+One node per piece of the platform; the chapter numbers name the
+devlog posts that build it. Every post carries this map grown to its
+own chapter, so reading in order watches it fill in.
 
-## Engineering docs
+```mermaid
+flowchart TD
+    loop["<b>the dev loop</b><br/>CI gates, review, the decision log<br/>#00 #01"]
+    gen["<b>generator</b><br/>a deterministic synthetic cloud, seeded<br/>#02"]
+    hot["<b>hot graph</b><br/>current state, benchmarked<br/>#03"]
+    ing["<b>ingest</b><br/>one watermark, three guarantees<br/>#04"]
+    cold["<b>cold history</b><br/>every past state, on two clocks<br/>#05"]
+    query["<b>query layer</b><br/>one API over both stores<br/>#06"]
+    obs["<b>observability</b><br/>wide events + SLOs<br/>#07"]
+    mcp["<b>MCP server</b><br/>the agent's tool surface<br/>#08"]
+    evals["<b>analyst + evals</b><br/>triage judged on planted ground truth<br/>#09 #10 #11"]
+    runtime["<b>safe runtime</b><br/>typed approvals + the audit trail<br/>#12"]
+    drills["<b>drills</b><br/>paid runs verified before they spend<br/>#13"]
+    seam["<b>worker seam</b><br/>models are config, not code<br/>#14"]
+    gw["<b>gateway</b><br/>routing, budgets, failover, caching<br/>#15 #16 #17 #19"]
+    providers(["model providers"])
+    ledger["<b>evals ledger</b><br/>institutional memory, log-structured<br/>#18"]
+    sent["<b>sentinel</b><br/>misuse detection over the audit trail<br/>#20 #21 #22 #23"]
 
-- [Security posture](security-posture.md)
-- [Stream contract](stream-contract.md)
-- [Planner vocabulary](planner-vocabulary.md)
-- [Capacity](capacity.md)
-- [Prompt audit](prompt-audit.md)
-- [Evals compaction runbook](evals-compaction-runbook.md)
-- [Drills runbook](drills/README.md)
-- [Sentinel threat model](sentinel/threat-model.md)
+    loop -.->|every change ships through it| gen
+    gen -->|seeded events| ing
+    ing --> hot
+    ing --> cold
+    hot --> query
+    cold --> query
+    query -.->|wide events| obs
+    query --> mcp
+    mcp -->|tools| evals
+    evals -->|every run lands in the trail| runtime
+    drills -.-> evals
+    seam -.-> evals
+    evals -->|model calls| gw
+    gw --> providers
+    ledger -.-> evals
+    runtime -->|audit rows| sent
+```
+
+## Devlog
+
+Notes written as the work was done.
+
+<!-- posts:auto -->

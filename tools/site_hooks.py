@@ -25,6 +25,7 @@ _MD_LINK = re.compile(r"\[([^\]]+)\]\([^)]+\)")
 @dataclass
 class Post:
     src_uri: str
+    chapter: str
     title: str
     date: str
     tags: list[str]
@@ -49,8 +50,11 @@ def _parse_post(src_uri: str, path: str) -> Post | None:
     excerpt = paras[0].replace("\n", " ") if paras else ""
     # links in an excerpt would resolve relative to the wrong page — keep the text only
     excerpt = _MD_LINK.sub(r"\1", excerpt)
+    stem = Path(src_uri).stem
+    chapter = stem.split("-", 1)[0] if stem[:2].isdigit() else ""
     return Post(
         src_uri=src_uri,
+        chapter=chapter,
         title=title,
         date=str(meta.get("date", "")),
         tags=[str(t) for t in meta.get("tags", [])],
@@ -65,17 +69,33 @@ def _collect_posts(files: Files) -> list[Post]:
             post = _parse_post(f.src_uri, f.abs_src_path)
             if post:
                 posts.append(post)
-    posts.sort(key=lambda p: (p.date, p.src_uri), reverse=True)
+    # chapter order: the devlog reads like a book, oldest first
+    posts.sort(key=lambda p: p.src_uri)
     return posts
 
 
+def _entry_title(p: Post) -> str:
+    return f'<span class="chapno">#{p.chapter}</span>{p.title}' if p.chapter else p.title
+
+
+def _post_url(p: Post, prefix: str = "") -> str:
+    # raw-HTML hrefs are not rewritten by the engine, so emit the final
+    # directory URL directly
+    return prefix + p.src_uri[: -len(".md")] + "/"
+
+
+def _post_list(posts: list[Post], prefix: str) -> str:
+    items = "\n".join(
+        f'<li><a href="{_post_url(p, prefix)}">{_entry_title(p)}</a></li>' for p in posts
+    )
+    return f'<ul class="devlog-list">\n{items}\n</ul>'
+
+
 def _writing_page(posts: list[Post]) -> str:
-    lines = ["# Writing", "", "Build-in-public notes, newest first.", ""]
+    lines = ["# Devlog", "", "The build log, chapter by chapter — read it in order.", ""]
     for p in posts:
         lines += [
-            f"### [{p.title}](../{p.src_uri})",
-            "",
-            f'<small class="post-date">{p.date}</small>',
+            f"### [{_entry_title(p)}](../{p.src_uri})",
             "",
             p.excerpt,
             "",
@@ -84,15 +104,19 @@ def _writing_page(posts: list[Post]) -> str:
 
 
 def _tag_page(tag: str, posts: list[Post]) -> str:
-    lines = [f"# {tag}", "", f'Posts filed under "{tag}", newest first.', ""]
-    for p in posts:
-        lines.append(f"- [{p.title}](../../{p.src_uri}) — {p.date}")
+    lines = [f"# {tag}", "", f'Chapters filed under "{tag}", in order.', ""]
+    lines.append(_post_list(posts, "../../"))
     lines.append("")
     return "\n".join(lines)
 
 
+_POSTS_CACHE: list[Post] = []
+
+
 def on_files(files: Files, config: ProperDocsConfig) -> Files:
+    global _POSTS_CACHE
     posts = _collect_posts(files)
+    _POSTS_CACHE = posts
     files.append(File.generated(config, "writing/index.md", content=_writing_page(posts)))
     tags: dict[str, list[Post]] = {}
     for p in posts:
@@ -106,6 +130,10 @@ def on_files(files: Files, config: ProperDocsConfig) -> Files:
 
 
 def on_page_markdown(markdown: str, page: Page, config: ProperDocsConfig, files: Files) -> str:
+    if page.file.src_uri == "index.md":
+        # the home page's Devlog list is generated, never hand-maintained —
+        # titles come from each post's H1 at build time
+        return markdown.replace("<!-- posts:auto -->", _post_list(_POSTS_CACHE, ""))
     if not page.file.src_uri.startswith(POSTS_PREFIX):
         return markdown
     tags = [str(t) for t in page.meta.get("tags", [])]

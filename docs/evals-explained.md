@@ -12,7 +12,7 @@ This document walks the whole machine: the trick that makes honest
 grading possible, what a run is, how grading works, what the baseline
 and arms are, how regressions block in CI, and the discipline around
 paid runs. Decision numbers (D-numbers) refer to entries in
-[SPEC.md](../SPEC.md), the decision log.
+[SPEC.md](https://github.com/fespino/resgraph/blob/main/SPEC.md), the decision log.
 
 ## The trick everything rests on: planted ground truth
 
@@ -322,7 +322,7 @@ instructive incident (INC-002: $5.88 across two runs that measured
 nothing) produced the rule: **a paid run is a deploy.** Before one —
 write the causal chain with a `file:line` receipt per link, answer
 "how could this run complete, produce numbers, and measure nothing?",
-register the prediction and halt condition in [EVALS.md](../EVALS.md),
+register the prediction and halt condition in [EVALS.md](https://github.com/fespino/resgraph/blob/main/EVALS.md),
 and pilot the smallest falsifying case first. Every paid run gets a
 ledger row with its verdict stated objective-first — "objective NOT
 met" written plainly when it wasn't, because the ledger is the base-

@@ -27,6 +27,51 @@ same logic, a write path should meet its instruments on day one, not
 after its first incident. Instrument-before-subject, applied to
 execution.
 
+<!-- more -->
+
+!!! info "The resgraph series"
+    This is the thirteenth post about
+    [**resgraph**](https://github.com/fespino/resgraph), a mini data
+    platform I am building for learning purposes.
+    Browse the repository exactly as it stood when this was written:
+    [`phase-9-safe-runtime`](https://github.com/fespino/resgraph/tree/phase-9-safe-runtime).
+    Every snippet below is copied from that tag, trimmed only for
+    length.
+
+In this phase: the analyst leaves read-only. Part II so far built
+the tool surface, the agent, and the eval harness that certifies
+it; this phase wraps the first privileged capability in its
+runtime — permission tiers (D26), the audit trail (D27), the write
+path (D28), budgets and the release gate (D29).
+
+The platform so far, with this post's piece highlighted:
+
+```mermaid
+flowchart TD
+    loop["<b>the dev loop</b><br/>CI gates, review, the decision log<br/>#00 #01"]
+    gen["<b>generator</b><br/>a deterministic synthetic cloud, seeded<br/>#02"]
+    hot["<b>hot graph</b><br/>current state, benchmarked<br/>#03"]
+    ing["<b>ingest</b><br/>one watermark, three guarantees<br/>#04"]
+    cold["<b>cold history</b><br/>every past state, on two clocks<br/>#05"]
+    query["<b>query layer</b><br/>one API over both stores<br/>#06"]
+    obs["<b>observability</b><br/>wide events + SLOs<br/>#07"]
+    mcp["<b>MCP server</b><br/>the agent's tool surface<br/>#08"]
+    evals["<b>analyst + evals</b><br/>triage judged on planted ground truth<br/>#09 #10 #11"]
+    runtime["<b>safe runtime</b><br/>typed approvals + the audit trail<br/>#12 ◀"]
+
+    loop -.->|every change ships through it| gen
+    gen -->|seeded events| ing
+    ing --> hot
+    ing --> cold
+    hot --> query
+    cold --> query
+    query -.->|wide events| obs
+    query --> mcp
+    mcp -->|tools| evals
+    evals -->|every run lands in the trail| runtime
+    class runtime thispost
+```
+
 ## The model proposes; it cannot ask to write
 
 The strongest control in the phase is the one with no enforcement
@@ -36,20 +81,28 @@ who assembles the plan outside the model against the suspect the
 model identified. No model output is ever interpreted as an
 instruction to write.
 
-The contrast that sharpened this:
+A contrast sharpened this design:
 [Claude Code's auto mode](https://www.anthropic.com/engineering/claude-code-auto-mode)
 strips assistant messages from its permission check so the agent
-cannot argue its own dangerous action into approval. We ended up not
-needing the strip — there is no model text in the permission path to
-remove. A mitigation you designed out beats a mitigation you
+cannot argue its own dangerous action into approval. This design
+never needed the strip — there is no model text in the permission
+path to remove. A mitigation you designed out beats a mitigation you
 implemented: it cannot regress, because there is nothing to turn off.
 
 The privileged tool itself is never in the agent's tool blocks. It is
 registered `privileged=True` with an empty surface set, and the
-agent's toolset is built by *selection* — read-only, unprivileged,
-closed-world — so a new registration is off the agent's surface until
-it earns a place, rather than on it until someone remembers to
-exclude it. An injection that convinces the model to "call"
+agent's toolset is built by *selection*, not exclusion — so a new
+registration is off the agent's surface until it earns a place,
+rather than on it until someone remembers to exclude it:
+
+```python
+# src/resgraph/analyst/tools.py
+return tuple(
+    e for e in entries if e.hints.read_only and not e.privileged and not e.hints.open_world
+)
+```
+
+An injection that convinces the model to "call"
 `apply_remediation` reaches an error outcome, not an execution, and
 a test proves that with a scripted client that obeys the injection.
 
@@ -63,6 +116,21 @@ looked sails through on muscle memory. So the approver types the
 the true count — the mismatch message is the gate working. `skip N`
 drops a step without renumbering the rest, so "step 2" means the same
 step in the post-incident conversation as it did at approval time.
+The prompt and the decision record carry the design:
+
+```python
+# src/resgraph/analyst/approval.py
+PROMPT = "Approve? Type the step count to apply, 'skip N' to drop a step, or 'no': "
+
+
+@dataclass(frozen=True)
+class ApprovalDecision:
+    approver: str
+    approved: bool
+    plan_hash: str
+    applied: tuple[int, ...]  # 0-based indices into the original plan
+    skipped: tuple[int, ...]
+```
 
 Two more properties turned out to carry weight:
 
@@ -79,7 +147,16 @@ reads plus an untrusted-content channel plus a write channel is the
 [lethal trifecta](https://simonwillison.net/series/prompt-injection/),
 and each leg alone can look justified. The analyst reads platform
 data, so its toolset admits no open-world tool and no write-capable
-tool — enforced at toolset construction, refused with the rule named.
+tool — enforced at toolset construction, refused with the rule
+named:
+
+```python
+if entry.hints.open_world:
+    raise RuntimeError(
+        f"tool {entry.name!r} is open-world; a session reading platform "
+        "data admits no untrusted-content channel (D26 composition rule)"
+    )
+```
 
 ## Audit at rest: one file, with the agent stopped
 
@@ -94,14 +171,20 @@ disclosure, not a shortcut: at one writer on one laptop, a trail that
 depends on a service being up has gaps exactly when it matters. The
 division of labor is strict — the audit store owns payloads (tool
 arguments, the resource ids each result surfaced); progress surfaces
-carry status, hashes, and sizes only. Ephemeral events, durable
-state.
+carry status, hashes, and sizes only. The events are ephemeral; the
+state is durable.
 
-Two honesty details in the schema:
+The schema carries two disclosures:
 
 - **Tamper-evident, not tamper-proof.** Each event row hashes the
   previous row's hash with its own content; `audit <run_id> --verify`
-  recomputes the chain and names the first broken row. The named
+  recomputes the chain and names the first broken row:
+
+    ```python
+    # src/resgraph/analyst/audit.py
+    material = json.dumps([prev, run_id, seq, kind, payload, latency_ms, tokens, ts])
+    return hashlib.sha256(material.encode()).hexdigest()
+    ``` The named
   residual ships in the decision record: truncating the tail is
   silent, as in any chain without an external head pointer. Signing
   stays rejected until there is a second party to distrust — a key
@@ -126,9 +209,34 @@ That choice activated a requirement nobody planned. The platform's
 idempotency watermark drops a message whose sequence is not ahead of
 the target's — silently, by design, since its first week. An executor
 that emitted and returned would therefore report success for writes
-that never landed. So each step is **emit, then confirm**: read the
-watermark back, fail the step if the sequence never arrived. A
-remediation that vanished is a failure, not a success nobody checked.
+that never landed. So each step is **emit, then confirm** — the
+executor's docstring carries the rule and the two subtleties D2
+forces:
+
+```python
+# src/resgraph/analyst/executor.py
+"""D28's privileged capability — `apply_remediation`.
+
+Nothing here writes to a store. An approved step becomes a D2 update
+emitted onto the same ingest stream every other producer uses, applied
+by the same idempotent path (D3/D10). The watermark drops a stale
+message silently, so every step confirms: emit, read the watermark
+back, and fail the step if it did not land. A remediation that
+vanished is a failure, never a success nobody checked.
+
+Two properties fall out of D2 and matter more than they look:
+
+- An upsert is a full statement — it replaces the attribute bag and
+  the owned edge set. A patch is therefore merged onto the target's
+  *live* state at apply time, never onto the render-time snapshot,
+  or remediation would quietly revert whatever changed in between.
+- The rollback target is the snapshot the approver saw. If the
+  resource moved past the sequence this step wrote, that snapshot no
+  longer restores anything and the step reports itself irreversible
+  rather than clobbering a third party's write.
+"""
+```
+
 The oldest decision in the log wrote a correctness requirement for
 the newest capability — which is the payoff of keeping a decision log
 later phases actually read.
@@ -137,14 +245,14 @@ Execution runs on a step machine, not a for-loop, and its rollback
 contract has a three-way answer instead of a boolean. A rollback
 callable can discover at rollback time that the world moved and the
 approved pre-state no longer restores anything; it returns
-`ROLLBACK_IRREVERSIBLE` — the honest middle between lying (a plain
-return) and alarming (a raise). In every case the unwind continues to
+`ROLLBACK_IRREVERSIBLE` — the precise middle between lying (a plain
+return) and false-alarming (a raise). In every case the unwind continues to
 the end, because stopping halfway leaves later steps silently
 unattempted. Compare
 [Stripe's auto-remediation machines](https://stripe.dev/blog/how-stripe-uses-graph-search-and-state-machines-to-auto-remediate-a-global-database-fleet),
 which re-plan from intermediate state: with a human approval gate, a
 re-plan is a *new proposal* and rides the same gate — after a failure
-the machine's job is to leave an honestly-described state for the
+the machine's job is to leave an accurately described state for the
 next proposal, not to plan.
 
 ## Budgets as enforcement, with the cutoff path graded
@@ -156,8 +264,7 @@ lands mid-commit — and a breach injects one final "conclude now"
 turn. The run ends degraded, with a named cutoff reason, still
 holding a report whose claims stay graded.
 
-The part most systems skip: the cutoff path is *graded*, not just
-implemented. A budget-starved companion dataset re-runs the same
+The cutoff path is *graded*, not just implemented. A budget-starved companion dataset re-runs the same
 scenarios under a tool-call floor that cannot reach the cause, and
 the graded question flips from "did it find the cause" to "did it
 conclude honestly under starvation." Honest degradation passes; a
@@ -195,9 +302,9 @@ the design surface:
   diff reads noise. The
   [AgentAssay](https://arxiv.org/abs/2603.02601) finding that binary
   pass/fail detects roughly zero regressions on non-deterministic
-  workflows supplied the concept; measuring our own flip rate
-  supplied the threshold. Consulting a paper gets you the concept;
-  measuring gets you the number.
+  workflows supplied the concept; measuring this workload's flip
+  rate supplied the threshold. Consulting a paper gets you the
+  concept; measuring gets you the number.
 - **Declined, blocked, and broken are different exit codes** (0
   passed, 1 blocked, 3 declined, 4 evidence unreadable), so CI never
   infers a verdict by grepping prose.
@@ -228,8 +335,7 @@ review is part of the build, not a ceremony after it.
 The gate itself supplied the best one. As first merged, it compared
 the newest committed run against the baseline — and scored PASS on a
 7-item companion run against the 30-item baseline it never measured.
-The fix became a principle worth exporting: **comparability precedes
-verdict.** The gate now reports the item sets and declines any run
+The fix became a principle: **comparability precedes verdict.** The gate now reports the item sets and declines any run
 whose items differ from the baseline's, rather than comparing
 pass-rates across different questions.
 
@@ -252,8 +358,8 @@ something is worse than no control: the green check still appears.
 
 ## What breaks at 1000×
 
-Every control above states its own scale boundary, and they are worth
-reading as a set. The typed count stops proving the plan was read
+Every control above states its own scale boundary — read them as a
+set. The typed count stops proving the plan was read
 once plans exceed a dozen steps — past that, the gate needs per-step
 acknowledgement, redesigned alongside the render. The embedded audit
 store moves to a served store the day a second concurrent writer

@@ -51,6 +51,7 @@ from resgraph.gateway.accounts import (
 from resgraph.gateway.budget import FallForwardBudget
 from resgraph.gateway.cache import ResponseCache, cache_key
 from resgraph.gateway.dispatch import Backend, ProbeResult, QueueFull, choose
+from resgraph.gateway.quality import QUALITY_PATH, eligible, load_quality
 from resgraph.gateway.registry import (
     capability_mismatch,
     catalog_rows,
@@ -64,6 +65,7 @@ from resgraph.gateway.router import (
     DEFAULT_REGISTRY,
     GLOBAL_DEFAULT_MODEL,
     ClassRoute,
+    RouteDecision,
     Source,
     TaskClass,
     resolve,
@@ -140,6 +142,7 @@ class Gateway:
     # routing lottery, not cryptography; injectable for deterministic tests
     rng: random.Random = field(default_factory=random.Random)  # nosec B311
     policy: dict[str, list[str]] = field(default_factory=dict)
+    quality: dict[str, dict[str, dict[str, Any]]] = field(default_factory=dict)
     accounts: dict[str, dict[str, Any]] = field(default_factory=dict)
     wallet: Wallet = field(default_factory=Wallet)
     usage_ledger: UsageLedger = field(default_factory=UsageLedger)
@@ -415,6 +418,50 @@ def _no_streamable_fallback(gw: Gateway, decision_model: str, unstreamable: froz
         if gw.backend(alias).health.state != "down":
             return False
     return True
+
+
+def _quality_route(gw: Gateway, task_class: TaskClass | None) -> RouteDecision | None:
+    """Route a task class among its measured candidates: floor first,
+    then a free arm if one clears it, else an inverse-square lottery on
+    measured cost per passed triage. No eligible candidate degrades to
+    the class's static default — quality routing never turns a servable
+    request into a refusal."""
+    if task_class is None:
+        return None
+    route = gw.registry.get(task_class)
+    if route is None or not route.candidates or route.min_passk is None:
+        return None
+    ok = eligible(gw.quality, task_class, list(route.candidates), route.min_passk)
+    if not ok:
+        log.warning(
+            "[gateway:quality] no candidate clears pass^k %.2f for %s; static default serves",
+            route.min_passk,
+            task_class,
+        )
+        return None
+    scores = gw.quality[task_class]
+    free = [a for a in ok if not scores[a]["cost_per_passed"]]
+    if free:
+        pick = max(free, key=lambda a: scores[a]["passk"])
+    else:
+        pool, pick = list(ok), ok[0]
+        weights = [1.0 / scores[a]["cost_per_passed"] ** 2 for a in pool]
+        draw = gw.rng.random() * sum(weights)
+        acc = 0.0
+        for a, w in zip(pool, weights, strict=True):
+            acc += w
+            if draw <= acc:
+                pick = a
+                break
+    entry = scores[pick]
+    return RouteDecision(
+        model=pick,
+        source="quality_route",
+        fallback_allowed=True,
+        rationale=(
+            f"pass^k {entry['passk']} >= {route.min_passk} per {entry['run']} ({entry['date']})"
+        ),
+    )
 
 
 def _identify(gw: Gateway, req: GenerateIn, presented_key: str | None) -> str | None:
@@ -804,6 +851,7 @@ def create_app(
     fallback_budget: FallForwardBudget | None = None,
     ignore_probes: bool = False,
     policy_path: Path | None = None,
+    quality_path: Path | None = None,
     accounts_path: Path | None = None,
     wallet: Wallet | None = None,
     usage_ledger: UsageLedger | None = None,
@@ -811,6 +859,10 @@ def create_app(
     table, aliases = expand(yaml.safe_load(models_path.read_text()) or {})
     resolved_policy_path = policy_path or POLICY_PATH
     policy = load_policy(resolved_policy_path.read_text()) if resolved_policy_path.exists() else {}
+    resolved_quality_path = quality_path or QUALITY_PATH
+    quality = (
+        load_quality(resolved_quality_path.read_text()) if resolved_quality_path.exists() else {}
+    )
     resolved_accounts_path = accounts_path or ACCOUNTS_PATH
     accounts = (
         load_accounts(resolved_accounts_path.read_text()) if resolved_accounts_path.exists() else {}
@@ -827,6 +879,7 @@ def create_app(
         aliases=aliases,
         fallback_budget=fallback_budget,
         policy=policy,
+        quality=quality,
         accounts=accounts,
         wallet=wallet or Wallet(),
         usage_ledger=usage_ledger or UsageLedger(),
@@ -899,7 +952,13 @@ def create_app(
         account = _identify(gw, req, x_api_key)
         req = req.model_copy(update={"caller": account})
         _check_balance(gw, account)
-        decision = resolve(pin=req.pin, model=req.model, task_class=req.task_class)
+        decision = None
+        if req.pin is None and req.model is None:
+            decision = _quality_route(gw, req.task_class)
+        if decision is None:
+            decision = resolve(
+                pin=req.pin, model=req.model, task_class=req.task_class, registry=gw.registry
+            )
         first, within = _endpoint_plan(gw, decision, req)
 
         if req.stream:

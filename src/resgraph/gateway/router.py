@@ -17,16 +17,22 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Literal
 
-Source = Literal["pin", "override", "task_class_default", "global_default"]
+Source = Literal["pin", "override", "quality_route", "task_class_default", "global_default"]
 TaskClass = Literal["judgment", "workhorse", "classification"]
 
 
 @dataclass(frozen=True)
 class ClassRoute:
-    """A task-class default: registry data with its rationale, not code."""
+    """A task-class default: registry data with its rationale, not code.
+
+    A route MAY declare measured candidates and a pass^k floor; the
+    gateway then routes among the candidates that clear the floor,
+    falling back to ``model`` when none do."""
 
     model: str
     rationale: str
+    candidates: tuple[str, ...] = ()
+    min_passk: float | None = None
 
 
 DEFAULT_REGISTRY: Mapping[TaskClass, ClassRoute] = {

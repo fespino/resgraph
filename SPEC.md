@@ -2382,9 +2382,10 @@ spend/administer capability boundary adopted here.
   shape again. An autouse conftest fixture now redirects both to
   per-test directories (the same pattern the telemetry fixture set),
   so no future test can write production billing state regardless of
-  what it constructs. Reversal/refactor candidate recorded: a single
-  data-root env var for every `data/` writer would replace both
-  fixtures with one.
+  what it constructs. Reversal/refactor candidate recorded: a
+  settings module with one call-time-resolved data root for every
+  `data/` writer would replace the per-concern fixtures with one
+  (#295).
 
 **Rejected:** pre-metering by estimated output (guessing dressed as a
 refusal); balances as daily ledgers (prepaid grants don't reset at

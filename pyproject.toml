@@ -34,6 +34,7 @@ resgraph-evals = "resgraph.evals.cli:app"
 resgraph-gateway = "resgraph.gateway.cli:app"
 resgraph-langfuse = "resgraph.langfuse.cli:app"
 resgraph-gen = "resgraph.gen.cli:app"
+resgraph-ingest = "resgraph.ingest.cli:app"
 resgraph-mcp = "resgraph.mcp.server:main"
 resgraph-sentinel = "resgraph.sentinel.cli:main"
 

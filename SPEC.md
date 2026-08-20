@@ -2618,6 +2618,47 @@ cost_details (above); Langfuse as a second system of record
 (structural — no reversal); the legacy ingestion API (sunset is
 announced; building on it would be a debt with a date).
 
+## D48 — Raw-first ingestion: the producer writes to a spool, never to the store (Langfuse phase, #318)
+
+Langfuse's v3 migration put a spool and a queue between ingest and
+the analytical store; this rebuilds that shape over our own events
+and grades it on the three properties it exists for. The engine is
+DuckDB by the phase's recorded decision — no new containers.
+
+- **The producer's write path ends at raw.** An ingest call
+  content-addresses the batch, writes one file, and enqueues only a
+  reference. Measured on this laptop: p50 567 µs versus 24.3 ms
+  writing the same batch straight into the columnar store, with a
+  500-batch backlog and nothing draining — the producer does not
+  move as the backlog grows, which is the entire claim.
+- **Delivery is at-least-once and the sink absorbs it.** The queue
+  redelivers any claim that was taken but never acked, so the sink
+  writes idempotently on an event key (the D3 watermark idea one
+  layer up) and a redelivered batch writes zero rows. The worker
+  acks AFTER the flush, never before — the same ack-after-apply
+  discipline the stream consumer already runs.
+- **Raw is authoritative; the columnar store is disposable.** The
+  sink can be dropped and rebuilt from the spool alone, matching its
+  own digest. This is what makes the layout in the next slice a
+  question rather than a commitment: a store you can rebuild is a
+  store you can re-shape.
+- **Skipping the spool costs replayability, not just latency.** The
+  measurement's direct-to-store arm leaves no raw behind, so replay
+  cannot restore it — pinned by test. The queue is usually sold on
+  latency; the durability half is the one that survives an outage.
+- **Enrichment happens on the async leg**, where run-level
+  properties are propagated onto every row and cost is priced from
+  the tokens the trail recorded, using the same pricing table the
+  gateway and the market baseline read.
+
+**Rejected:** a broker for the reference queue (SQLite holds a
+laptop's backlog and adds no container — the reversal condition is a
+second concurrent worker, the same trigger the audit store records);
+priced-at-read (pricing is enrichment: it is recorded once, not
+recomputed per query); acking before the flush (it converts a worker
+crash into silent loss, which is exactly what raw-first exists to
+prevent).
+
 ## Phase contracts
 - The generator MUST emit D2 messages exactly and expose `--seed`
   for reproducibility.

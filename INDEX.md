@@ -75,5 +75,8 @@
   export of recorded runs, the agent round-trip reconciler
   (`resgraph-langfuse export|roundtrip`), opt-in `langfuse` compose
   profile
+- src/resgraph/ingest/ — raw-first ingestion pipeline (D48): content-addressed
+  spool + reference queue, async enrichment worker (ack-after-apply), DuckDB
+  columnar sink with idempotent writes and replay-from-raw (`resgraph-ingest`)
 - skills/ — investigation playbooks (SKILL.md, validated at startup)
 - .mcp.json — Claude Code/Desktop wiring for the resgraph MCP server

@@ -78,11 +78,16 @@ openai:
 # 7b (~5 GiB) needs a ≥16 GB host; 1.5b fits a tight box but is a seam smoke
 # worker, not a credible analyst — it fabricates, and the fabrication guards fire
 # on it (#192). Only 1.5b has been run end to end here; 3b/7b await the hardware.
+# `market:` names a setup's listing in the market snapshot (evals/market/)
+# when the wire name doesn't normalize onto the listing id's tail — the
+# declared, never fuzzy, side of the match. `resgraph-gateway
+# market-baseline` then prints local-vs-market price for the same weights.
 qwen-local-7b:
   provider: ollama
   capabilities:
     tools: true
   model: qwen2.5:7b
+  market: qwen/qwen-2.5-7b-instruct
   base_url: http://localhost:11434/v1
   temperature: 0
   seed: 7

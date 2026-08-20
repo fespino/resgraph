@@ -2494,6 +2494,65 @@ precision theater); screening tool arguments and responses in-line
 (the post-hoc seat owns whole-run views; the request seat owns what
 callers send — one boundary per seat).
 
+## D46 — The market connector: consume the reference, deliberately small (gateway phase, #270)
+
+The integration slice: everything else in this phase replicates the
+reference gateway against local traffic; this consumes it. One
+connector ingests OpenRouter's public models catalog and exactly one
+consumer reads it — the market-baseline price comparison — proving the
+ingestion is real without growing a project.
+
+- **Pre-flight before code, recorded on #270 (2026-08-20), verdict
+  GO with conditions.** The ToS never grants API access explicitly
+  and reserves broad rights in "Materials"; the adopted reading is
+  that calling a documented API endpoint is not scraping the Site,
+  supported by the observed serving posture (the catalog is served
+  `cache-control: public, max-age=300` from Cloudflare's CDN with
+  wildcard CORS — a resource the operator invites arbitrary clients
+  to fetch). Conditions bound the exposure: documented endpoint
+  only, at most one pull per day, a User-Agent naming this repo,
+  and snapshots as deletable fixtures — if OpenRouter objects, the
+  consumer degrades to "no market baseline", not a broken gateway.
+- **Snapshots keep the full schema shape and redact the prose.**
+  The catalog is facts (ids, prices, context windows — no
+  copyright) except `description`, authored text per model.
+  Committed snapshots (`evals/market/`) preserve every key so the
+  drift tests see the whole shape, but `description` values are
+  replaced with a fixed placeholder. Each snapshot records source
+  URL and fetch time — provenance, same rule as the quality table.
+- **401/403 is a defined terminal outcome, not an error.** The
+  endpoint answers without auth today, but the OpenAPI spec marks
+  it bearer-authenticated — open access is observed behavior, not
+  contract. On 401/403 the connector states that the open door
+  closed and stops; on 429 it stops for the run. Never a retry loop
+  against someone else's free resource.
+- **Format drift refuses at the boundary, both directions.** The
+  wire response and every loaded snapshot pass the same shape
+  validation (`data` list; each row carries id, name,
+  context_length, and float-parseable prompt/completion pricing);
+  failure names the problem and refuses rather than ingesting
+  garbage. Drift is live, not hypothetical: rows today carry six
+  fields the phase's own doc-validation pass (two days prior)
+  didn't list.
+- **Matching is declared or mechanical, never fuzzy.** A market row
+  matches an endpoint by explicit `market:` id in models.yaml, or
+  by exact normalized id-tail (lowercase, `.`/`:` → `-`:
+  `anthropic/claude-haiku-4.5` → our `claude-haiku-4-5`). An
+  ambiguous tail (two authors, one tail) auto-matches nothing; an
+  unmatched endpoint is reported as unmatched — a fact, not a zero.
+  `resgraph-gateway market-pull` ingests; `market-baseline` prints
+  ours-vs-market per mtok with the ratio, the "run it locally vs
+  route to it" table with real numbers in one column.
+
+**Rejected:** ingesting the per-model endpoints listing (per-provider
+uptime and latency percentiles — the natural second source, but the
+umbrella charters the market-as-world treatment out of this phase);
+fuzzy model-name matching (a wrong price silently attributed is worse
+than an honest "unmatched"); committing description text (facts are
+free; prose is someone's); polling on a schedule inside the gateway
+process (the consumer moves on week timescales; a manual/cron pull is
+the honest cadence and keeps the serving path network-free).
+
 ## Phase contracts
 - The generator MUST emit D2 messages exactly and expose `--seed`
   for reproducibility.

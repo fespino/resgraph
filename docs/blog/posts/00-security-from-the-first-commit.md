@@ -340,7 +340,7 @@ the PR
 response procedure held up in practice — identify from the run
 logs, then either rotate or document the exception.
 
-## Layer 4: the harness that audits the harness
+## Layer 4: the audit of the machinery
 
 The workflows themselves are an attack surface — a compromised or
 sloppy GitHub Action can exfiltrate secrets — and they're also the

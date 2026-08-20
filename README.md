@@ -68,6 +68,11 @@
 | src/resgraph/graph/loader.py                 |       31 |        0 |    100% |           |
 | src/resgraph/graph/queries.py                |       47 |        0 |    100% |           |
 | src/resgraph/graph/schema.py                 |       22 |        0 |    100% |           |
+| src/resgraph/ingest/\_\_init\_\_.py          |        0 |        0 |    100% |           |
+| src/resgraph/ingest/cli.py                   |       34 |        0 |    100% |           |
+| src/resgraph/ingest/sink.py                  |       34 |        0 |    100% |           |
+| src/resgraph/ingest/spool.py                 |       61 |        0 |    100% |           |
+| src/resgraph/ingest/worker.py                |       55 |        0 |    100% |           |
 | src/resgraph/langfuse/\_\_init\_\_.py        |        0 |        0 |    100% |           |
 | src/resgraph/langfuse/cli.py                 |       62 |        0 |    100% |           |
 | src/resgraph/langfuse/otlp.py                |       41 |        0 |    100% |           |
@@ -99,7 +104,7 @@
 | src/resgraph/tools/context.py                |        9 |        0 |    100% |           |
 | src/resgraph/tools/http.py                   |       21 |        0 |    100% |           |
 | src/resgraph/tools/registry.py               |       24 |        0 |    100% |           |
-| **TOTAL**                                    | **6012** |  **131** | **98%** |           |
+| **TOTAL**                                    | **6196** |  **131** | **98%** |           |
 
 
 ## Setup coverage badge

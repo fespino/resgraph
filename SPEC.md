@@ -2738,6 +2738,55 @@ retrieval. Ranking them today would repeat the mistake this section
 exists to prevent; each gets its two-axis line here when the horizon
 reaches it, under a dated amendment.
 
+### Amendment (2026-08-20): the post-Langfuse queue, penciled
+
+The horizon reached the pool: phases 11 (misuse detection) and 12
+(the gateway — which consumed API platformization and most of the
+serving-dashboard theme) are closed, phase 13 (Langfuse) is in
+flight. The next slot is penciled, not locked — the pencil carries a
+recorded condition, and the final call is made at Langfuse closeout.
+
+- **Phase 14 (penciled) — the market as a referential world.**
+  Dependency: everything it needs shipped in phase 12 — the
+  connector (D46), committed snapshots, the validated catalog
+  schema, and the per-model endpoints listing recorded as the
+  natural second source; the D2 pipeline and the five tools have
+  been waiting for a real world since D6 chose a synthetic one.
+  Impact: `world_diff` answering "what changed in the LLM market
+  this week", price history as resource history, provider blast
+  radius — the platform's own instruments pointed at reality, and
+  D13's two clocks exercised against real churn. **Condition, as
+  D46's umbrella wrote it: the data must earn the phase.** The
+  snapshot record started 2026-08-20; the pull stays at the polite
+  daily cadence through the Langfuse phase, and if the accumulated
+  churn is too thin to teach anything, the slot passes to the
+  fallback below. That check is the first act of the phase decision,
+  not an afterthought.
+- **Fallback / phase 15 — rollout engineering (#224).** Dependency:
+  the purest continuation — the gateway is the seam, D44's quality
+  table is the promotion criterion, and the Langfuse replication
+  slices build half the shadow/replay machinery it needs. Impact:
+  completes the serving arc (route → observe → bill → promote
+  safely). Costs a doc-validation window first: no literature has
+  been researched for it yet.
+- **Wildcard — compliance-as-code, if the regulatory peg is wanted
+  while it is alive.** The EU AI Act's 2026-08-02 date landed with
+  most high-risk obligations [deferred to late 2027/2028](https://knowledge.dlapiper.com/dlapiperknowledge/globalemploymentlatestdevelopments/2026/The-Digital-AI-Omnibus-Proposed-deferral-of-high-risk-AI-obligations-under-the-AI-Act)
+  while [Article 50 transparency duties took effect on schedule](https://www.aiacto.eu/en/blog/ai-act-what-changes-august-2-2026)
+  — "what the deferral left standing" is the frame. Recorded hook:
+  D42 rejected the compliance-shaped narrowing vocabulary
+  (`zdr`, `data_collection`) under "vocabulary earns its way in
+  when a caller exists" — this phase would BE that caller, so
+  building it fulfills a recorded reversal condition rather than
+  widening scope.
+
+Ranked lower this round, with reasons that expire: derived
+analytics marts (#164) gets strictly cheaper after the Langfuse
+replication slices teach the DuckDB analytics lessons — re-rank it
+after them; sandboxing, agent memory, ambient automation, and
+retrieval currently lack both a dependency pull and a timing peg,
+and stay in the pool.
+
 ## Corrections
 
 The decision log's credibility does not rest on never being wrong — it

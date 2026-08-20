@@ -184,3 +184,27 @@ def test_the_cli_baseline_without_a_snapshot_says_pull_first(tmp_path, monkeypat
     r = CliRunner().invoke(cli.app, ["market-baseline"])
     assert r.exit_code == 1
     assert "run market-pull first" in str(r.exception)
+
+
+def test_row_shapes_are_a_fingerprint_across_pulls_not_a_count_within_one():
+    """The catalog's own rows differ by design — an omitted optional
+    field is not drift — so shape is only a question about pulls."""
+    thin = {k: v for k, v in ROW.items() if k != "description"}
+    assert len(market.field_sets([ROW, thin])) == 2  # normal, not a signal
+    assert market.drift([ROW, thin], [ROW, thin]) == []
+
+
+def test_drift_names_fields_nobody_declared():
+    before = [ROW]
+    after = [{**ROW, "reasoning": {"enabled": True}}, {**ROW, "id": "x/y"}]
+    findings = market.drift(before, after)
+    assert "fields new since the previous pull: ['reasoning']" in findings
+    assert "distinct row shapes: 1 -> 2" in findings
+    gone = market.drift([{**ROW, "retired_field": 1}], [ROW])
+    assert "fields gone since the previous pull: ['retired_field']" in gone
+
+
+def test_the_committed_snapshot_has_no_drift_against_itself():
+    doc = market.load_snapshot(max(market.SNAPSHOT_DIR.glob("openrouter-*.json")))
+    assert market.drift(doc["data"], doc["data"]) == []
+    assert len(market.field_sets(doc["data"])) == 5  # the live catalog's real spread

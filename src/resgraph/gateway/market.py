@@ -102,6 +102,35 @@ def load_snapshot(path: Path) -> dict[str, Any]:
     return doc
 
 
+def field_sets(rows: list[dict[str, Any]]) -> dict[frozenset[str], int]:
+    """The distinct row shapes present, with how many rows carry each.
+    Catalog rows legitimately differ (an omitted optional field is not
+    drift), so the shapes are a fingerprint to compare ACROSS pulls —
+    never a count to threshold within one."""
+    shapes: dict[frozenset[str], int] = {}
+    for row in rows:
+        key = frozenset(row)
+        shapes[key] = shapes.get(key, 0) + 1
+    return shapes
+
+
+def drift(previous: list[dict[str, Any]], current: list[dict[str, Any]]) -> list[str]:
+    """What changed in the catalog's SHAPE between two pulls. Names the
+    fields rather than requiring anyone to have enumerated them: a
+    field nobody declared is exactly the one that gets missed."""
+    before = {field for shape in field_sets(previous) for field in shape}
+    after = {field for shape in field_sets(current) for field in shape}
+    findings = []
+    if appeared := sorted(after - before):
+        findings.append(f"fields new since the previous pull: {appeared}")
+    if vanished := sorted(before - after):
+        findings.append(f"fields gone since the previous pull: {vanished}")
+    shapes_before, shapes_after = len(field_sets(previous)), len(field_sets(current))
+    if shapes_before != shapes_after:
+        findings.append(f"distinct row shapes: {shapes_before} -> {shapes_after}")
+    return findings
+
+
 def _normalize(name: str) -> str:
     return re.sub(r"[.:]", "-", name.lower())
 

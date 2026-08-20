@@ -8,7 +8,7 @@ from pathlib import Path
 
 import typer
 
-from resgraph.ingest import worker
+from resgraph.ingest import reconcile, worker
 from resgraph.ingest.sink import SINK_PATH, Sink
 from resgraph.ingest.spool import QUEUE_PATH, SPOOL_ROOT, RefQueue, Spool
 
@@ -70,6 +70,28 @@ def replay(
         f" digest {sink.digest()[:16]}"
     )
     sink.close()
+
+
+@app.command(name="reconcile")
+def reconcile_cmd(
+    audit_db: str = "data/audit.db",
+    sink_path: str = str(SINK_PATH),
+    quiet_after_s: float = 86_400,
+) -> None:
+    """The trail's own count against the sink's, per run, plus how
+    long since anything was recorded — a stopped producer keeps every
+    component healthy and both counts agreeing at zero."""
+    findings = reconcile.reconcile(Path(audit_db), Path(sink_path))
+    quiet = reconcile.silence_seconds(Path(audit_db))
+    if quiet is None:
+        findings.append("the trail holds no events at all")
+    elif quiet > quiet_after_s:
+        findings.append(f"nothing recorded for {quiet / 3600:.1f}h")
+    for finding in findings:
+        typer.echo(f"MISMATCH {finding}")
+    if findings:
+        raise SystemExit(1)
+    typer.echo(f"reconciled; newest event {(quiet or 0) / 60:.1f} min old")
 
 
 @app.command()

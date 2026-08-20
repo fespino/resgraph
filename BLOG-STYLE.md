@@ -25,6 +25,12 @@ page.
   is defined broadly (the system around a capable but fallible
   component); the dev-loop / coding-agent case is an application of
   it, not the definition.
+- When the post's subject already has an established industry name,
+  name that discipline first and make the equivalence second — post
+  00 opens with the secure development lifecycle and then introduces
+  harness engineering as the same posture under a wider name. A new
+  term grounded in a classical one reads as a lens; a new term
+  floating alone reads as a rebrand.
 - Place the post in the series arc: later phases harness the
   platform's own agents (evals, judges, budget gates); phase zero
   harnesses the loop that builds them. Post 00 is the verification

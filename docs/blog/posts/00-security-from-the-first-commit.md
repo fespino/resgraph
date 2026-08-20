@@ -11,18 +11,22 @@ tags:
 
 # One harness for humans and agents
 
-**Harness engineering** is designing the system around a capable but
-fallible component — the gates, feedback loops, recorded context, and
-measurements that produce dependable outcomes without trusting the
-component to be careful. In a system with an AI component, that
-component is the model, and the harness — the evals, guardrails,
-and context around it — is where most of the application builder's
-engineering lives. But the oldest
-fallible component in software is the programmer: CI, code review,
-and branch protection are the harness the industry built for *us*,
-decades before anyone called it that. That loop — the one that builds
-everything else — now increasingly includes coding agents, and the
-same harness has to hold for both kinds of contributor.
+Every serious codebase ships from inside a **secure development
+lifecycle**: an unpushable default branch, an issue and a review in
+front of every change, CI-enforced scanning, dependencies pinned
+through lockfiles. This post builds that lifecycle for resgraph
+from the first commit — the branch rules, the workflows, the
+scanners, and the probes that verify each control from outside the
+repo.
+
+Only one frame comes before the techniques. **Harness engineering** is the
+system built around a capable but fallible component, and the
+oldest fallible component in software is the programmer: the
+lifecycle *is* the harness the industry built for us, decades
+before anyone called it that. The development loop now includes
+coding agents, and the same lifecycle has to hold for both kinds of
+contributor — that is the title, and the test every control below
+passes.
 
 <!-- more -->
 
@@ -126,10 +130,11 @@ Four checks run on every push and PR: **ruff** (lint + format),
 **bandit** (Python SAST), **CodeQL** (taint tracking and dataflow,
 catching what pattern-matching can't), and **pytest** with coverage.
 
-In the CI job, every leg
-runs with `continue-on-error: true`, results collect into a summary
-table, and a single `Gate` step at the end fails the build if any leg
-failed.
+In
+[the CI job](https://github.com/fespino/resgraph/blob/phase-0-foundations/.github/workflows/ci.yml),
+every leg runs with `continue-on-error: true`, results collect into
+a summary table, and a single `Gate` step at the end fails the build
+if any leg failed.
 
 ```yaml
 # .github/workflows/ci.yml
@@ -181,23 +186,20 @@ gh api repos/fespino/resgraph/branches/main/protection \
 
 The whole lifecycle, as the platform enforces it:
 
-```text
-main is unpushable (branch protection, enforce_admins on)
-        │
-  issue opened first ──── records intent, self-contained
-        │
-  branch + PR ─────────── "Closes #N"; commits cite the SPEC
-        │                  decisions (D-numbers) they touch
-        │
-  automated checks ────── required: test, pyright, TruffleHog,
-  + code review            OSV-Scanner, CodeQL; advisory: zizmor;
-        │                  the sticky CI summary + coverage comments
-        │                  show the reviewer the state without
-        │                  leaving the PR
-        │
-  merge into main ─────── triggers the main-only jobs: Scorecard
-                           publishes, the coverage baseline updates,
-                           zizmor re-validates all workflows
+```mermaid
+flowchart TD
+    protected["<b>main is unpushable</b><br/>branch protection, enforce_admins on"]
+    issue["<b>issue opened first</b><br/>records intent, self-contained"]
+    pr["<b>branch + PR</b><br/>'Closes #N' — commits cite the SPEC decisions (D-numbers) they touch"]
+    checks["<b>automated checks + code review</b><br/>• required: test, pyright, TruffleHog, OSV-Scanner, CodeQL<br/>• advisory: zizmor<br/>• the sticky CI summary + coverage comments show the reviewer the state without leaving the PR"]
+    merge["<b>merge into main</b> — triggers the main-only jobs:<br/>• Scorecard publishes<br/>• the coverage baseline updates<br/>• zizmor re-validates all workflows"]
+
+    protected --> issue
+    issue --> pr
+    pr --> checks
+    checks --> merge
+    class checks leftalign
+    class merge leftalign
 ```
 
 A rule that binds the human and the agent *identically* is exactly
@@ -493,9 +495,13 @@ this page.
 
 ## Layer 7: the supply chain
 
-Three mechanical rules, all visible in the workflow files, all aimed
-at the same idea: the loop's own dependencies are a third kind of
-fallible contributor — one you never get to interview:
+The base pin is the lockfile: every Python dependency resolves
+through `uv.lock`, Dependabot keeps it current, and osv-scanner
+reads it for CVEs — no floating versions anywhere in the build. On
+top of that sit three mechanical rules, all visible in the workflow
+files, all aimed at the same idea: the loop's own dependencies are a
+third kind of fallible contributor — one you never get to
+interview:
 
 **Pin actions to commit SHAs, not tags.** A tag can be repointed at
 malicious code; a SHA can't. The human-readable version rides along

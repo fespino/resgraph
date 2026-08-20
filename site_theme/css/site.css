@@ -463,3 +463,7 @@ div.mermaid g.thispost polygon {
   stroke: var(--link) !important;
   stroke-width: 2.5px !important;
 }
+/* nodes whose label carries bullet lines read better ragged-left */
+div.mermaid g.leftalign .nodeLabel {
+  text-align: left;
+}

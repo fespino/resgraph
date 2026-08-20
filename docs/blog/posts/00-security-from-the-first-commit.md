@@ -202,15 +202,12 @@ flowchart TD
 ```
 
 A rule that binds the human and the agent *identically* is exactly
-what you want with a stochastic contributor in the loop.
-Every change — mine or an agent's — goes through issue → branch →
-pull request → green gates → merge, and there is no privileged path
-for the agent to be talked into using, because there is no privileged
-path at all. An owner can always dismantle the protection in the
-settings first, so "can't bypass" would be overclaiming; what the
-control actually buys is that bypass stops being a slip and becomes a
-deliberate, visible act. The harness is a mechanical fact, not a
-convention that holds until someone — or something — is in a hurry.
+what you want with a stochastic contributor in the loop: there is
+no privileged path for the agent to be talked into using, because
+there is no privileged path at all. An owner can always dismantle
+the protection in the settings first, so "can't bypass" would be
+overclaiming; what the control actually buys is that bypass stops
+being a slip and becomes a deliberate, visible act.
 
 The issue coming *before* the PR is the other property that matters:
 the issue records what and why in self-contained form, the PR

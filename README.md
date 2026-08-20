@@ -49,13 +49,12 @@ audit trail (phases 7–11). Each phase is tagged at its end state:
 | 10 | Serving gateway: task-class routing with recorded source, honest stream failure, two measured cache layers, the failover drill (INC-004) | `phase-10-token-path` |
 | 10.5 | Institutional memory as a log-structured store: archive/history/working-set split, fed-context sha pinned per run | `phase-10.5-institutional-memory` |
 | 11 | Misuse detection (resgraph-sentinel): three cost-ordered layers over the audit trail, benign FP rate as the headline, review queue whose labels close loops in code, CI recall gate | `phase-11-sentinel` |
+| 12 | Gateway vs the reference: one alias/many endpoints, percentile windows + price lottery (0.449×), caller/operator contract, prepaid billing, eval-driven routing (18×), screening + sunset gate, market connector — every workstream doc-validated before code, exit gate audited item-by-item | `phase-12-gateway` |
 
 Each increment lands via issue → PR, citing the SPEC decisions
-(D-numbers) it implements. Next: the gateway phase (#263) — closing
-the measured distance between this miniature and a production API
-gateway (one model/many endpoints, percentile routing windows,
-price-weighted sampling, per-caller billing), each workstream
-doc-validated against the real thing before any code.
+(D-numbers) it implements. Next: the Langfuse phase (#243) —
+integrate the real product where using it teaches, then replicate
+the layer where building it does.
 
 ## Quickstart: to a live dashboard
 

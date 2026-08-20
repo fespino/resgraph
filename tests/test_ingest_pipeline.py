@@ -25,7 +25,8 @@ def test_the_spool_is_content_addressed(parts):
     spool, _, _ = parts
     batch = worker.synth_batch("run-1", 3)
     first = spool.write(batch)
-    assert spool.write(batch) == first
+    again = spool.write(batch)
+    assert again == first
     assert spool.refs() == [first]
     assert spool.read(first) == batch
     with pytest.raises(FileNotFoundError, match="raw is the source"):
@@ -57,7 +58,8 @@ def test_the_producer_path_does_not_move_while_the_backlog_grows(parts):
 
 def test_delivery_is_at_least_once_and_the_sink_absorbs_it(parts):
     spool, queue, sink = parts
-    assert sink.write([]) == 0
+    empty = sink.write([])
+    assert empty == 0
     ref = spool.write(worker.synth_batch("run-1", 5))
     queue.enqueue(ref)
     first = worker.drain(spool, queue, sink)
@@ -80,17 +82,22 @@ def test_a_worker_that_dies_mid_batch_leaves_the_claim_reclaimable(parts, monkey
     with pytest.raises(RuntimeError):
         worker.drain(spool, queue, sink)
     assert (queue.pending(), queue.inflight()) == (0, 1)  # unacked: nothing was lost
-    assert queue.reclaim(older_than_s=0.0)
+    reclaimed = queue.reclaim(older_than_s=0.0)
+    assert reclaimed
     monkeypatch.undo()
-    assert worker.drain(spool, queue, sink)["rows_written"] == 4
+    retried = worker.drain(spool, queue, sink)
+    assert retried["rows_written"] == 4
 
 
 def test_the_queue_only_reclaims_stale_claims(parts):
     _, queue, _ = parts
     queue.enqueue("a", now=100.0)
-    assert queue.claim(now=100.0) == ["a"]
-    assert queue.reclaim(older_than_s=30.0, now=120.0) == []
-    assert queue.reclaim(older_than_s=30.0, now=140.0) == ["a"]
+    claimed = queue.claim(now=100.0)
+    assert claimed == ["a"]
+    fresh = queue.reclaim(older_than_s=30.0, now=120.0)
+    assert fresh == []
+    stale = queue.reclaim(older_than_s=30.0, now=140.0)
+    assert stale == ["a"]
     assert queue.pending() == 1
 
 

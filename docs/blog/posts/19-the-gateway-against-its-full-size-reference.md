@@ -91,10 +91,15 @@ model routing.
 
 You pay the app; the app pays the restaurants — and the app holds
 a singular position in the market, because it sees every order in
-the city and the money flows through it. Stripe recently
-[bought OpenRouter for $7 billion](https://finance.yahoo.com/technology/ai/articles/stripe-acquires-openrouter-7b-turning-091812340.html);
-why is theirs to say, but a payments company buying the layer the
-money flows through at least fits the shape.
+the city and the money flows through it. Stripe has
+[agreed to acquire OpenRouter](https://stripe.com/newsroom/news/stripe-agrees-to-acquire-openrouter)
+— a deal [reported at $7 billion](https://finance.yahoo.com/technology/ai/articles/stripe-acquires-openrouter-7b-turning-091812340.html),
+though the announcement names no price — and Stripe's stated reason
+lands on exactly this position: tokens are "the central currency
+for companies building with AI," and the pair will "help businesses
+maximize profitability by routing their requests intelligently and
+spending their tokens efficiently." A payments company is buying
+the layer the money flows through, and says so.
 And the web's original design expected middlemen of exactly this
 kind: HTTP's layered-system constraint explicitly allows standing
 in the middle, because its designers knew that routing, caching,

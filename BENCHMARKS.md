@@ -478,6 +478,13 @@ so it measures the insert alone. Run 2026-08-20.
 | spool + enqueue a reference | **567 µs** | 1.04 ms | 19.2 ms |
 | straight into the columnar store | 24.3 ms | 33.4 ms | 55.8 ms |
 
+The isolation property is measured directly rather than inferred: the
+producer's p50 over the first half of the run (backlog climbing from
+empty) was **557 µs**, and over the second half (backlog 250 → 500)
+**539 µs** — a drift of 0.97×. The producer path does not notice the
+queue filling behind it, which is the property the whole shape exists
+to buy.
+
 **42.8× at p50**, and the number is not the interesting part — the
 shape is. Row-by-row inserts are an analytical store's worst case, and
 that is precisely the argument for not putting one on the producer's

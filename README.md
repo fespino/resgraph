@@ -46,8 +46,9 @@
 | src/resgraph/gateway/accounts.py             |       78 |        0 |    100% |           |
 | src/resgraph/gateway/budget.py               |       16 |        0 |    100% |           |
 | src/resgraph/gateway/cache.py                |       39 |        0 |    100% |           |
-| src/resgraph/gateway/cli.py                  |       25 |        0 |    100% |           |
+| src/resgraph/gateway/cli.py                  |       52 |        0 |    100% |           |
 | src/resgraph/gateway/dispatch.py             |       97 |        0 |    100% |           |
+| src/resgraph/gateway/market.py               |       68 |        0 |    100% |           |
 | src/resgraph/gateway/quality.py              |       22 |        0 |    100% |           |
 | src/resgraph/gateway/registry.py             |       98 |        0 |    100% |           |
 | src/resgraph/gateway/relay.py                |       77 |        0 |    100% |           |
@@ -94,7 +95,7 @@
 | src/resgraph/tools/context.py                |        9 |        0 |    100% |           |
 | src/resgraph/tools/http.py                   |       21 |        0 |    100% |           |
 | src/resgraph/tools/registry.py               |       24 |        0 |    100% |           |
-| **TOTAL**                                    | **5759** |  **131** | **98%** |           |
+| **TOTAL**                                    | **5854** |  **131** | **98%** |           |
 
 
 ## Setup coverage badge

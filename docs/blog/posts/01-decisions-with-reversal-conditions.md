@@ -19,7 +19,7 @@ opinion: you can't tell later whether you weighed the alternative or
 never saw it. The last post built the verification half of the
 harness — the gates that check work after it exists. This one is the
 context half: everything a contributor reads *before* touching code,
-whether that contributor is you in six months, a teammate joining the
+whether that contributor is future you, a teammate joining the
 project, or a coding agent starting a session cold.
 
 <!-- more -->
@@ -60,10 +60,8 @@ flowchart TD
 
 ## The shape of a decision
 
-Every locked decision in `SPEC.md` carries an ID (`D1`, `D2`, …), and
-changing a locked decision isn't an edit — it's a *new* decision that
-supersedes the old one, so the history stays intact. The spec's own
-header states the rule:
+Every locked decision in `SPEC.md` carries an ID (`D1`, `D2`, …),
+and the spec's own header states what "locked" means:
 
 ```markdown
 # resgraph SPEC
@@ -71,6 +69,9 @@ header states the rule:
 Decision log + phase contracts. Locked decisions carry D-NN ids;
 changing one requires a new decision superseding it, not an edit.
 ```
+
+Supersede-not-edit is what keeps the history intact: a changed
+answer never erases the record that the old answer existed and lost.
 
 Here is D1 as it actually appears — after a comparison table of the
 two candidates, the record closes with the three required parts:
@@ -109,8 +110,7 @@ change lifecycle from the last post:
 ```
 
 That last line is what keeps the log alive instead of decorative:
-every PR that touches a contract names the decision it implements,
-so the paper trail builds itself as a side effect of normal work.
+the paper trail builds itself as a side effect of normal work.
 
 ## The decision that had to be executable
 
@@ -162,10 +162,10 @@ rot like any prose, but the contract itself can't.
 
 It did its job on the very first run — and not in the way I expected.
 The test failed immediately, but not because the schema was wrong:
-because I'd written the spec's fence as a bare ``` instead of
-```json`, so the test couldn't *find* the block to parse. The
-anti-drift mechanism caught a defect in the anti-drift setup itself,
-on day one. That's the signal that the test is real: it fails when
+because I'd written the spec's fence as a bare code fence instead of
+a `json`-labeled one, so the test couldn't *find* the block to parse.
+The anti-drift mechanism caught a defect in the anti-drift setup
+itself, on day one. That's the signal that the test is real: it fails when
 reality disagrees with your intent, including when your intent is
 sloppily expressed.
 
@@ -202,13 +202,11 @@ class UpdateMessage(BaseModel):
         return self
 ```
 
-Read it line by line against the spec: `frozen=True` makes messages immutable
-events; `extra="forbid"` makes an unknown field a rejection, not
-forward compatibility; `AwareDatetime` makes a naive timestamp a
-validation error, because ambiguous time is the seed of a whole class
-of downstream bugs; and the validator rejects a payload-carrying
-delete outright. Note what the error message says: it cites **(D2)**.
-The tests pin that:
+Each line enforces a sentence of the spec, and the block's own
+comments carry the mapping — immutable events, strict parsing,
+aware-only time, delete as a pure removal. What the code adds beyond
+the spec's prose is in the error message: it cites **(D2)**. The
+tests pin that:
 
 ```python
 def test_delete_with_attrs_rejected():
@@ -253,11 +251,14 @@ class UpdateMessageV2(BaseModel):
     schema_version: Literal[2] = 2
     ...
 
+
 AnyUpdate = Annotated[
     UpdateMessage | UpdateMessageV2,
     Field(discriminator="schema_version"),
 ]
-``` A plain `int` wouldn't fail
+```
+
+A plain `int` wouldn't fail
 as loudly as you'd hope: strict parsing already rejects a v2 that
 *adds* fields, so the Literal guards the subtler case — a version
 that changes what fields *mean* without changing the shape, which is
@@ -293,11 +294,9 @@ X" beats a confident wrong answer that nobody remembers making.
 ## What I'd take to the next project
 
 - **A decision log with rejections and reversal conditions** costs a
-  few minutes per decision and saves the archaeology later. The
-  reversal condition is the underrated half: it states what evidence
-  would justify a change, so revisiting isn't relitigating — and any
-  contributor can check a proposal against it from the document
-  alone.
+  few minutes per decision and saves the archaeology later — and it
+  prices every exit in advance, which is half of whether a decision
+  is safe to make at all.
 - **Make the spec executable where you can.** A schema example that's
   also a test fixture cannot rot. The cheapest documentation is the
   kind that fails the build when it lies — context and verification

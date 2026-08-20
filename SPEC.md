@@ -2610,6 +2610,39 @@ exception itself is that data collection and code changes are
 different acts, and a collection that needs a reviewer every morning
 is the manual cadence this replaces.
 
+**The store is git, which is a laptop-scale choice with a stated
+ceiling.** Snapshots are files in the repository, and that buys four
+things a bucket does not: a pull request shows exactly which fields
+and prices moved, provenance rides the commit history rather than a
+metadata column, the whole record deletes in one command if the
+upstream terms ever demand it (the licensing safety valve this
+decision was designed around), and there is no infrastructure to run
+or pay for. What it cannot do is query: answering "how did this
+model's price move over ninety days" means reading ninety files.
+DuckDB narrows that gap today — `read_json_auto('evals/market/*.json')`
+treats the directory as a table — which is why the ceiling is size
+rather than capability.
+
+The production shape is the one this platform already builds
+elsewhere: land raw observations in object storage partitioned by
+date, keep a manifest, and derive a columnar table you can query —
+which is D48's spool-and-sink applied to a dataset that predates it,
+and D46's own Iceberg reversal condition once the market becomes a
+world rather than a reference table. Saying so plainly matters more
+than the mechanism: a repository is a serviceable store for a daily
+826 KB file and is the wrong answer at any real volume, and nothing
+here should be read as a recommendation to keep observational data
+in version control.
+
+**The retention trigger has fired.** The gateway phase's exit-gate
+audit recorded that a scheduled pull would need a retention rule
+"decided before the directory grows, not after". Scheduling it makes
+that condition live: 826 KB per day is ~24 MB a month and ~294 MB a
+year uncompressed. Git delta-compresses successive catalogs so the
+pack grows by less than that, but every version is kept forever and
+clone cost only rises. The rule is owed now rather than at the
+symptom, and is tracked separately.
+
 **Rejected** for the same job: a pull request per pull (a daily merge
 is the same dependence on someone remembering, and unmerged snapshots
 are not where the baseline consumer reads them); a bot-owned data

@@ -459,3 +459,35 @@ The CI budget (`test_screening_pays_its_latency_budget`, p50 < 1 ms
 over 200 calls) holds with ~25× headroom — the budget is deliberately
 loose so slower CI runners don't flake, while a rule set an order of
 magnitude heavier still fails the build before it costs a request.
+
+
+## Raw-first ingestion: the producer's write path (D48)
+
+**Hardware:** Apple M3, 8 GB RAM, macOS 15.2 (laptop; pure local I/O,
+no containers — spool on APFS, SQLite queue, DuckDB sink). Method:
+`resgraph-ingest spike --batches 500 --size 20` — 500 batches of 20
+synthetic audit-shaped events, each batch timed twice: once through
+the pipeline's producer path (content-address, write raw, enqueue a
+reference) and once written straight into the columnar store. Nothing
+drains the queue during the run, so the backlog reaches 500 batches.
+The direct arm is timed generously: enrichment sits outside its clock,
+so it measures the insert alone. Run 2026-08-20.
+
+| producer path | p50 | p99 | max |
+|---|---|---|---|
+| spool + enqueue a reference | **567 µs** | 1.04 ms | 19.2 ms |
+| straight into the columnar store | 24.3 ms | 33.4 ms | 55.8 ms |
+
+**42.8× at p50**, and the number is not the interesting part — the
+shape is. Row-by-row inserts are an analytical store's worst case, and
+that is precisely the argument for not putting one on the producer's
+path; quoting the ratio as "our ingest is 43× faster" would be
+dishonest, since the two arms are doing different jobs. What the run
+shows is that the producer's cost is decoupled from the sink's state:
+the backlog grew to 500 batches and the producer's p99 stayed near a
+millisecond.
+
+The second property has no number: the direct arm leaves no raw
+behind, so a replay cannot rebuild what it wrote (pinned by test).
+Latency is the advertised half of a queue; replayability is the half
+that matters after an outage.

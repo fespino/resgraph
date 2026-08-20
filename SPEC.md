@@ -2582,6 +2582,28 @@ free; prose is someone's); polling on a schedule inside the gateway
 process (the consumer moves on week timescales; a manual/cron pull is
 the honest cadence and keeps the serving path network-free).
 
+**Amendment (2026-08-21): the cadence is now collected, not intended.**
+The pull ran manually, which meant it did not run: the roadmap's
+phase-14 gate is conditional on accumulated catalog churn and the
+directory held a single file for as long as nobody remembered. A
+scheduled workflow (`.github/workflows/market-snapshot.yml`) now pulls
+once daily and commits the snapshot. This does not reverse the
+rejection below of polling *inside the gateway process* — that
+rejection keeps the serving path network-free, and a job outside the
+process is the "manual/cron pull" the decision already called honest.
+Two properties make it safe to run unattended: the pull refuses on
+shape drift rather than ingesting garbage, and it prints its own
+field-set drift against the previous snapshot into the run summary,
+so an undeclared upstream field is announced the day it appears.
+
+The workflow is also the one place in this repository that commits to
+the default branch without review, against the standing rule that
+changes arrive by pull request. The exception is recorded rather than
+taken quietly, and it is bounded: the commit step stages
+`evals/market/` and nothing else, so the job can add observations and
+can never change behaviour. Data collection and code changes are
+different acts and only the second needs a reviewer.
+
 **Rejected — the Iceberg cold store as the home for snapshots, with
 its schema evolution as the drift detector.** The instinct is right
 (this platform owns an Iceberg store whose job includes schema

@@ -23,6 +23,12 @@ maps each phase to its events.
 | post-6 (2026-08-02) | — | D0 (pyright strict gate, #68) |
 | 7 — MCP server | D19–D21 | — |
 | 8 — analyst agent | D22–D25 | `phase-8-analyst` |
+| 9 — safe runtime | D26–D28, D29a–D29b | — |
+| 10 — token path | D29c, D30–D33 | — |
+| 10.5 — institutional memory | D34 | — |
+| 11 — sentinel | D35–D39 | — |
+| 12 — gateway | D40–D46 | D45 (`announced` rejection recorded at the phase audit) |
+| 13 — Langfuse | D47+ | — |
 
 ## D0 — Toolchain: typed Python, with the types enforced (phase 0)
 

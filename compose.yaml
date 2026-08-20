@@ -89,5 +89,125 @@ services:
     entrypoint: ["/bin/sh", "-c", "ollama pull ${OLLAMA_MODEL:-qwen2.5:7b}"]
     restart: "no"
 
+  # Langfuse profile: opt-in, and heavier than everything above combined
+  # (their stack recommends 16 GiB) — run it with the store stack DOWN:
+  #   docker compose --profile langfuse up -d
+  # Secrets here are local-dev placeholders behind loopback binds, same
+  # rationale as Grafana's anonymous admin. Headless init issues fixed
+  # keys so the exporter needs no UI step; only the web UI/API (3001,
+  # 3000 belongs to Grafana) touches the host.
+  langfuse-web:
+    profiles: ["langfuse"]
+    image: langfuse/langfuse:4@sha256:c2350a95d710f726f6466ffd47675eb704d0ff77fa1df1b9e6751ada6134ef75
+    depends_on: &langfuse-deps
+      langfuse-postgres: {condition: service_healthy}
+      langfuse-clickhouse: {condition: service_healthy}
+      langfuse-redis: {condition: service_healthy}
+      langfuse-minio: {condition: service_healthy}
+    ports: ["127.0.0.1:3001:3000"]
+    environment: &langfuse-env
+      NEXTAUTH_URL: http://localhost:3001
+      NEXTAUTH_SECRET: resgraph-local-dev
+      SALT: resgraph-local-salt
+      ENCRYPTION_KEY: "0000000000000000000000000000000000000000000000000000000000000000"
+      TELEMETRY_ENABLED: "false"
+      DATABASE_URL: postgresql://postgres:postgres@langfuse-postgres:5432/postgres
+      CLICKHOUSE_MIGRATION_URL: clickhouse://langfuse-clickhouse:9000
+      CLICKHOUSE_URL: http://langfuse-clickhouse:8123
+      CLICKHOUSE_USER: clickhouse
+      CLICKHOUSE_PASSWORD: clickhouse
+      CLICKHOUSE_CLUSTER_ENABLED: "false"
+      LANGFUSE_S3_EVENT_UPLOAD_BUCKET: langfuse
+      LANGFUSE_S3_EVENT_UPLOAD_REGION: auto
+      LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: minio
+      LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: miniosecret
+      LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://langfuse-minio:9000
+      LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
+      LANGFUSE_S3_EVENT_UPLOAD_PREFIX: events/
+      LANGFUSE_S3_MEDIA_UPLOAD_BUCKET: langfuse
+      LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: http://langfuse-minio:9000
+      LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID: minio
+      LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: miniosecret
+      LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE: "true"
+      REDIS_HOST: langfuse-redis
+      REDIS_PORT: "6379"
+      REDIS_AUTH: resgraph-local
+      LANGFUSE_INIT_ORG_ID: resgraph
+      LANGFUSE_INIT_ORG_NAME: resgraph
+      LANGFUSE_INIT_PROJECT_ID: resgraph
+      LANGFUSE_INIT_PROJECT_NAME: resgraph
+      LANGFUSE_INIT_PROJECT_PUBLIC_KEY: pk-lf-resgraph-local
+      LANGFUSE_INIT_PROJECT_SECRET_KEY: sk-lf-resgraph-local
+      LANGFUSE_INIT_USER_EMAIL: dev@localhost.local
+      LANGFUSE_INIT_USER_NAME: dev
+      LANGFUSE_INIT_USER_PASSWORD: resgraph-local-dev
+  langfuse-worker:
+    profiles: ["langfuse"]
+    image: langfuse/langfuse-worker:4@sha256:37a7c4251b602e60fd39451e6c252195908bf61837d4e252adbd752c0809e835
+    depends_on: *langfuse-deps
+    environment: *langfuse-env
+  langfuse-postgres:
+    profiles: ["langfuse"]
+    image: postgres:17@sha256:e38411452a464af89e5adadb8d223bf53b898d47d6ef918b2d58c08707350449
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+      TZ: UTC
+      PGTZ: UTC
+    volumes: [langfuse-postgres-data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+  langfuse-clickhouse:
+    profiles: ["langfuse"]
+    image: clickhouse/clickhouse-server:25.12@sha256:8a790dd3468db22b1d4e7b18a176f378ff5ff6053b9c48dd4ea1fa71a24c5ba6
+    user: "101:101"
+    environment:
+      CLICKHOUSE_DB: default
+      CLICKHOUSE_USER: clickhouse
+      CLICKHOUSE_PASSWORD: clickhouse
+    volumes:
+      - langfuse-clickhouse-data:/var/lib/clickhouse
+      - langfuse-clickhouse-logs:/var/log/clickhouse-server
+    healthcheck:
+      test: wget --no-verbose --tries=1 --spider http://localhost:8123/ping || exit 1
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 1s
+  langfuse-redis:
+    profiles: ["langfuse"]
+    image: redis:7@sha256:e9b2e45ecd47fbb69b877cf8d045d5cccaaaed52524b6e098b4abe8212994f73
+    command: ["redis-server", "--requirepass", "resgraph-local", "--maxmemory-policy", "noeviction"]
+    volumes: [langfuse-redis-data:/data]
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "resgraph-local", "ping"]
+      interval: 3s
+      timeout: 10s
+      retries: 10
+  langfuse-minio:
+    profiles: ["langfuse"]
+    image: cgr.dev/chainguard/minio:latest@sha256:ef7c127fd0d380cca429c7aa44000d0c9b73044872451ead5084e155fbe00437
+    entrypoint: sh
+    command: -c 'mkdir -p /data/langfuse && minio server --address ":9000" --console-address ":9001" /data'
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: miniosecret
+    volumes: [langfuse-minio-data:/data]
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 1s
+      timeout: 5s
+      retries: 5
+      start_period: 1s
+
 volumes:
   ollama-models:
+  langfuse-postgres-data:
+  langfuse-clickhouse-data:
+  langfuse-clickhouse-logs:
+  langfuse-redis-data:
+  langfuse-minio-data:

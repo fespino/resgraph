@@ -2565,6 +2565,53 @@ free; prose is someone's); polling on a schedule inside the gateway
 process (the consumer moves on week timescales; a manual/cron pull is
 the honest cadence and keeps the serving path network-free).
 
+## D47 — Langfuse integration is one-way, and the round-trip is the acceptance test (Langfuse phase, #308)
+
+The integration phase's structural decision, set by its first slice:
+resgraph records feed Langfuse; Langfuse never becomes a system of
+record. The audit store keeps its authority; the exporter is a copy
+with the trail's own timestamps.
+
+- **Raw OTLP, not their SDK.** The legacy ingestion API sunsets
+  2026-11-16; the supported path is OTLP over HTTP. The exporter
+  emits OTLP JSON directly because OTLP spans carry explicit
+  timestamps — a recorded run exports under the trail's clock. The
+  SDK's context managers instrument live code and would fight a
+  replay.
+- **The mapping**: run → trace (root span; run id doubles as
+  session), llm_call → generation (model + usage), tool_call → tool
+  span, step/approval/cutoff → event spans; every span carries its
+  audit seq so the round-trip can join back.
+- **Usage always, cost never.** Generations carry token usage but no
+  cost_details: the two-meters comparison (L4) needs Langfuse to
+  price traffic with its own table, and echoing our number would
+  make that reconciliation measure nothing — the drill lesson
+  ("how could this complete and measure nothing?") applied at
+  design time.
+- **The acceptance test is machine-shaped, on both read layers.**
+  Export alone is half an integration: a resgraph agent must read
+  the data back — observations (row leg) and the v2 metrics
+  endpoint (aggregate leg; the v2 API removed the traces view) —
+  and reconcile both against the audit store with every mismatch
+  named (`resgraph-langfuse roundtrip`, nonzero on any). An awkward
+  or lossy read path is a measured finding about where the product
+  assumes a human eyeball, not a failure.
+- **The trail now records the token split per llm_call**
+  (input/output beside the summed total — additive keys). The
+  exporter uses the split when present and exports the honest
+  total for older rows; it never invents a split.
+- **The `langfuse` compose profile is opt-in and heavier than the
+  host**: their stack (web, worker, ClickHouse, MinIO, Redis,
+  Postgres — all digest-pinned, loopback-only, telemetry off)
+  recommends 16 GiB; this laptop has 8, so it runs with the store
+  stack down. Headless init issues fixed local keys — no UI step
+  in the loop.
+
+**Rejected:** their SDK for the exporter (above); sending
+cost_details (above); Langfuse as a second system of record
+(structural — no reversal); the legacy ingestion API (sunset is
+announced; building on it would be a debt with a date).
+
 ## Phase contracts
 - The generator MUST emit D2 messages exactly and expose `--seed`
   for reproducibility.

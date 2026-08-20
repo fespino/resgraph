@@ -8,7 +8,7 @@ from pathlib import Path
 
 import typer
 
-from resgraph.ingest import reconcile, worker
+from resgraph.ingest import layouts, reconcile, worker
 from resgraph.ingest.sink import SINK_PATH, Sink
 from resgraph.ingest.spool import QUEUE_PATH, SPOOL_ROOT, RefQueue, Spool
 
@@ -70,6 +70,20 @@ def replay(
         f" digest {sink.digest()[:16]}"
     )
     sink.close()
+
+
+@app.command(name="layouts")
+def layouts_cmd(
+    runs: int = 200,
+    events_per_run: int = 30,
+    repeats: int = 7,
+    root: str = "data/ingest/layouts",
+) -> None:
+    """Wide against normalized (and against normalized with the
+    duplicates at-least-once leaves), same rows, same questions.
+    Refuses to time anything until the arms agree on every answer."""
+    result = layouts.compare(Path(root), runs=runs, events_per_run=events_per_run, repeats=repeats)
+    typer.echo(json.dumps(result, indent=1))
 
 
 @app.command(name="reconcile")

@@ -498,3 +498,51 @@ The second property has no number: the direct arm leaves no raw
 behind, so a replay cannot rebuild what it wrote (pinned by test).
 Latency is the advertised half of a queue; replayability is the half
 that matters after an outage.
+
+
+## Wide versus normalized: where the layout win actually is (D49)
+
+**Hardware:** Apple M3, 8 GB RAM, macOS 15.2 (laptop; DuckDB 1.5.5
+in-process, no containers). Method: one generated row set (1,000 runs
+x 30 events = 30,000 observations) written into three layouts — wide
+(run properties on every row), normalized (runs joined to events), and
+normalized carrying the duplicates at-least-once delivery leaves when
+nothing dedups on write (every 10th event replayed, read through a
+`QUALIFY row_number()` dedup). Every arm answers the same four
+questions and the answers are compared before any timing: a
+disagreement aborts the run rather than producing numbers. Median of 9
+repeats after a warm-up, `resgraph-ingest layouts`. Run 2026-08-20.
+
+| query | wide | normalized | normalized + dedup-on-read |
+|---|---|---|---|
+| run_timeline (no join) | 0.231 ms | **0.181 ms** | 2.425 ms |
+| latency_p99_by_kind (no join) | 0.358 ms | **0.349 ms** | 2.231 ms |
+| cost_by_model (join) | **0.421 ms** | 1.237 ms | 2.535 ms |
+| spend_per_run (join) | **0.717 ms** | 1.343 ms | 3.082 ms |
+
+| storage at 30k rows | wide | normalized |
+|---|---|---|
+| file size | 2,109,440 B | **1,323,008 B** |
+
+Read plainly: the wide layout wins **2.9x and 1.9x** on the two
+questions that need a join and **loses slightly** (0.97x, 0.78x) on
+the two that do not — the win is the join disappearing, nothing more.
+Against the dedup-on-read arm it wins **4.3x to 10.5x**, which is the
+larger effect by far and says that most of what this shape buys is
+never paying for deduplication at read time. Storage runs the other
+way: 1.59x the bytes.
+
+The published figures for this migration are ~3x less memory and ~20x
+faster queries at fleet scale on a different engine. At 1/1000 scale
+in DuckDB the direction reproduces for join queries and the magnitude
+does not; the storage direction inverts outright. Neither is a
+refutation — they are different measurements — and the honest summary
+is that this laptop can locate *where* the win comes from, not *how
+big* it gets.
+
+**A scale caveat that nearly became a wrong headline.** The storage
+ratio reads 0.75x at 3,000 rows (wide apparently smaller), 1.00x at
+9,000, and 1.59x at 30,000. The small runs sit on DuckDB's file
+allocation steps, so they measure granularity rather than layout. The
+first run of this experiment was at 800 rows and reported the opposite
+conclusion with exactly the same confidence.

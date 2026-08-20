@@ -2691,6 +2691,48 @@ recomputed per query); acking before the flush (it converts a worker
 crash into silent loss, which is exactly what raw-first exists to
 prevent).
 
+## D49 — The wide layout stays, for the dedup it avoids rather than the join (Langfuse phase, #319)
+
+Both layouts were built over one row set and asked the same four
+questions, with the arms refusing to be timed until every answer
+matched. What the measurement says at 30k observations on this laptop
+(full table in BENCHMARKS.md):
+
+- **The join win is real and modest**: wide beats normalized by
+  2.9× and 1.9× on the two questions that need the run's model,
+  and by nothing at all — 0.97× and 0.78×, i.e. slightly worse —
+  on the two that never join. The published claim for this shape is
+  ~20× faster queries; the direction reproduces at 1/1000 scale and
+  the magnitude does not. Where a wide table wins is now located
+  rather than assumed: it wins exactly where a join disappears.
+- **The dominant win is against dedup-on-read**: 4.3× to 10.5×
+  over the same normalized layout carrying the duplicates that
+  at-least-once delivery leaves when nothing dedups on write. Most
+  of what this layout buys is not the join — it is never paying for
+  deduplication at read time. That is the finding that justifies
+  the sink deduping on write, and it makes the two slices one
+  argument.
+- **The layout costs storage, in the other direction**: 1.59× the
+  bytes of the normalized pair at 30k rows. Propagating run
+  properties onto every row is not free; columnar compression
+  softens it without erasing it.
+- **Below ~10k rows the comparison measures the filesystem, not
+  the layout.** The storage ratio reads 0.75× at 3k rows, 1.00× at
+  9k, and 1.59× at 30k — the small numbers sit on DuckDB's
+  allocation steps. The first honest reading is the largest one,
+  and a single small run would have reported the opposite result
+  with equal confidence.
+
+**Kept:** the wide observation sink, on the dedup-avoidance result.
+**Rejected:** reporting the small-scale storage number (it inverted
+under scale — a measurement that flips is a measurement of the wrong
+thing); claiming the published 3×/20× figures reproduce (they do not
+at this scale, and saying so is the result).
+**Reversal condition:** row-level reads dominating the workload, or
+storage becoming the binding constraint — both would move the
+balance back toward the normalized pair, and the comparison is a
+command away.
+
 ## Phase contracts
 - The generator MUST emit D2 messages exactly and expose `--seed`
   for reproducibility.

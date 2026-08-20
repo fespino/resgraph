@@ -2464,9 +2464,16 @@ Two request-path protections, each landing differently on this stack.
   so an in-line block would break the exact workload the gateway
   exists to serve. The gateways sell filter-and-block; our honest
   version is flag-and-serve with the post-hoc seat keeping the
-  whole-run view. Catch parity is pinned by test: the detection
-  corpus's own planted payload is flagged at request time by the
-  same signatures that catch it post-hoc.
+  whole-run view. Catch parity is pinned by test and swept across
+  the mutation space: the corpus's injection attacks vary only the
+  planted target, and every variant is flagged at request time by
+  the same signatures that catch it post-hoc. The parity has an
+  honest boundary: the corpus's other three attack types
+  (exfiltration, budget abuse, privileged probing) mutate the tool
+  trace and token shape, not request text — structurally invisible
+  to ANY request-time text screen, ours or the marketed ones. That
+  boundary is why the post-hoc seat exists; in-line screening can
+  only ever cover the attacks that arrive as words.
 - **The sunset gate: lifecycle metadata without remapping.** An
   endpoint MAY declare `lifecycle: {deprecated, sunset}` (ISO dates,
   validated at load). Deprecated serves with a logged warning; past
@@ -2492,7 +2499,12 @@ never happens); per-request date parsing beyond ISO-day lexical
 comparison (days are the honest grain for deprecation; hours would be
 precision theater); screening tool arguments and responses in-line
 (the post-hoc seat owns whole-run views; the request seat owns what
-callers send — one boundary per seat).
+callers send — one boundary per seat); a third `announced` lifecycle
+state (the phase charter's wording, #263) — recorded late, at the
+phase audit: a state with no date semantics and no gate behavior is
+vocabulary without a contract, deprecated/sunset already cover
+warn-then-block, and the validator refusing unknown keys makes the
+rejection enforced rather than implied.
 
 ## D46 — The market connector: consume the reference, deliberately small (gateway phase, #270)
 

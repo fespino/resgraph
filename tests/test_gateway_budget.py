@@ -21,9 +21,12 @@ SETUPS = {
         "model": "qwen2.5:1.5b",
         "base_url": "http://localhost:11434/v1",
     },
-    "gpt-free": {
+    # a self-hosted OpenAI-protocol server; the model name must not be a
+    # real paid model — the phase audit caught this fixture calling gpt-4o
+    # free, the exact convention slip the load-time warning now names
+    "oss-free": {
         "provider": "openai",
-        "model": "gpt-4o",
+        "model": "oss-local-8b",
         "base_url": "http://localhost:9999/v1",
     },
 }
@@ -31,7 +34,7 @@ SETUPS = {
 REGISTRY = {
     "judgment": ClassRoute("haiku", "paid"),
     "workhorse": ClassRoute("qwen-local-1.5b", "local"),
-    "classification": ClassRoute("gpt-free", "unpriced, hence free by convention"),
+    "classification": ClassRoute("oss-free", "unpriced, hence free by convention"),
 }
 
 
@@ -77,7 +80,7 @@ def _gen(client: TestClient, **body: Any):
 def test_a_walk_to_a_paid_backend_within_budget_serves_and_charges(harness):
     client, behaviors, _, budget = harness
     behaviors["qwen-local-1.5b"] = "boom"
-    behaviors["gpt-free"] = "boom"
+    behaviors["oss-free"] = "boom"
     r = _gen(client, task_class="workhorse")
     assert r.status_code == 200
     assert r.json()["backend"] == "anthropic"
@@ -100,7 +103,7 @@ def test_an_exhausted_budget_with_only_paid_candidates_is_a_budget_503(harness):
     client, behaviors, calls, budget = harness
     budget.charge(2.0)
     behaviors["qwen-local-1.5b"] = "boom"
-    behaviors["gpt-free"] = "boom"
+    behaviors["oss-free"] = "boom"
     r = _gen(client, task_class="workhorse")
     assert r.status_code == 503
     assert "budget" in r.json()["detail"]

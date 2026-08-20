@@ -51,6 +51,36 @@ def _app(tmp_path, accounts: dict | None = ACCOUNTS):
     )
 
 
+def test_a_hosted_endpoint_without_a_price_warns_at_load(tmp_path, caplog):
+    """The market table's first catch, closed as a class: a paid
+    hosted model with no price on file meters $0 under the
+    local-weights convention — say so at load, not on the invoice."""
+    models = tmp_path / "m.yaml"
+    models.write_text(
+        yaml.safe_dump(
+            {
+                "remote": {
+                    "provider": "openai",
+                    "base_url": "https://api.big.cloud/v1",
+                    "model": "unlisted",
+                },
+                "local": {
+                    "provider": "ollama",
+                    "base_url": "http://localhost:11434/v1",
+                    "model": "qwen0",
+                },
+                "priced": {"provider": "anthropic", "model": "claude-haiku-4-5"},
+            }
+        )
+    )
+    with caplog.at_level("WARNING", logger="resgraph.gateway"):
+        server.create_app(
+            models_path=models, client_factory=_Client, registry={}, ignore_probes=True
+        )
+    warned = [r.getMessage() for r in caplog.records if "meters $0" in r.getMessage()]
+    assert warned == ["endpoint remote is hosted but has no price on file: it meters $0"]
+
+
 def _gen(client, key=None, **fields):
     headers = {"x-api-key": key} if key else {}
     return client.post(

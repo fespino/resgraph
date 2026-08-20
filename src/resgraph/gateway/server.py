@@ -53,7 +53,13 @@ from resgraph.gateway.accounts import (
 from resgraph.gateway.budget import FallForwardBudget
 from resgraph.gateway.cache import ResponseCache, cache_key
 from resgraph.gateway.dispatch import Backend, ProbeResult, QueueFull, choose
-from resgraph.gateway.quality import QUALITY_PATH, eligible, load_quality
+from resgraph.gateway.quality import (
+    QUALITY_PATH,
+    eligible,
+    frontier,
+    load_quality,
+    stale,
+)
 from resgraph.gateway.registry import (
     capability_mismatch,
     catalog_rows,
@@ -77,6 +83,9 @@ from resgraph.gateway.router import (
 from resgraph.gateway.screen import screen
 
 log = logging.getLogger("resgraph.gateway")
+
+# beyond this, a quality score describes an arm that may no longer exist
+QUALITY_MAX_AGE_DAYS = 90
 
 MODELS_PATH = Path("evals/models.yaml")
 POLICY_PATH = Path("evals/gateway-policy.yaml")
@@ -445,6 +454,14 @@ def _quality_route(gw: Gateway, task_class: TaskClass | None) -> RouteDecision |
         )
         return None
     scores = gw.quality[task_class]
+    admitted = frontier(scores, ok)
+    if len(admitted) < len(ok):
+        log.info(
+            "[gateway:quality] %s: %s excluded, worse on every measured axis",
+            task_class,
+            sorted(set(ok) - set(admitted)),
+        )
+    ok = admitted
     free = [a for a in ok if not scores[a]["cost_per_passed"]]
     if free:
         pick = max(free, key=lambda a: scores[a]["passk"])
@@ -913,6 +930,18 @@ def create_app(
     quality = (
         load_quality(resolved_quality_path.read_text()) if resolved_quality_path.exists() else {}
     )
+    today = datetime.now(UTC).date().isoformat()
+    for task_class_name, arms in quality.items():
+        aged = stale(arms, list(arms), today, QUALITY_MAX_AGE_DAYS)
+        if aged:
+            # a re-measurement signal, never a routing input: serving an
+            # arm produces no pass^k, so a stale score cannot refresh itself
+            log.warning(
+                "[gateway:quality] %s: evidence older than %d days for %s; re-run the arms",
+                task_class_name,
+                QUALITY_MAX_AGE_DAYS,
+                sorted(aged),
+            )
     resolved_accounts_path = accounts_path or ACCOUNTS_PATH
     accounts = (
         load_accounts(resolved_accounts_path.read_text()) if resolved_accounts_path.exists() else {}

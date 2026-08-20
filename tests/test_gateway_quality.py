@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 from typer.testing import CliRunner
 
 from resgraph.gateway import server
-from resgraph.gateway.quality import eligible, load_quality
+from resgraph.gateway.quality import dominates, eligible, frontier, load_quality, stale
 from resgraph.gateway.router import ClassRoute
 
 TABLE = {
@@ -203,3 +203,105 @@ def test_the_replay_comparison_price_only_vs_quality_floored(tmp_path):
     assert price_solved == pytest.approx(10.0)  # 0.05 * 200: cheapest solves 5%
     assert quality_solved / price_solved == 18.0  # the floor is the whole difference
     assert quality_spend == pytest.approx(180 * 0.111)
+
+
+def test_dominance_needs_every_axis_the_arms_recorded():
+    """Two axes would prune an arm that trades quality for speed —
+    which is why the table stopped discarding latency."""
+    good = {"passk": 0.9, "cost_per_passed": 0.10, "latency_p50_s": 4.0}
+    worse = {"passk": 0.7, "cost_per_passed": 0.15, "latency_p50_s": 9.0}
+    faster = {"passk": 0.7, "cost_per_passed": 0.15, "latency_p50_s": 0.5}
+    assert dominates(good, worse)
+    assert not dominates(good, faster)
+    assert not dominates(worse, good)
+    scores = {"good": good, "worse": worse, "faster": faster}
+    assert frontier(scores, ["good", "worse", "faster"]) == ["good", "faster"]
+
+
+def test_dominance_ignores_axes_one_side_never_recorded():
+    old = {"passk": 0.9, "cost_per_passed": 0.10}  # a table written before latency was kept
+    new = {"passk": 0.8, "cost_per_passed": 0.20, "latency_p50_s": 1.0}
+    assert dominates(old, new)  # compared on what both carry, not on absence
+    assert frontier({"a": old, "b": new}, ["a", "b"]) == ["a"]
+    assert not dominates({"passk": 0.5}, {"cost_per_passed": 0.1})  # nothing in common
+
+
+def test_staleness_is_measured_in_days_and_never_routes():
+    scores = {
+        "fresh": {"passk": 0.9, "cost_per_passed": 0.1, "date": "2026-08-01"},
+        "old": {"passk": 0.9, "cost_per_passed": 0.1, "date": "2026-01-01"},
+        "unparseable": {"passk": 0.9, "cost_per_passed": 0.1, "date": "last tuesday"},
+    }
+    aged = stale(scores, list(scores), "2026-08-21", 90)
+    assert aged == ["old"]  # the unparseable date is not silently treated as ancient
+    assert stale(scores, ["missing"], "2026-08-21", 90) == []
+
+
+def test_the_router_refuses_to_spend_on_a_dominated_arm(tmp_path, caplog):
+    """The receipt: an arm that clears the floor but loses on every
+    axis drew a third of the stream under the lottery alone, and
+    serving it could not even update its own score."""
+    table = {
+        "scores": {
+            "judgment": {
+                "good": {
+                    "passk": 0.9,
+                    "cost_per_passed": 0.10,
+                    "latency_p50_s": 4.0,
+                    "run": "r",
+                    "date": "2026-08-19",
+                },
+                "cheapbad": {
+                    "passk": 0.75,
+                    "cost_per_passed": 0.15,
+                    "latency_p50_s": 9.0,
+                    "run": "r",
+                    "date": "2026-08-19",
+                },
+            }
+        }
+    }
+    registry = {
+        "judgment": ClassRoute("static", "test", candidates=("good", "cheapbad"), min_passk=0.7)
+    }
+    app = _app(tmp_path, table=table, registry=registry)
+    gw = app.state.gateway
+    gw.rng = random.Random(7)
+    client = TestClient(app)
+    with caplog.at_level("INFO", logger="resgraph.gateway"):
+        picks = [_gen(client, task_class="judgment").json()["model"] for _ in range(200)]
+    assert set(picks) == {"good"}  # both cleared the floor; only one is on the frontier
+    assert any("worse on every measured axis" in r.getMessage() for r in caplog.records)
+
+    scores = table["scores"]["judgment"]
+    weights = {a: 1.0 / scores[a]["cost_per_passed"] ** 2 for a in scores}
+    share = weights["cheapbad"] / sum(weights.values())
+    assert share == pytest.approx(0.308, abs=0.005)  # what price-weighting alone would spend
+    solved_before = 200 * (
+        (1 - share) * scores["good"]["passk"] + share * scores["cheapbad"]["passk"]
+    )
+    assert solved_before == pytest.approx(170.8, abs=0.5)
+    assert 200 * scores["good"]["passk"] == 180.0  # excluding it buys ~9 solved runs per 200
+
+
+def test_old_evidence_asks_to_be_re_measured_not_re_routed(tmp_path, caplog):
+    """Staleness is announced once at load, as a request to re-run the
+    arms — never as a share of traffic, because a served request
+    produces no pass^k to refresh the score with."""
+    table = {
+        "scores": {
+            "judgment": {
+                "good": {
+                    "passk": 0.9,
+                    "cost_per_passed": 0.10,
+                    "run": "r",
+                    "date": "2020-01-01",
+                }
+            }
+        }
+    }
+    with caplog.at_level("WARNING", logger="resgraph.gateway"):
+        _app(tmp_path, table=table)
+    aged = [r.getMessage() for r in caplog.records if "re-run the arms" in r.getMessage()]
+    assert len(aged) == 1
+    assert "'good'" in aged[0]

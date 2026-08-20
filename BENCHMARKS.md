@@ -546,3 +546,28 @@ ratio reads 0.75x at 3,000 rows (wide apparently smaller), 1.00x at
 allocation steps, so they measure granularity rather than layout. The
 first run of this experiment was at 800 rows and reported the opposite
 conclusion with exactly the same confidence.
+
+
+## Quality routing: what the frontier saves (D51)
+
+Methodology: deterministic policy comparison, no hardware dependency
+— two arms clearing a pass^k floor of 0.7, at (0.90 pass^k,
+$0.10/passed, 4.0 s p50) and (0.75, $0.15/passed, 9.0 s p50), over a
+200-request stream, committed as `tests/test_gateway_quality.py` (the
+test is the receipt). The second arm is dominated: worse on every
+axis the table records. No live traffic. Run 2026-08-21.
+
+| policy | share to the dominated arm | solved (of 200) |
+|---|---|---|
+| floor, then inverse-square price lottery (D44) | 30.8% | 170.8 |
+| floor, then frontier, then lottery (D51) | **0%** | **180.0** |
+
+About nine solved runs per two hundred, bought by not spending on an
+arm that loses everywhere. The number is small by design — this is a
+two-arm table, and the share a dominated arm takes grows with how
+cheap it is, since the lottery weights by inverse square of cost. The
+result that matters is not the magnitude but that the spend bought
+nothing at all: unlike the dispatch layer, where serving an endpoint
+updates the latency window it is ranked by, serving an arm never
+updates its pass^k, so the traffic could not even buy the measurement
+that might have justified it.

@@ -200,6 +200,21 @@ page.
   its cause, and the fix; the reader draws the lesson. Personal
   pride framings ("the part I'm most pleased with") get the same
   treatment.
+- Report the claim a measurement actually supports, not the largest
+  one its number permits. When a magnitude depends on the fixture
+  rather than on the mechanism — a ratio that moves with how cheap
+  the loser was, a speedup measured against a worst case, a result
+  from a two-arm table — say what it depends on in the same
+  paragraph, and lead with the qualitative finding when that is the
+  part that generalizes. "The spend bought nothing" survives a
+  change of fixture; "30.8% of traffic recovered" does not. Two
+  standing applications: a ratio against a deliberately unflattering
+  baseline is quoted with the baseline named (the ingest producer
+  path is 42.8x faster than row-by-row inserts *into an analytical
+  store*, which is that store's worst case and the reason the
+  architecture exists, not a benchmark win), and a laptop-scale
+  result that disagrees with a fleet-scale published claim is
+  reported as a different measurement rather than a refutation.
 - Define jargon at first mention; every external source name carries
   its link at the point of mention; D-numbers appear with what they
   decide.

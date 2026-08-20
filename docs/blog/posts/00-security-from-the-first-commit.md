@@ -74,7 +74,7 @@ and a layer exists for each stage:
 
 1. **Before the change**: recorded context — the spec, the decision
    log, the instructions file the contributor reads before touching
-   code. (That's the next post.)
+   code.
 2. **At the merge**: gates that fail the build, identically for human
    and agent.
 3. **After the merge**: scheduled sweeps for what slips past the
@@ -126,11 +126,9 @@ it layer by layer, with the code:
 
 ## Layer 1: the merge gate
 
-Four checks run on every push and PR: **ruff** (lint + format),
-**bandit** (Python SAST), **CodeQL** (taint tracking and dataflow,
-catching what pattern-matching can't), and **pytest** with coverage.
-
-In
+The gate has four legs — **ruff**, **bandit**, **CodeQL**, and
+**pytest** with coverage — and the interesting part is how they
+fail. In
 [the CI job](https://github.com/fespino/resgraph/blob/phase-0-foundations/.github/workflows/ci.yml),
 every leg runs with `continue-on-error: true`, results collect into
 a summary table, and a single `Gate` step at the end fails the build
@@ -486,9 +484,6 @@ if at_t is None:
     raise HTTPException(status_code=400, detail="at must be a non-empty ISO-8601 timestamp")
 ```
 
-The obligation is enforced, not claimed, like everything else on
-this page.
-
 ## Layer 7: the supply chain
 
 The base pin is the lockfile: every Python dependency resolves
@@ -618,11 +613,10 @@ Scorecard prices below.
 
 ## What I'd take to the next project
 
-- **Harness before feature.** The test for every control: does it
-  still work when the contributor is fast, tireless,
-  plausible-sounding, and occasionally confidently wrong? Review by
-  vibes fails that test; a gate that names exactly which leg failed
-  passes it.
+- **Harness before feature.** Every control faces one test — does
+  it bind a contributor you cannot ask to be careful? A gate that
+  names the failed leg passes; a convention that assumes goodwill
+  does not.
 - **Supply-chain hygiene is cheap and compounding.** The whole list
   is SHA-pinned actions, checksum-verified binaries, least-privilege
   permissions, and timeouts everywhere. None of this is hard; it's

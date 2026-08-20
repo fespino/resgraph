@@ -418,3 +418,44 @@ endpoint is the fastest) — the honest frame, since it is exactly the
 case price-weighting exists for. The lottery also never starves the
 expensive endpoint (8.2% of traffic keeps it measured), which a hard
 price sort would.
+
+## Eval-driven routing: the quality floor vs price-only (D44)
+
+Methodology: deterministic policy simulation, no hardware dependency —
+the same 200-request stream routed under both policies over fixture
+arms mirroring the measured shapes (a strong arm: pass^k 0.9 at
+$0.111/passed; a cheap arm: pass^k 0.05 at $0.02/passed), committed as
+`tests/test_gateway_quality.py` (the test IS the receipt; re-run it to
+reproduce the numbers exactly). No live traffic: this measures the
+routing policy, not the arms — the arm shapes come from measured runs,
+the stream is synthetic because neither policy reads request content.
+Run 2026-08-20.
+
+| policy | requests solved (of 200) | spend per solved |
+|---|---|---|
+| quality floor, then price lottery | **180** | $0.111 |
+| price-only (min cost-per-passed) | 10 | $0.02 |
+
+18× more solved. Per-call price comparison is structurally blind to
+delivery rate — the cheap arm's $0.02/passed is real, but it passes 5%
+of the time, and no per-request price signal can see that. The floor
+is the whole difference: the same lottery runs under both policies.
+
+## In-line screening: the request-time seat's latency (D45)
+
+**Hardware:** Apple M3, 8 GB RAM, macOS 15.2 (laptop; pure CPU, no
+stores involved). Method: `resgraph.gateway.screen.screen()` over a
+1.9 KB realistic investigation payload, 2,000 timed calls after one
+warm-up (patterns compile at import), nearest-rank percentiles. Run
+2026-08-20.
+
+| metric | value |
+|---|---|
+| p50 | 39.5 µs |
+| p99 | 47.4 µs |
+| max | 53.0 µs |
+
+The CI budget (`test_screening_pays_its_latency_budget`, p50 < 1 ms
+over 200 calls) holds with ~25× headroom — the budget is deliberately
+loose so slower CI runners don't flake, while a rule set an order of
+magnitude heavier still fails the build before it costs a request.

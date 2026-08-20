@@ -30,6 +30,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
+from urllib.parse import urlsplit
 
 import yaml
 from fastapi import FastAPI, Header, HTTPException
@@ -887,6 +888,11 @@ def _stream_observer(gw: Gateway, source: str, task_label: str) -> Callable[[dic
     return observe_stream
 
 
+def _locally_served(setup: dict[str, Any]) -> bool:
+    host = urlsplit(setup.get("base_url") or "").hostname
+    return host in ("localhost", "127.0.0.1", "0.0.0.0", "::1")  # nosec B104 — match, not bind
+
+
 def create_app(
     models_path: Path = MODELS_PATH,
     client_factory: Callable[[dict[str, Any]], Any] = build_client,
@@ -917,6 +923,10 @@ def create_app(
         if cadence is not None and float(cadence) <= 0:
             # wait(0) spins: a hot probe loop, and a spend bug on a priced setup
             raise SystemExit(f"setup {name!r}: probe_interval_s must be > 0, got {cadence}")
+        if endpoint_price(setup, PRICES_PER_MTOK) is None and not _locally_served(setup):
+            # "no price on file is unmetered" is a convention for local
+            # weights; on a hosted endpoint it silently zero-bills paid calls
+            log.warning("endpoint %s is hosted but has no price on file: it meters $0", name)
     gw = Gateway(
         setups=table,
         client_factory=client_factory,

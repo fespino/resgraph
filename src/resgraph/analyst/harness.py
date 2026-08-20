@@ -320,6 +320,10 @@ def run_triage(
                 "latency_ms": int((time.monotonic() - llm_started) * 1000),
                 "tokens": (getattr(resp.usage, "input_tokens", 0) or 0)
                 + (getattr(resp.usage, "output_tokens", 0) or 0),
+                # the split, additively: per-call pricing downstream
+                # (Langfuse cost tracking) cannot price a summed total
+                "input_tokens": getattr(resp.usage, "input_tokens", 0) or 0,
+                "output_tokens": getattr(resp.usage, "output_tokens", 0) or 0,
             }
             if (route_source := getattr(resp, "source", None)) is not None:
                 # served through the gateway: the winning routing source,

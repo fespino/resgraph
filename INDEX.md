@@ -71,5 +71,9 @@
   reference gateway's public catalog, ours-vs-market baseline),
   `resgraph-gateway serve` with
   health probes; metrics in obs.py, SLO rules + dashboard in observability/
+- src/resgraph/langfuse/ — Langfuse integration (D47): one-way OTLP
+  export of recorded runs, the agent round-trip reconciler
+  (`resgraph-langfuse export|roundtrip`), opt-in `langfuse` compose
+  profile
 - skills/ — investigation playbooks (SKILL.md, validated at startup)
 - .mcp.json — Claude Code/Desktop wiring for the resgraph MCP server

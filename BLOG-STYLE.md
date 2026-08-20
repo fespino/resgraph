@@ -163,6 +163,15 @@ page.
   "The division of labor:"), no "Hence X" / "different key, miss,
   fresh reasoning" chains. Every sentence gets a subject and a verb;
   at most one deliberate rhetorical chain per post.
+- The redundancy sweep is a standing step of every review pass:
+  prose must not redo work an adjacent artifact already does — the
+  chart it sits under, the table it follows, the code block it
+  introduces, or the previous sentence. Cut on sight: label
+  sentences ("This is loop ergonomics."), closing restatements of a
+  point just made, re-narrations of a diagram's flow, and punchline
+  term-drops never used again. Whole-then-zoom duplication *across*
+  sections stays sanctioned (the reader must not scroll back);
+  the disease is prose duplicating its own neighbors.
 - The telegraphic sweep is a standing step of every review pass:
   reread the body prose sentence by sentence and expand any verbless
   fragment. Grep can't find these — the pass is a read. Exempt

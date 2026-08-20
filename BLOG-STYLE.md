@@ -17,6 +17,21 @@ page.
   only for length.
 - Later-phase code may appear only in clearly-dated update contexts,
   cited by current path.
+- **A phase that changes behaviour a published post describes owes
+  that post a dated addendum, and the closeout is where the debt is
+  noticed.** The post is not wrong — it described the repo at its
+  tag — so the remedy is never a rewrite: it is an addendum naming
+  the later decision, what changed, and why, cited by current path.
+  The check is cheap and specific: for each decision the phase
+  landed, ask whether a published post explains the mechanism it
+  supersedes. Two non-triggers, so the step stays small: a phase
+  whose posts are unpublished owes posts, not addenda; and a
+  measurement that merely gained precision needs nothing unless the
+  published number is now wrong. When an addendum lands, prefer the
+  argument over the correction — a mechanism that later grew a step
+  usually did so because the post's own thesis had a sibling case it
+  did not cover, and that is the interesting half for a reader who
+  has just finished the original.
 
 ## Frame: definition first, then specialize
 

@@ -424,14 +424,21 @@ ul.devlog-list a:hover {
   background: color-mix(in srgb, var(--link) 12%, transparent);
 }
 
-/* masthead: the project half fades to the theme accent on hover;
-   the owner half never changes — reused across projects, each with
-   its own --link */
+/* masthead hover reads as one gesture across the whole title: the
+   project half fades to the theme accent (reused across projects,
+   each with its own --link) while the owner half loses a little
+   opacity on the same clock */
 .site-title .site-project {
   transition: color 0.25s ease;
 }
 .site-title:hover .site-project {
   color: var(--link);
+}
+.site-title .site-owner {
+  transition: opacity 0.25s ease;
+}
+.site-title:hover .site-owner {
+  opacity: 0.7;
 }
 
 /* striped tables */

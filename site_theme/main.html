@@ -16,7 +16,7 @@
 <body>
   <header class="site-header">
     {%- set title_parts = config.site_name.split(' / ', 1) %}
-    <a class="site-title" href="{{ nav.homepage.url|url }}">{{ title_parts[0] }}{% if title_parts|length > 1 %} <span class="site-project">/ {{ title_parts[1] }}</span>{% endif %}</a>
+    <a class="site-title" href="{{ nav.homepage.url|url }}"><span class="site-owner">{{ title_parts[0] }}</span>{% if title_parts|length > 1 %} <span class="site-project">/ {{ title_parts[1] }}</span>{% endif %}</a>
   </header>
   <main class="content">
 {{ page.content }}

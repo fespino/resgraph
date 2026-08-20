@@ -9,7 +9,7 @@
 <body>
   <header class="site-header">
     {%- set title_parts = config.site_name.split(' / ', 1) %}
-    <a class="site-title" href="{{ config.site_url }}">{{ title_parts[0] }}{% if title_parts|length > 1 %} <span class="site-project">/ {{ title_parts[1] }}</span>{% endif %}</a>
+    <a class="site-title" href="{{ config.site_url }}"><span class="site-owner">{{ title_parts[0] }}</span>{% if title_parts|length > 1 %} <span class="site-project">/ {{ title_parts[1] }}</span>{% endif %}</a>
   </header>
   <main class="content">
     <h1>Not found</h1>

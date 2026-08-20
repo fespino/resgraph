@@ -2599,10 +2599,23 @@ so an undeclared upstream field is announced the day it appears.
 The workflow is also the one place in this repository that commits to
 the default branch without review, against the standing rule that
 changes arrive by pull request. The exception is recorded rather than
-taken quietly, and it is bounded: the commit step stages
-`evals/market/` and nothing else, so the job can add observations and
-can never change behaviour. Data collection and code changes are
-different acts and only the second needs a reviewer.
+taken quietly. What the scoping buys, stated precisely: the commit
+step stages `evals/market/` and nothing else, so the job **as
+written** adds observations and does not touch code — a bound on what
+it does, not a boundary a compromised runner would respect. That risk
+is carried by the pinned action digests, by `contents: write` scoped
+to this one job while the workflow defaults to read-all, and by the
+workflow-security lint that audits this file. The reasoning for the
+exception itself is that data collection and code changes are
+different acts, and a collection that needs a reviewer every morning
+is the manual cadence this replaces.
+
+**Rejected** for the same job: a pull request per pull (a daily merge
+is the same dependence on someone remembering, and unmerged snapshots
+are not where the baseline consumer reads them); a bot-owned data
+branch on the coverage-branch precedent (it preserves the rule and
+costs this decision's own property that snapshots are committed and
+reviewable in the repository proper).
 
 **Rejected — the Iceberg cold store as the home for snapshots, with
 its schema evolution as the drift detector.** The instinct is right

@@ -35,6 +35,65 @@ def serve(
     )
 
 
+@app.command(name="market-pull")
+def market_pull(
+    out_dir: str = "",
+    url: str = "",
+) -> None:
+    """One polite pull of the reference gateway's public catalog into a
+    committed snapshot (full schema shape, authored prose redacted).
+    Cadence is manual or at most daily — the pre-flight condition, and
+    the endpoint is CDN-cached for 300s anyway."""
+    from datetime import UTC, datetime
+
+    from resgraph.gateway import market
+
+    rows = market.fetch(url or market.MODELS_URL)
+    now = datetime.now(UTC)
+    path = market.snapshot(
+        rows,
+        path=Path(out_dir or market.SNAPSHOT_DIR) / f"openrouter-{now.date().isoformat()}.json",
+        url=url or market.MODELS_URL,
+        fetched_at=now.isoformat(timespec="seconds"),
+    )
+    typer.echo(f"{len(rows)} models -> {path}")
+
+
+@app.command(name="market-baseline")
+def market_baseline(
+    snapshot: str = "",
+    models_config: str = str(MODELS_PATH),
+) -> None:
+    """Our catalog against the market's: per endpoint, our effective
+    price per mtok next to the market listing for the same weights.
+    'free' is local unmetered serving; 'unmatched' is a fact, not a
+    zero. Defaults to the newest committed snapshot."""
+    import yaml
+
+    from resgraph.evals.pricing import PRICES_PER_MTOK
+    from resgraph.gateway import market
+    from resgraph.gateway.registry import expand
+
+    path = (
+        Path(snapshot)
+        if snapshot
+        else max(market.SNAPSHOT_DIR.glob("openrouter-*.json"), default=None)
+    )
+    if path is None:
+        raise SystemExit("no market snapshot on file: run market-pull first")
+    doc = market.load_snapshot(Path(path))
+    table, _ = expand(yaml.safe_load(Path(models_config).read_text()) or {})
+    typer.echo(f"market: {doc['source']} @ {doc['fetched_at']} ({doc['model_count']} models)")
+    for r in market.baseline(table, PRICES_PER_MTOK, doc["data"]):
+        ours = f"${r['ours_per_mtok']:.2f}" if r["ours_per_mtok"] else "free"
+        if r["market_id"]:
+            them = f"${r['market_per_mtok']:.2f} ({r['market_id']})"
+            ratio = f" ratio={r['ratio']}" if r["ratio"] is not None else ""
+        else:
+            them, ratio = "unmatched", ""
+        typer.echo(f"{r['endpoint']}: ours={ours} market={them}{ratio}")
+
+
 @app.command()
 def lifecycle(
     models_config: str = str(MODELS_PATH),

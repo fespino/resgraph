@@ -15,7 +15,8 @@
 - evals/ — eval artifacts: scenarios/ (committed recipes + the
   trace-mining sanitization checklist), runs/ (envpinned
   row files), baseline.json, models.yaml (named model setups, --worker/--judge),
-  meta/ (grader mutation gate, also a CI step)
+  meta/ (grader mutation gate, also a CI step), market/ (redacted
+  snapshots of the reference gateway's public catalog, D46)
 - docs/discovery/ — problem-discovery memos written before code (the
   quality bar's git history is the witness)
 - docs/prompt-audit.md — PREFIX/SUFFIX verdict table + cache diagnosis
@@ -62,11 +63,13 @@
   single source of truth, budgets, refs+fetch shaping, HTTP projection
 - src/resgraph/mcp/ — MCP server over the registry (stdio), server card,
   skills-as-prompts loader (D21)
-- src/resgraph/gateway/ — serving gateway (D30–D33, D40–D45): precedence router
+- src/resgraph/gateway/ — serving gateway (D30–D33, D40–D46): precedence router
   with recorded source, endpoint registry (one alias, many endpoints;
   capability admission; `GET /v1/models`), caller/operator contract + billing (accounts, wallet, `GET /v1/usage`), eval-driven routing (quality table from runs), in-line screening + sunset lifecycle, dispatch policy
   (queues/health/EWMA), stream relay + accounting, response cache
-  (TTL/LRU, deterministic setups only), `resgraph-gateway serve` with
+  (TTL/LRU, deterministic setups only), market connector (pull the
+  reference gateway's public catalog, ours-vs-market baseline),
+  `resgraph-gateway serve` with
   health probes; metrics in obs.py, SLO rules + dashboard in observability/
 - skills/ — investigation playbooks (SKILL.md, validated at startup)
 - .mcp.json — Claude Code/Desktop wiring for the resgraph MCP server

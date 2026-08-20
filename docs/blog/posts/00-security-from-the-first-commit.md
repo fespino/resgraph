@@ -161,14 +161,13 @@ if any leg failed.
   run: exit 1
 ```
 
-This is loop ergonomics for both kinds of contributor. One round
-trip surfaces every failure at once — lint, format, and the failing
-test together. For a human that saves push-and-wait cycles; for an
-agent it's the difference between one fix-iteration and four, and
-each avoided iteration is avoided context burn and avoided drift. The sticky PR comment is the same idea aimed
-at the *next* actor in the loop: machine-legible state pushed to
-where the next actor — human reviewer or agent — already is. That's
-context engineering.
+One round trip surfaces every failure at once — lint, format, and
+the failing test together. For a human that saves push-and-wait
+cycles; for an agent it is the difference between one fix-iteration
+and four, and each avoided iteration is avoided context burn and
+avoided drift. The sticky PR comment aims the same idea at the next
+actor in the loop: machine-legible state pushed to where the
+reviewer — human or agent — already is.
 
 ## Layer 2: the unbypassable path
 

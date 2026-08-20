@@ -29,6 +29,7 @@ maps each phase to its events.
 | 11 — sentinel | D35–D39 | — |
 | 12 — gateway | D40–D46 | D45 (`announced` rejection recorded at the phase audit) |
 | 13 — Langfuse | D47–D50 | D46 (shape fingerprint + the Iceberg rejection, from the L9 review) |
+| 13.5 — frontier routing (mini) | D51 | D44 (dominated arms excluded; the table carries latency) |
 
 ## D0 — Toolchain: typed Python, with the types enforced (phase 0)
 
@@ -2771,6 +2772,72 @@ was never in doubt — the question is whether the producer speaks).
 cadence is irregular enough that a single staleness threshold
 produces false alarms — both would move this from a fixed bound to
 a per-producer expected-interval model.
+
+## D51 — The quality router spends only on the frontier, and staleness asks for a re-run (mini phase, #325)
+
+D44 floored on pass^k and then weighted a lottery purely on cost, so
+an arm worse on quality *and* more expensive still drew traffic — a
+third of a task class's stream in the committed receipt. Two changes,
+one of which is a correction to what the table carries.
+
+- **The table stopped discarding an axis it had already measured.**
+  `arm_summary` computes latency percentiles; the routing-table
+  builder emitted only pass^k and cost. Latency now travels with the
+  score under the same provenance rule. This is not cosmetic: over
+  two axes, an arm that trades quality and cost for being five times
+  faster reads as dominated and would have been pruned. Dominance
+  compares every axis both scores record, and an axis one side never
+  recorded is not compared at all, so older tables behave as before.
+- **Dominated arms are excluded before the lottery draws.** An arm
+  is dominated when another eligible arm is at least as good
+  everywhere and strictly better somewhere. The exclusion is logged
+  with the arms named.
+- **Staleness is a re-measurement signal, never a traffic share** —
+  announced once at load, not per request. This is the decision's
+  interesting half, because the obvious alternative is wrong here in
+  a way worth stating: D41 keeps an expensive endpoint in the pool
+  at 8.2% precisely because *serving it updates the latency window
+  it is ranked by*, so the traffic buys information. Serving an arm
+  never updates its pass^k — quality comes from eval runs against
+  planted ground truth, and a served request has no answer key. A
+  pull at this layer returns no reward signal, so a dominated arm's
+  traffic is pure loss and an aged score can only be refreshed by
+  re-running the arms.
+
+**Prior art, and where it stops applying.** This is the
+[multi-objective bandit](https://arxiv.org/html/2506.13125) shape:
+vector rewards, a Pareto front instead of a best arm, and policies
+([Pareto-UCB1](https://ai.vub.ac.be/sites/default/files/MO_MAB_IJCNN_Accepted_v2.pdf),
+[Pareto set identification](https://arxiv.org/html/2606.18785)) that
+prune dominated arms once dominance is statistically safe while
+spending exploration on arms whose front-membership is uncertain. The
+staleness half is the
+[non-stationary bandit](https://arxiv.org/pdf/0805.3415) problem,
+whose answer is forgetting — discounted or sliding-window estimates —
+which this platform already implements one layer down in D41's rolling
+windows while D44's table forgot nothing. What does **not** transfer
+is exploration-by-pulling, for the structural reason above: these
+policies assume a pull yields a reward observation, and here it does
+not.
+
+**Receipt** (seeded, committed as a test): two arms clearing a 0.7
+floor at pass^k 0.90/$0.10 and 0.75/$0.15. Inverse-square weighting
+alone sends 30.8% of the stream to the second; over 200 requests that
+is ~170.8 solved against 180.0 when it is excluded — about nine
+solved runs bought back per two hundred, with no measurement lost
+because none was being gained.
+
+**Rejected:** keeping dominated arms on a small exploration share
+(the D41 analogy, invalid here — a pull buys no quality signal);
+letting staleness reduce an arm's weight (same reason: reduced
+traffic still cannot refresh a score, and it would quietly degrade
+service on the platform's best-measured arm); pruning on two axes
+(above — it prunes genuine trades).
+**Reversal condition:** a quality signal that updates from served
+traffic — an online grader, or planted ground truth in production
+requests. That would make a pull informative and put the exploration
+argument back on the table, at which point Pareto-UCB's confidence
+pruning becomes the right policy rather than plain dominance.
 
 ## Phase contracts
 - The generator MUST emit D2 messages exactly and expose `--seed`

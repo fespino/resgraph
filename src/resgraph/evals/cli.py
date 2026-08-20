@@ -321,6 +321,9 @@ def routing_table(
                 if summary["cost_per_passed"] is not None
                 else None
             ),
+            "latency_p50_s": (
+                round(summary["latency_p50_s"], 3) if summary["latency_p50_s"] is not None else None
+            ),
             "run": path,
             "date": date,
         }

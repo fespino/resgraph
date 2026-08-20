@@ -78,7 +78,8 @@
 - src/resgraph/ingest/ — raw-first ingestion pipeline (D48): content-addressed
   spool + reference queue, async enrichment worker (ack-after-apply), DuckDB
   columnar sink with idempotent writes and replay-from-raw; the wide-vs-normalized
-  layout comparison (D49), answers reconciled before anything is timed
+  layout comparison (D49), answers reconciled before anything is timed; the
+  trail-against-sink reconciliation and its separate staleness answer (D50)
   (`resgraph-ingest`)
 - skills/ — investigation playbooks (SKILL.md, validated at startup)
 - .mcp.json — Claude Code/Desktop wiring for the resgraph MCP server

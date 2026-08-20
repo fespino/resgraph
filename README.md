@@ -51,10 +51,16 @@ audit trail (phases 7–11). Each phase is tagged at its end state:
 | 11 | Misuse detection (resgraph-sentinel): three cost-ordered layers over the audit trail, benign FP rate as the headline, review queue whose labels close loops in code, CI recall gate | `phase-11-sentinel` |
 | 12 | Gateway vs the reference: one alias/many endpoints, percentile windows + price lottery (0.449×), caller/operator contract, prepaid billing, eval-driven routing (18×), screening + sunset gate, market connector — every workstream doc-validated before code, exit gate audited item-by-item | `phase-12-gateway` |
 
+| 13 | Observability replication (D47–D50): recorded runs exported as OTLP with an agent round-trip, raw-first ingestion (producer p50 567 µs vs 24.3 ms straight to the store), the wide-vs-normalized layout measured rather than assumed, and controls for absence and undeclared drift | `phase-13-observability` |
+
 Each increment lands via issue → PR, citing the SPEC decisions
-(D-numbers) it implements. Next: the Langfuse phase (#243) —
-integrate the real product where using it teaches, then replicate
-the layer where building it does.
+(D-numbers) it implements. Phase 13's integration half is parked
+(#317): self-hosting the reference platform needs more machine than
+this host has, and a slice whose deliverable is a claim about the
+real product cannot be honestly finished against fixtures. Next: the
+post-Langfuse queue in SPEC's roadmap amendment — the market as a
+referential world if the accumulated snapshots earn it, rollout
+engineering otherwise.
 
 ## Quickstart: to a live dashboard
 

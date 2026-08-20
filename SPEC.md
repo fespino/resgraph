@@ -28,7 +28,7 @@ maps each phase to its events.
 | 10.5 — institutional memory | D34 | — |
 | 11 — sentinel | D35–D39 | — |
 | 12 — gateway | D40–D46 | D45 (`announced` rejection recorded at the phase audit) |
-| 13 — Langfuse | D47+ | — |
+| 13 — Langfuse | D47–D50 | D46 (shape fingerprint + the Iceberg rejection, from the L9 review) |
 
 ## D0 — Toolchain: typed Python, with the types enforced (phase 0)
 
@@ -2732,6 +2732,45 @@ at this scale, and saying so is the result).
 storage becoming the binding constraint — both would move the
 balance back toward the normalized pair, and the comparison is a
 command away.
+
+## D50 — Absence is a separate question from disagreement (Langfuse phase, #322)
+
+The ingestion path had a control for wrong data and none for no
+data. Every component reports healthy when a producer stops — the
+spool is empty, the queue drained, the sink idle, the error rate
+zero — so the dashboards stay green through total loss. Two
+controls, because neither can see the other's failure.
+
+- **Reconciliation is a second count from a source the pipeline
+  does not own.** The audit trail's events per run against the
+  sink's rows per run, with each discrepancy named in its own
+  sentence: recorded but absent, present but never recorded, or
+  counted differently. The trail is authoritative because it is
+  written by the thing being measured, not by the pipeline
+  measuring it — a count the pipeline computes about itself proves
+  only that it is self-consistent.
+- **Staleness is asked separately, because reconciliation cannot
+  see silence.** When a producer stops, both counts agree at zero,
+  which is indistinguishable from perfect health. So the age of the
+  newest recorded event is reported beside the reconciliation and
+  refused past a threshold. A control that covers a blind spot has
+  its own blind spot, and the second one is not optional.
+- **Both are refusals, not dashboards.** `resgraph-ingest
+  reconcile` exits nonzero with every gap stated, so the control
+  can gate rather than decorate.
+
+**Rejected:** volume alarms as the silent-producer detector (the
+usual answer, and both noisy and deaf — a quiet weekend reads as an
+outage while a partial outage reads as a quiet weekend; a threshold
+on a rate cannot distinguish "less" from "none of a subset");
+inferring absence from the queue being empty (a drained queue is the
+healthy steady state, which is exactly the ambiguity); a heartbeat
+row written by the pipeline (it would prove the pipeline runs, which
+was never in doubt — the question is whether the producer speaks).
+**Reversal condition:** a second producer, or a producer whose
+cadence is irregular enough that a single staleness threshold
+produces false alarms — both would move this from a fixed bound to
+a per-producer expected-interval model.
 
 ## Phase contracts
 - The generator MUST emit D2 messages exactly and expose `--seed`

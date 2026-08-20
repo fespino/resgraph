@@ -184,3 +184,98 @@ def test_the_cli_baseline_without_a_snapshot_says_pull_first(tmp_path, monkeypat
     r = CliRunner().invoke(cli.app, ["market-baseline"])
     assert r.exit_code == 1
     assert "run market-pull first" in str(r.exception)
+
+
+def test_row_shapes_are_a_fingerprint_across_pulls_not_a_count_within_one():
+    """The catalog's own rows differ by design — an omitted optional
+    field is not drift — so shape is only a question about pulls."""
+    thin = {k: v for k, v in ROW.items() if k != "description"}
+    assert len(market.field_sets([ROW, thin])) == 2  # normal, not a signal
+    assert market.drift([ROW, thin], [ROW, thin]) == []
+
+
+def test_drift_names_fields_nobody_declared():
+    before = [ROW]
+    after = [{**ROW, "reasoning": {"enabled": True}}, {**ROW, "id": "x/y"}]
+    findings = market.drift(before, after)
+    assert "fields new since the previous pull: ['reasoning']" in findings
+    assert "distinct row shapes: 1 -> 2" in findings
+    gone = market.drift([{**ROW, "retired_field": 1}], [ROW])
+    assert "fields gone since the previous pull: ['retired_field']" in gone
+
+
+def test_the_committed_snapshot_has_no_drift_against_itself():
+    doc = market.load_snapshot(max(market.SNAPSHOT_DIR.glob("openrouter-*.json")))
+    assert market.drift(doc["data"], doc["data"]) == []
+    assert len(market.field_sets(doc["data"])) == 5  # the live catalog's real spread
+
+
+def test_a_pull_reports_its_own_drift_against_the_previous_snapshot(tmp_path, monkeypatch):
+    """Noticing is not a separate act of discipline: the pull that
+    introduces a new field says so."""
+    from resgraph.gateway import cli
+
+    market.snapshot(
+        [ROW],
+        path=tmp_path / "openrouter-2026-08-19.json",
+        url=market.MODELS_URL,
+        fetched_at="2026-08-19T00:00:00+00:00",
+    )
+    monkeypatch.setattr(market, "fetch", lambda url: [{**ROW, "reasoning": {"enabled": True}}])
+    result = CliRunner().invoke(cli.app, ["market-pull", "--out-dir", str(tmp_path)])
+    assert result.exit_code == 0, result.output
+    assert "DRIFT fields new since the previous pull: ['reasoning']" in result.output
+    assert "openrouter-2026-08-19.json" in result.output
+
+
+def test_the_first_pull_has_nothing_to_compare_against(tmp_path, monkeypatch):
+    from resgraph.gateway import cli
+
+    monkeypatch.setattr(market, "fetch", lambda url: [ROW])
+    result = CliRunner().invoke(cli.app, ["market-pull", "--out-dir", str(tmp_path)])
+    assert result.exit_code == 0, result.output
+    assert "DRIFT" not in result.output
+
+
+def _snap(path, rows, day):
+    return market.snapshot(
+        rows,
+        path=path / f"openrouter-{day}.json",
+        url=market.MODELS_URL,
+        fetched_at=f"{day}T00:00:00+00:00",
+    )
+
+
+def test_the_drift_command_compares_two_snapshots(tmp_path, monkeypatch):
+    from resgraph.gateway import cli
+
+    monkeypatch.setattr(market, "SNAPSHOT_DIR", tmp_path)
+    _snap(tmp_path, [ROW], "2026-08-19")
+    _snap(tmp_path, [{**ROW, "reasoning": {}}], "2026-08-20")
+    newest = CliRunner().invoke(cli.app, ["market-drift"])
+    assert newest.exit_code == 0, newest.output
+    assert "DRIFT fields new since the previous pull: ['reasoning']" in newest.output
+
+    same = CliRunner().invoke(
+        cli.app,
+        [
+            "market-drift",
+            "--previous",
+            str(tmp_path / "openrouter-2026-08-19.json"),
+            "--current",
+            str(tmp_path / "openrouter-2026-08-19.json"),
+        ],
+    )
+    assert "no shape change between" in same.output
+
+
+def test_the_drift_command_needs_two_snapshots(tmp_path, monkeypatch):
+    from resgraph.gateway import cli
+
+    monkeypatch.setattr(market, "SNAPSHOT_DIR", tmp_path)
+    alone = CliRunner().invoke(cli.app, ["market-drift"])
+    assert alone.exit_code == 1
+    assert "need two snapshots" in str(alone.exception)
+    _snap(tmp_path, [ROW], "2026-08-20")
+    still_alone = CliRunner().invoke(cli.app, ["market-drift"])
+    assert still_alone.exit_code == 1  # one snapshot is not a comparison

@@ -2552,6 +2552,16 @@ ingestion is real without growing a project.
   garbage. Drift is live, not hypothetical: rows today carry six
   fields the phase's own doc-validation pass (two days prior)
   didn't list.
+- **Declared fields are refused; undeclared ones are reported.**
+  Validation can only catch what someone enumerated, so each row's
+  field set is also fingerprinted and compared PULL TO PULL, naming
+  fields that appeared or vanished with nobody having predicted
+  them. The comparison is between pulls and never within one: the
+  catalog's rows legitimately differ from each other (five distinct
+  shapes in the committed snapshot), so shape cardinality inside a
+  single pull is noise. A pull prints its own drift against the
+  previous snapshot, so noticing is not a separate act of
+  discipline.
 - **Matching is declared or mechanical, never fuzzy.** A market row
   matches an endpoint by explicit `market:` id in models.yaml, or
   by exact normalized id-tail (lowercase, `.`/`:` → `-`:
@@ -2570,6 +2580,28 @@ than an honest "unmatched"); committing description text (facts are
 free; prose is someone's); polling on a schedule inside the gateway
 process (the consumer moves on week timescales; a manual/cron pull is
 the honest cadence and keeps the serving path network-free).
+
+**Rejected — the Iceberg cold store as the home for snapshots, with
+its schema evolution as the drift detector.** The instinct is right
+(this platform owns an Iceberg store whose job includes schema
+evolution) and the mechanism does not do what it appears to: Iceberg
+tracks the schema WE declare, not the source's. A new upstream field
+enters its history only after someone evolves the table to hold it,
+which requires having already noticed the field — the detector would
+depend on the discovery it exists to make. Both loading options fail
+here: typed columns silently drop undeclared fields at write time
+(the exact failure the fingerprint exists to catch), and a JSON-blob
+column makes the schema history vacuous about the only part that
+varies — which is what this platform's own cold table already does,
+storing `attrs` and `relationships` as strings. The file-pair
+comparison also keeps what makes the snapshots useful: committed,
+reviewable in a diff, deletable in one command, and free of any store
+dependency in a slice whose point is being $0.
+**Reversal condition:** the market becoming a world rather than a
+reference table — prices as events with an event time distinct from
+their observation time. That is D13's semantics and the cold store's
+job, and at that point Iceberg time travel replaces comparing two
+files.
 
 ## D47 — Langfuse integration is one-way, and the round-trip is the acceptance test (Langfuse phase, #308)
 

@@ -57,6 +57,33 @@ def market_pull(
         fetched_at=now.isoformat(timespec="seconds"),
     )
     typer.echo(f"{len(rows)} models -> {path}")
+    previous = sorted(p for p in path.parent.glob("openrouter-*.json") if p != path)
+    if previous:
+        prior = market.load_snapshot(previous[-1])
+        for finding in market.drift(prior["data"], market.redact(rows)):
+            typer.echo(f"DRIFT {finding} (vs {previous[-1].name})")
+
+
+@app.command(name="market-drift")
+def market_drift(previous: str = "", current: str = "") -> None:
+    """Two snapshots compared by shape: which fields appeared or
+    disappeared. The catalog's own rows differ from each other by
+    design, so drift is a question about pulls, not about rows."""
+    from resgraph.gateway import market
+
+    snaps = sorted(market.SNAPSHOT_DIR.glob("openrouter-*.json"))
+    paths = [
+        Path(previous or (snaps[-2] if len(snaps) > 1 else "")),
+        Path(current or (snaps[-1] if snaps else "")),
+    ]
+    if not all(p.name for p in paths) or not all(p.exists() for p in paths):
+        raise SystemExit("need two snapshots to compare: pull again, or name both")
+    docs = [market.load_snapshot(p) for p in paths]
+    findings = market.drift(docs[0]["data"], docs[1]["data"])
+    for finding in findings:
+        typer.echo(f"DRIFT {finding}")
+    if not findings:
+        typer.echo(f"no shape change between {paths[0].name} and {paths[1].name}")
 
 
 @app.command(name="market-baseline")

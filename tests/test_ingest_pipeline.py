@@ -152,3 +152,44 @@ def test_the_cli_walks_the_pipeline(tmp_path):
     # restore it: skipping the spool costs replayability, not just latency
     assert "5 batches replayed, 20 rows" in replayed.output
     assert Sink(tmp_path / "sink.duckdb").count() == 20
+
+
+def test_a_new_column_is_born_with_full_history(tmp_path, monkeypatch):
+    """Raw-first's dividend: a lens can be reground and reapplied to
+    history. The sink drops what it has no column for; the spool does
+    not, so widening the schema and replaying fills the past too."""
+    import duckdb
+
+    from resgraph.ingest import sink as sink_module
+
+    spool, queue = Spool(tmp_path / "raw"), RefQueue(tmp_path / "q.db")
+    path = tmp_path / "s.duckdb"
+    sink = Sink(path)
+    for run in range(3):
+        queue.enqueue(spool.write(worker.synth_batch(f"run-{run}", 6)))
+    worker.drain(spool, queue, sink)
+    assert sink.count() == 18
+    sink.close()
+
+    con = duckdb.connect(str(path))
+    con.execute("ALTER TABLE observations ADD COLUMN turn INTEGER")
+    con.close()
+    monkeypatch.setattr(sink_module, "COLUMNS", (*sink_module.COLUMNS, "turn"))
+    base = worker.enrich
+    monkeypatch.setattr(
+        worker, "enrich", lambda e: {**base(e), "turn": (e.get("payload") or {}).get("turn")}
+    )
+    widened = Sink(path)
+    widened.reset()
+    worker.replay_from_raw(spool, widened)
+    widened.close()
+
+    con = duckdb.connect(str(path), read_only=True)
+    filled = con.execute("SELECT COUNT(*) FROM observations WHERE turn IS NOT NULL").fetchone()[0]
+    total = con.execute("SELECT COUNT(*) FROM observations").fetchone()[0]
+    con.close()
+    queue.close()
+    assert (total, filled) == (
+        18,
+        6,
+    )  # every llm_call in history, recorded before the column existed

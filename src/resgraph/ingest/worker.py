@@ -120,6 +120,9 @@ def measure_backpressure(
         sink.write(rows)
         direct.append(time.perf_counter() - start)
     queued_stats, direct_stats = _percentiles(queued), _percentiles(direct)
+    half = len(queued) // 2
+    early = _percentiles(queued[:half])["p50_us"] if half else queued_stats["p50_us"]
+    late = _percentiles(queued[half:])["p50_us"] if half else queued_stats["p50_us"]
     return {
         "batches": batches,
         "batch_size": size,
@@ -127,4 +130,8 @@ def measure_backpressure(
         "direct": direct_stats,
         "backlog": queue.pending(),
         "speedup_p50": direct_stats["p50_us"] / queued_stats["p50_us"],
+        # the isolation property itself: an empty backlog against a full one
+        "queued_early_p50_us": early,
+        "queued_late_p50_us": late,
+        "backlog_drift": late / early,
     }

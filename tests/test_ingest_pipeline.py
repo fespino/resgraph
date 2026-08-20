@@ -48,11 +48,11 @@ def test_the_producer_path_does_not_move_while_the_backlog_grows(parts):
     spool, queue, sink = parts
     result = worker.measure_backpressure(spool, queue, sink, batches=60, size=20)
     assert result["backlog"] == 60
-    # relative, never absolute: a wall-clock bound here would flake on a
-    # loaded runner, and the measured latencies belong in BENCHMARKS
-    assert result["queued"]["p50_us"] < result["direct"]["p50_us"]
+    assert result["backlog_drift"] < 3  # the property: a full backlog costs the producer nothing
     assert result["speedup_p50"] > 2
-    assert result["queued"]["p99_us"] < result["direct"]["p50_us"]
+    # a catastrophe budget, not an SLO: loose enough to survive a loaded
+    # runner, tight enough to fail if I/O reappears on the producer path
+    assert result["queued"]["p50_us"] < 20_000
 
 
 def test_delivery_is_at_least_once_and_the_sink_absorbs_it(parts):

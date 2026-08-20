@@ -2552,6 +2552,16 @@ ingestion is real without growing a project.
   garbage. Drift is live, not hypothetical: rows today carry six
   fields the phase's own doc-validation pass (two days prior)
   didn't list.
+- **Declared fields are refused; undeclared ones are reported.**
+  Validation can only catch what someone enumerated, so each row's
+  field set is also fingerprinted and compared PULL TO PULL, naming
+  fields that appeared or vanished with nobody having predicted
+  them. The comparison is between pulls and never within one: the
+  catalog's rows legitimately differ from each other (five distinct
+  shapes in the committed snapshot), so shape cardinality inside a
+  single pull is noise. A pull prints its own drift against the
+  previous snapshot, so noticing is not a separate act of
+  discipline.
 - **Matching is declared or mechanical, never fuzzy.** A market row
   matches an endpoint by explicit `market:` id in models.yaml, or
   by exact normalized id-tail (lowercase, `.`/`:` → `-`:

@@ -1,0 +1,55 @@
+name: market-snapshot
+# The phase-14 gate (SPEC roadmap amendment) is conditional on accumulated
+# catalog churn, which nobody was collecting: the cadence existed as an
+# intention and the directory held one file. This is the collection.
+#
+# D46 rejected polling inside the gateway PROCESS, to keep the serving path
+# network-free; a scheduled job outside it is the cadence that decision
+# called honest. One request per day, under the connector's own User-Agent.
+on:
+  schedule:
+    - cron: '0 9 * * *'   # daily 09:00 UTC, after the 06-08:00 security scans
+  workflow_dispatch:
+permissions: read-all
+
+jobs:
+  pull:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write   # commits the day's snapshot; scoped to evals/market/ below
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          # Documented exception (zizmor artipacked, .github/zizmor.yml):
+          # this job commits the snapshot it fetched and needs the token to
+          # persist. Nothing else in the job touches the network.
+          persist-credentials: true
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d  # v10.0.1
+      - run: uv sync --dev
+      - id: pull
+        name: pull the catalog
+        # market-pull refuses on shape drift and prints DRIFT lines against
+        # the previous snapshot, so an undeclared upstream field is announced
+        # on the day it appears rather than at the next manual look.
+        run: uv run resgraph-gateway market-pull | tee "$RUNNER_TEMP/pull.log"
+      - name: commit the snapshot
+        run: |
+          if [ -z "$(git status --porcelain evals/market/)" ]; then
+            echo "no new snapshot (same day, or the catalog is byte-identical)"
+            exit 0
+          fi
+          git config user.name  'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          # only ever this directory: the job collects data, never code
+          git add evals/market/
+          git commit -m "data: market catalog snapshot $(date -u +%F)"
+          git push
+      - name: surface drift in the run summary
+        run: |
+          {
+            echo '## Market catalog pull'
+            echo '```'
+            cat "$RUNNER_TEMP/pull.log"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

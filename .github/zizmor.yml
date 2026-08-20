@@ -7,3 +7,8 @@ rules:
     # GITHUB_TOKEN, already contents:write scoped for that branch.
     ignore:
       - ci.yml
+      # market-snapshot.yml commits the snapshot it just fetched, so the
+      # checkout token must persist. The job's write scope is the whole
+      # repo by necessity and its commit step stages evals/market/ only:
+      # it collects data and never touches code.
+      - market-snapshot.yml

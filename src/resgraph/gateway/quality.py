@@ -5,7 +5,7 @@ without them — a routing table with no provenance is an opinion. The
 table is generated from eval runs (resgraph-evals routing-table),
 never hand-written.
 
-Decisions: D44 (SPEC.md).
+Decisions: D44, D51, D52 (SPEC.md).
 """
 
 from datetime import date, timedelta
@@ -17,17 +17,24 @@ import yaml
 QUALITY_PATH = Path("evals/routing-quality.yaml")
 
 
+REQUIRED = ("passk", "fabrication_count", "run", "date")
+
+
+def _optional_float(entry: dict[str, Any], key: str) -> float | None:
+    value = entry.get(key)
+    return float(value) if value is not None else None
+
+
 def load_quality(text: str) -> dict[str, dict[str, dict[str, Any]]]:
-    """task_class -> alias -> {passk, cost_per_passed, run, date}."""
+    """task_class -> alias -> {passk, cost_per_passed, latencies,
+    fabrication_count, workers, run, date}."""
     doc = yaml.safe_load(text) or {}
     out: dict[str, dict[str, dict[str, Any]]] = {}
     for task_class, entries in (doc.get("scores") or {}).items():
         out[task_class] = {}
         for alias, entry in (entries or {}).items():
             entry = entry or {}
-            missing = [
-                k for k in ("passk", "run", "date") if not entry.get(k) and entry.get(k) != 0
-            ]
+            missing = [k for k in REQUIRED if not entry.get(k) and entry.get(k) != 0]
             if missing:
                 raise SystemExit(
                     f"quality entry {task_class}/{alias} lacks {missing}: "
@@ -38,20 +45,26 @@ def load_quality(text: str) -> dict[str, dict[str, dict[str, Any]]]:
                 raise SystemExit(f"quality entry {task_class}/{alias}: passk {passk} not in [0,1]")
             out[task_class][alias] = {
                 "passk": passk,
-                "cost_per_passed": (
-                    float(entry["cost_per_passed"])
-                    if entry.get("cost_per_passed") is not None
-                    else None
-                ),
-                "latency_p50_s": (
-                    float(entry["latency_p50_s"])
-                    if entry.get("latency_p50_s") is not None
-                    else None
-                ),
+                "cost_per_passed": _optional_float(entry, "cost_per_passed"),
+                "latency_p50_s": _optional_float(entry, "latency_p50_s"),
+                "latency_p95_s": _optional_float(entry, "latency_p95_s"),
+                "fabrication_count": int(entry["fabrication_count"]),
+                "workers": [str(w) for w in (entry.get("workers") or [])],
                 "run": str(entry["run"]),
                 "date": str(entry["date"]),
             }
     return out
+
+
+def fabricating(
+    table: dict[str, dict[str, dict[str, Any]]], task_class: str, candidates: list[str]
+) -> list[str]:
+    """Candidates whose measured run contains a fabrication. The eval
+    gate blocks a merge on these unconditionally (D29b); routing them
+    anyway would spend on a worker the rest of the platform treats as
+    disqualified rather than merely weaker."""
+    scores = table.get(task_class, {})
+    return [a for a in candidates if a in scores and scores[a]["fabrication_count"]]
 
 
 def eligible(
@@ -60,19 +73,29 @@ def eligible(
     candidates: list[str],
     min_passk: float,
 ) -> list[str]:
-    """Candidates whose measured pass^k clears the floor. An unmeasured
-    candidate is ineligible — no eval, no route: the floor is a
-    guarantee, and a guarantee cannot rest on an absent measurement."""
+    """Candidates whose measured pass^k clears the floor and whose run
+    fabricated nothing. An unmeasured candidate is ineligible — no
+    eval, no route: the floor is a guarantee, and a guarantee cannot
+    rest on an absent measurement."""
     scores = table.get(task_class, {})
-    return [a for a in candidates if a in scores and scores[a]["passk"] >= min_passk]
+    disqualified = set(fabricating(table, task_class, candidates))
+    return [
+        a
+        for a in candidates
+        if a in scores and scores[a]["passk"] >= min_passk and a not in disqualified
+    ]
 
 
 # (axis name, lower_is_better) — an axis absent from a score is not
-# compared, so a table that never carried latency behaves as before
+# compared, so a table that never carried latency behaves as before.
+# p95 rides beside p50 because TTFT is bimodal on the local backend
+# (docs/capacity.md): an arm can win the median and lose the tail a
+# caller with a deadline actually meets.
 AXES: tuple[tuple[str, bool], ...] = (
     ("passk", False),
     ("cost_per_passed", True),
     ("latency_p50_s", True),
+    ("latency_p95_s", True),
 )
 
 

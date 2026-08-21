@@ -5,7 +5,7 @@ leaves the claim to be reclaimed and the batch redelivered, which the
 sink's idempotent write absorbs. Raw is authoritative: the sink can be
 dropped and rebuilt from the spool alone.
 
-Decisions: D48 (SPEC.md).
+Decisions: D48, D52 (SPEC.md).
 """
 
 import json
@@ -15,6 +15,17 @@ from typing import Any
 from resgraph.evals.pricing import estimate_cost
 from resgraph.ingest.sink import Sink
 from resgraph.ingest.spool import RefQueue, Spool
+
+# D52 at the ingest boundary. Softer than the eval one: `payload` is
+# stored whole, so an unrecognised field inside it survives, and raw is
+# authoritative — a column added later is a replay away. What does not
+# survive is a field the raw event never carried, which is why the
+# queue's `enqueued_at` is invisible to this function and to its guard
+# (the observation clock is #329's decision, not a column to add here).
+NOT_PROJECTED: dict[str, str] = {
+    "run": "expanded into the run_* columns rather than stored as a struct",
+    "payload": "stored whole as JSON; the typed columns are extracts, not replacements",
+}
 
 
 def enrich(event: dict[str, Any]) -> dict[str, Any]:

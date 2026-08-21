@@ -56,6 +56,7 @@ from resgraph.gateway.dispatch import Backend, ProbeResult, QueueFull, choose
 from resgraph.gateway.quality import (
     QUALITY_PATH,
     eligible,
+    fabricating,
     frontier,
     load_quality,
     stale,
@@ -445,6 +446,13 @@ def _quality_route(gw: Gateway, task_class: TaskClass | None) -> RouteDecision |
     route = gw.registry.get(task_class)
     if route is None or not route.candidates or route.min_passk is None:
         return None
+    disqualified = fabricating(gw.quality, task_class, list(route.candidates))
+    if disqualified:
+        log.warning(
+            "[gateway:quality] %s: %s disqualified, the measured run fabricated",
+            task_class,
+            sorted(disqualified),
+        )
     ok = eligible(gw.quality, task_class, list(route.candidates), route.min_passk)
     if not ok:
         log.warning(

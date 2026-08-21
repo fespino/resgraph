@@ -2907,6 +2907,81 @@ requests. That would make a pull informative and put the exploration
 argument back on the table, at which point Pareto-UCB's confidence
 pruning becomes the right policy rather than plain dominance.
 
+## D52 — A measured metric crosses a boundary named, or stays behind with a reason (#328)
+
+D51 found the router blind to latency for months. The axis was
+measured the whole time; the table builder simply never copied the
+column, and **no test could have caught it** — nothing downstream had
+ever seen the field, so there was no expectation to violate. That is
+the same failure shape as a control that silently stops covering an
+input: the green check still appears. The remedy is the same one
+`test_eval_gate_scope.py` already uses — discover the inputs instead
+of listing them.
+
+**The rule.** Every metric a producer computes is, at each boundary
+it reaches, either a named input on the far side or an exclusion
+recorded with its reason. Two manifests in `resgraph.evals.arms`
+carry the decisions (`NOT_SUMMARISED` for `aggregate` →
+`arm_summary`, `ROUTING_INPUTS` / `NOT_ROUTING_INPUTS` for
+`arm_summary` → the quality table), the routing-table builder writes
+`ROUTING_INPUTS` rather than a hand-kept field list, and
+`tests/test_metric_boundaries.py` calls the producers on a committed
+run to discover what they return today. A metric that is neither
+carried nor excluded fails CI; so does an exclusion that outlives its
+metric, an axis the builder does not write, and a field the builder
+writes that the loader drops.
+
+**Two boundaries, not one.** The issue assumed the drop happened at
+the builder. It happens twice: `aggregate` produces nine metrics
+`arm_summary` never forwards, which is where `degraded_rows`,
+`cache_hit_mean` and the per-dimension rates were already being lost
+a layer earlier than anyone had looked.
+
+**What changed as routing behaviour:**
+
+- **A fabrication disqualifies, it does not merely rank.** The eval
+  gate blocks a merge on any fabrication unconditionally (D29b) and
+  the router then weighted arms as though the dimension did not
+  exist. `fabrication_count` is now a required table field and a
+  nonzero count makes an arm ineligible — floor or no floor, price or
+  no price. Required, not defaulted: an entry that never counted
+  fabrications would otherwise route exactly like a clean one, which
+  is the absence-reads-as-zero failure D50 named at the ingest layer.
+- **The tail is a fourth dominance axis.** D41 ranks endpoints on
+  percentiles rather than means because TTFT on the local backend is
+  bimodal (`docs/capacity.md`); admitting p50 alone in D51 reproduced
+  the averaging it rejects. An arm can win the median and lose the
+  tail a caller with a deadline actually meets, and now says so.
+- **The score names the worker that earned it.** `workers` travels
+  with `run` and `date`. #192 made the eval gate refuse a run from a
+  different worker than the baseline; the routing table had the same
+  exposure — an alias whose score came from a run of some other
+  model — and no way to see it.
+
+**Decided as exclusions, with the reasons that make them arguable:**
+`degraded_rows` counts reports that admitted degrading, which is
+*required* to pass a planted `store_degraded` item and suspect on a
+clean one, so the raw count sums a virtue and a vice — it becomes a
+routing input the day the harness splits it by whether a fault fired.
+`pass_any_trial` is the arm's best case out of k; the floor is a
+guarantee to a caller who gets one attempt. `slices` ranks arms per
+scenario type while the router classifies requests by task class,
+with nothing to match them against.
+
+**Rejected:** leaving fabrication to the eval gate alone (it gates
+the analyst's own runs in CI, not every arm whose table someone
+generates — and the platform calls the block unconditional);
+treating a missing `fabrication_count` as zero for backward
+compatibility (the table is generated and no scored entry is
+committed, so the compatibility being bought is hypothetical, and the
+cost is a silent one); replacing p50 with p95 rather than carrying
+both (the median is what most callers experience; the tail is what
+the deadline is set from).
+**Reversal condition:** a boundary where the manifest costs more than
+it catches — if the metric set churns fast enough that classifying
+each one becomes ceremony, the guard should assert the *carried* set
+and let exclusions go unnamed.
+
 ## Phase contracts
 - The generator MUST emit D2 messages exactly and expose `--seed`
   for reproducibility.

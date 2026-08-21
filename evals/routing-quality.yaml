@@ -7,6 +7,13 @@
 # aliases that clear the floor (unmeasured = ineligible: no eval, no
 # route), weighted by measured cost per passed triage.
 #
+# The fields are ROUTING_INPUTS in resgraph.evals.arms (D52), not a
+# list written into the builder: a metric the harness starts producing
+# is classified as a routing input or an exclusion with a reason, and
+# a guard test fails on anything unclassified. An entry generated
+# before a required field existed no longer loads — regenerate it
+# rather than hand-adding the field.
+#
 # No multi-arm run files are committed yet, so no scores are either;
 # the schema, once `resgraph-evals routing-table` generates it:
 #
@@ -15,5 +22,9 @@
 #     haiku:
 #       passk: 0.78
 #       cost_per_passed: 0.085
+#       latency_p50_s: 39.5
+#       latency_p95_s: 61.2
+#       fabrication_count: 0      # nonzero disqualifies, floor or no floor
+#       workers: [claude-haiku-4-5]
 #       run: evals/runs/<file>.jsonl
 #       date: "2026-08-19"

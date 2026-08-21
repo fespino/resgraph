@@ -25,8 +25,12 @@ the gate that had to learn what a worker is, and the three-arm
 experiment that then changed the product's default model. The
 punchline comes first: an eval that only ever confirmed the frontier
 model would have been a press release. This one cost $28 across four
-paid runs and changed the default to the model that is 8× cheaper —
-with one caveat, now designed around.
+paid runs and changed the default — to the cheap model, which the
+arms measured at 8× lower cost per passed triage than the frontier
+arm it replaced, with one caveat now designed around. The
+generalizable half is not that multiple: it is that neither model
+dominated, so which one wins is decided by the cost of the two
+error types rather than by a single number.
 
 <!-- more -->
 
@@ -251,8 +255,9 @@ fabrications, never one number.
 
 The arms changed the product. The cheap model became the default
 analyst worker — in the production triage CLI and the eval harness
-both — on the strength of the highest pass^k, the best recall, 8×
-lower cost, and 5× lower latency. The frontier model stopped being
+both — on the strength of the highest pass^k, the best recall, and,
+against the frontier arm it replaced, 8× lower cost and 2.3× lower
+latency. The frontier model stopped being
 the default and became a periodic reference arm, watched for honesty
 drift. The judge stays pinned on the frontier regardless.
 

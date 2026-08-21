@@ -19,8 +19,13 @@ three phases ago, so this workstream spends nothing new: the arms
 table that picked the analyst's worker, then picked the misuse
 judge, now answers its third question — which alias serves this
 class of request — at request time. The receipt is the phase's
-biggest number: over the same 200-request stream, price-only routing
-solves ~10 requests; routing with a measured floor solves 180.
+biggest number, and the qualitative half is what generalizes:
+per-call price comparison is structurally blind to delivery rate,
+so cheap can buy wrong. The magnitude is a property of the fixture,
+not of the mechanism — over a 200-request stream against two arms
+chosen to mirror measured shapes, price-only routing solves ~10 and
+routing with a measured floor solves 180, and a different pair of
+arms moves that ratio anywhere.
 
 <!-- more -->
 
@@ -254,6 +259,96 @@ dependency whose default silently shadows the injection is only
 testable by a test whose world disagrees with the default — a test
 world that mirrors production too faithfully can be too agreeable to
 catch anything.
+
+## Addendum, one phase later: the floor had a sibling hole
+
+This section was added after publication, when a later mini phase
+asked the mechanism above a question the post never did. The policy
+this post describes is floor, then free-preempt, then an
+inverse-square lottery on cost per passed triage — and its thesis is
+that a floor keeps cheap from buying *wrong*. The floor does that.
+What nothing in the same mechanism did was keep cheap from buying
+**worse in every way**.
+
+The receipt is uncomfortable. With two arms clearing a 0.7 floor —
+one at pass^k 0.90 and $0.10 per passed triage, the other at 0.75
+and $0.15 — the lottery sends **30.8% of the stream to the second**,
+which is worse on quality *and* more expensive. Weighting by cost
+alone cannot see "worse on every axis," because it only looks at
+one. The fix is a Pareto frontier between the floor and the draw: an
+arm is dominated when another eligible arm is at least as good
+everywhere and strictly better somewhere, and dominated arms are
+excluded before the lottery runs, with the exclusion logged and the
+arms named. Over the same 200-request stream that moves ~170.8
+solved to 180.0 — about nine solved runs per two hundred, bought by
+not spending on an arm that was never going to win
+([`src/resgraph/gateway/quality.py`](https://github.com/fespino/resgraph/blob/main/src/resgraph/gateway/quality.py),
+D51 — the quality router spends only on the frontier, and staleness
+asks for a re-run).
+
+The obvious objection is the interesting part, and it is why this
+addendum exists rather than a one-line correction. Exploration
+usually justifies exactly this kind of spend: you keep a weaker arm
+in the pool because serving it *teaches you something about it*.
+That argument is valid one layer down and invalid here, and the
+difference is structural. The routing economics of post 24 keep a
+flaky endpoint eligible precisely because **serving it updates the
+latency window it is ranked by** — the traffic buys information.
+Serving an arm never updates its pass^k: quality comes from eval
+runs against planted ground truth, and a served request has no
+answer key. A pull at this layer returns no reward signal, so a
+dominated arm's traffic is pure loss, and an aged score can only be
+refreshed by re-running the arms — which is why staleness here is a
+re-measurement signal announced once at load, never a reduced
+traffic share.
+
+Two smaller things travelled with it. The table had been
+**discarding an axis it already measured**: the arms summary computes
+latency percentiles and the table builder emitted only pass^k and
+cost, so the router was blind on an axis the eval program had
+already paid for. Latency now travels with the score under the same
+provenance rule — and it matters for dominance, because over two
+axes an arm that trades quality and cost for being five times faster
+reads as dominated and would have been pruned. Dominance compares
+only the axes both scores record, so older tables behave exactly as
+they did.
+
+This is the
+[multi-objective bandit](https://arxiv.org/html/2506.13125) shape,
+and reading it that way is what supplied both halves: vector rewards
+with a Pareto front instead of a single best arm, and policies like
+[Pareto-UCB1](https://ai.vub.ac.be/sites/default/files/MO_MAB_IJCNN_Accepted_v2.pdf)
+and [Pareto set identification](https://arxiv.org/html/2606.18785)
+that prune dominated arms once dominance is statistically safe while
+spending exploration on arms whose front-membership is still
+uncertain. The staleness half is the
+[non-stationary bandit](https://arxiv.org/pdf/0805.3415) problem,
+whose answer is forgetting — discounted or sliding-window
+estimates — which this platform already implements one layer down
+and had not implemented here. What does *not* transfer is
+exploration-by-pulling, for the structural reason above: those
+policies assume a pull yields a reward observation, and at this
+layer it does not.
+
+And the way this was found is the part worth stealing. It did not
+come from a review of the routing code. It came from reading
+[an industry post about programmable heterogeneity](https://www.callosum.com/blog/programmable-heterogeneity)
+— which argues for searching a configuration space toward a Pareto
+front, and whose underlying paper,
+[The Principle of Maximum Heterogeneity](https://arxiv.org/abs/2604.07602),
+carries a second clause the vendor summary drops: environmental
+demand places an *upper bound* on useful heterogeneity. Neither is
+about routing tables. Asking this platform's own policy the same
+question is what exposed
+something no per-layer review could see, because the two halves were
+each locally reasonable: the routing layer *forgets by construction*
+(rolling windows, an idle backend returns to unmeasured), while the
+quality table forgot nothing and weighted a months-old score exactly
+like yesterday's. Same concern, opposite policies, neither of them
+chosen. That is now a standing review shape in this repo — pick a
+concern, ask every layer what its policy is, and record each
+difference as decided or drifted
+([#329](https://github.com/fespino/resgraph/issues/329)).
 
 ## What breaks at 1000×
 

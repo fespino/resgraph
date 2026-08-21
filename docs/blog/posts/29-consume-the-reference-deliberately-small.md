@@ -217,74 +217,55 @@ table's *first* version exposed a genuine bug in this platform's own
 catalog — the story the next post opens with, because it was the
 phase audit's best catch.
 
-## Addendum, one phase later: the inversion started, in three steps
+## Addendum, one phase later: the inversion started
 
-This section was added after publication, when the sentence below
-about a manual pull becoming a pipeline stopped being a prediction.
-Three changes landed, and the first one exists because the post's
-own drift check had a hole in it.
+Added after publication, when the closing prediction below — that a
+daily manual pull becomes a pipeline — stopped being a prediction.
+Three changes landed, and the first exists because this post's own
+drift check had a hole.
 
 **A schema check catches only what someone enumerated.** The
-validator this post shows refuses a response whose declared fields
-are missing or malformed — which is exactly the wrong shape for the
-failure the post itself reported, where rows arrived carrying six
-fields nobody had listed. So the connector now fingerprints each
-pull's *set of row shapes* and compares it against the previous
-snapshot, naming fields rather than requiring anyone to have
-declared them:
+validator shown above refuses a response whose *declared* fields are
+missing or malformed, which is the wrong shape for the failure this
+post itself reported: rows arriving with six fields nobody had
+listed. So the connector now fingerprints each pull's set of row
+shapes and compares it against the previous snapshot, naming fields
+rather than requiring anyone to have declared them:
 
 ```python
-# src/resgraph/gateway/market.py
+# src/resgraph/gateway/market.py @ phase-13.5-frontier-routing
 def drift(previous: list[dict[str, Any]], current: list[dict[str, Any]]) -> list[str]:
     """What changed in the catalog's SHAPE between two pulls. Names the
     fields rather than requiring anyone to have enumerated them: a
     field nobody declared is exactly the one that gets missed."""
 ```
 
-The distinction that makes it work is in the neighbouring
-docstring: catalog rows legitimately differ from one another, since
-an omitted optional field is not drift, so the shapes are a
-fingerprint to compare *across* pulls and never a count to threshold
-*within* one.
+The distinction that makes it work sits in the neighbouring
+docstring: rows legitimately differ from each other, since an
+omitted optional field is not drift, so shapes are a fingerprint to
+compare *across* pulls and never a count to threshold *within* one.
 
 **The cadence became collected rather than intended.** The pull ran
-manually, which meant it did not run — a directory holding a single
-file for as long as nobody remembered. A scheduled workflow now
-pulls once daily and commits the snapshot, which is the "manual or
-cron pull" the original decision already called the honest cadence,
-and it does not reverse the rejection of polling *inside* the
-gateway process: the serving path stays network-free. Two properties
-make it safe unattended — the pull refuses on shape drift rather
-than ingesting garbage, and it prints its own field-set drift into
-the run summary, so an undeclared upstream field is announced the
-day it appears. It is also the one job in this repository that
-commits to the default branch without review, and that exception is
-recorded rather than taken quietly: the commit step stages the
-snapshot directory and nothing else, which is a bound on what the
-job as written does rather than a boundary a compromised runner
-would respect, with the residual carried by pinned action digests
-and a narrowly scoped write permission.
+manually, which meant it did not run — the directory held one file
+for as long as nobody remembered. A scheduled workflow now pulls
+daily and commits the snapshot, which is the cron pull the decision
+already called honest, and the serving path stays network-free. It
+is also the one job here that commits without review, recorded
+rather than taken quietly: the commit step stages the snapshot
+directory and nothing else, which bounds what the job as written
+does rather than what a compromised runner would respect.
 
-**And the decision now says plainly that git is the store.** That
-buys four things a bucket does not — a pull request shows exactly
-which fields and prices moved, provenance rides the commit history
-instead of a metadata column, the whole record deletes in one
-command if the upstream terms ever demand it, and there is no
-infrastructure to run or pay for. What it cannot do is query:
-answering "how did this model's price move over ninety days" means
-reading ninety files, which DuckDB narrows today by treating the
-directory as a table, so the ceiling is size rather than capability.
-Stated without hedging, because it matters more than the mechanism:
-**a repository is a serviceable store for a daily 826 KB file and
-the wrong answer at any real volume**, and nothing here should be
-read as a recommendation to keep observational data in version
-control. The production shape is the one this platform builds
-elsewhere — land raw observations in object storage partitioned by
-date, keep a manifest, derive a columnar table you can query — and
-scheduling has already made the retention rule live rather than
-hypothetical, at ~24 MB a month
-([D46's amendments](https://github.com/fespino/resgraph/blob/main/SPEC.md);
-[#332](https://github.com/fespino/resgraph/issues/332)).
+**And the decision now says git is the store.** That buys what a
+bucket does not — a pull request shows which prices moved,
+provenance rides the commit history, the record deletes in one
+command if the upstream terms demand it — and it cannot query:
+ninety days of price history means reading ninety files. Stated
+without hedging, because it matters more than the mechanism: a
+repository is a serviceable store for a daily 826 KB file and the
+wrong answer at any real volume, and nothing here is a
+recommendation to keep observational data in version control (D46's
+2026-08-21 amendments; the retention rule is now live at ~24 MB a
+month, [#332](https://github.com/fespino/resgraph/issues/332)).
 
 ## What breaks at 1000×
 

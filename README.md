@@ -31,8 +31,10 @@ flowchart LR
 
 Part I — the data foundation — is complete (phases 0–6); Part II — the
 AI layer — has landed the MCP surface, the analyst + its eval harness,
-the safe runtime, the serving gateway, and misuse detection over the
-audit trail (phases 7–11). Each phase is tagged at its end state:
+the safe runtime, the serving gateway, misuse detection over the audit
+trail, the gateway measured against its full-size reference, and an
+observability layer replicated and graded (phases 7–13.5). Each phase
+is tagged at its end state:
 
 | Phase | What landed | Tag |
 |---|---|---|
@@ -50,8 +52,8 @@ audit trail (phases 7–11). Each phase is tagged at its end state:
 | 10.5 | Institutional memory as a log-structured store: archive/history/working-set split, fed-context sha pinned per run | `phase-10.5-institutional-memory` |
 | 11 | Misuse detection (resgraph-sentinel): three cost-ordered layers over the audit trail, benign FP rate as the headline, review queue whose labels close loops in code, CI recall gate | `phase-11-sentinel` |
 | 12 | Gateway vs the reference: one alias/many endpoints, percentile windows + price lottery (0.449×), caller/operator contract, prepaid billing, eval-driven routing (18×), screening + sunset gate, market connector — every workstream doc-validated before code, exit gate audited item-by-item | `phase-12-gateway` |
-
 | 13 | Observability replication (D47–D50): recorded runs exported as OTLP with an agent round-trip, raw-first ingestion (producer p50 567 µs vs 24.3 ms straight to the store), the wide-vs-normalized layout measured rather than assumed, and controls for absence and undeclared drift | `phase-13-observability` |
+| 13.5 | Frontier routing (D51): quality routing spends only on the Pareto frontier, and stale evidence asks for a re-run instead of a share of traffic | `phase-13.5-frontier-routing` |
 
 Each increment lands via issue → PR, citing the SPEC decisions
 (D-numbers) it implements. Phase 13's integration half is parked

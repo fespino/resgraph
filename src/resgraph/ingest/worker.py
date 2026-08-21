@@ -16,12 +16,8 @@ from resgraph.evals.pricing import estimate_cost
 from resgraph.ingest.sink import Sink
 from resgraph.ingest.spool import RefQueue, Spool
 
-# D52 at the ingest boundary. Softer than the eval one: `payload` is
-# stored whole, so an unrecognised field inside it survives, and raw is
-# authoritative — a column added later is a replay away. What does not
-# survive is a field the raw event never carried, which is why the
-# queue's `enqueued_at` is invisible to this function and to its guard
-# (the observation clock is #329's decision, not a column to add here).
+# D52 at the ingest boundary — softer, because `payload` is stored whole
+# and raw is authoritative.
 NOT_PROJECTED: dict[str, str] = {
     "run": "expanded into the run_* columns rather than stored as a struct",
     "payload": "stored whole as JSON; the typed columns are extracts, not replacements",

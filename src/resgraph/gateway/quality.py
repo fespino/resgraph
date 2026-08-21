@@ -87,10 +87,7 @@ def eligible(
 
 
 # (axis name, lower_is_better) — an axis absent from a score is not
-# compared, so a table that never carried latency behaves as before.
-# p95 rides beside p50 because TTFT is bimodal on the local backend
-# (docs/capacity.md): an arm can win the median and lose the tail a
-# caller with a deadline actually meets.
+# compared, so a table that never carried latency behaves as before
 AXES: tuple[tuple[str, bool], ...] = (
     ("passk", False),
     ("cost_per_passed", True),

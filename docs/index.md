@@ -20,7 +20,7 @@ own chapter, so reading in order watches it fill in.
 
 ```mermaid
 flowchart TD
-    loop["<b>the dev loop</b><br/>CI gates, review, the decision log<br/>#00 #01 #30"]
+    loop["<b>the dev loop</b><br/>CI gates, review, the decision log<br/>#00 #01 #30 #33 #36"]
     gen["<b>generator</b><br/>a deterministic synthetic cloud, seeded<br/>#02"]
     hot["<b>hot graph</b><br/>current state, benchmarked<br/>#03"]
     ing["<b>ingest</b><br/>one watermark, three guarantees<br/>#04"]
@@ -28,15 +28,18 @@ flowchart TD
     query["<b>query layer</b><br/>one API over both stores<br/>#06"]
     obs["<b>observability</b><br/>wide events + SLOs<br/>#07"]
     mcp["<b>MCP server</b><br/>the agent's tool surface<br/>#08"]
-    evals["<b>analyst + evals</b><br/>triage judged on planted ground truth<br/>#09 #10 #11"]
+    evals["<b>analyst + evals</b><br/>triage judged on planted ground truth, every metric named at its boundary<br/>#09 #10 #11 #38"]
     runtime["<b>safe runtime</b><br/>typed approvals + the audit trail<br/>#12"]
     drills["<b>drills</b><br/>paid runs verified before they spend<br/>#13"]
     seam["<b>worker seam</b><br/>models are config, not code<br/>#14"]
-    gw["<b>gateway</b><br/>routing, budgets, failover, caching, billing<br/>#15 #16 #17 #19 #24 #25 #26 #27 #28 #29"]
+    gw["<b>gateway</b><br/>routing, budgets, failover, caching, billing<br/>#15 #16 #17 #19 #24 #25 #26 #27 #28 #29 #35 #37"]
     providers(["model providers"])
     market(["the market's catalog (OpenRouter)"])
     ledger["<b>evals ledger</b><br/>institutional memory, log-structured<br/>#18"]
     sent["<b>sentinel</b><br/>misuse detection over the audit trail<br/>#20 #21 #22 #23"]
+    lfx["<b>traces exporter</b><br/>recorded runs as OTLP, one way<br/>#31"]
+    lf(["the reference platform (Langfuse)"])
+    obsing["<b>observability ingest</b><br/>raw-first spool, queue, async worker, the layout measured, controls for absence and drift<br/>#32 #34 #35"]
 
     loop -.->|every change ships through it| gen
     gen -->|seeded events| ing
@@ -57,6 +60,10 @@ flowchart TD
     gw -.->|price baseline| market
     ledger -.-> evals
     runtime -->|audit rows| sent
+    runtime -->|recorded runs| lfx
+    lfx -.->|one way, never a system of record| lf
+    runtime -->|recorded events| obsing
+    obsing -.->|two counts, one truth| runtime
 ```
 
 ## Devlog

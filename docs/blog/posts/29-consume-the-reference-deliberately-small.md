@@ -255,6 +255,24 @@ rather than taken quietly: the commit step stages the snapshot
 directory and nothing else, which bounds what the job as written
 does rather than what a compromised runner would respect.
 
+**Correction, one day later: that job could never have committed to
+`main`.** Its first scheduled firing pulled the catalog and was
+refused on the push — `GH006: Protected branch update failed`,
+because the branch requires four checks with `enforce_admins` on,
+which no writer can bypass. The exception had been recorded
+deliberately and defended when its scoping was questioned, and it
+described a mechanism the repository's own protection had already
+made impossible. Nothing had exercised it; the cron's first run was
+the first test. Snapshots now land on `market-data`, an orphan
+branch holding the corpus and nothing else, with `main` keeping one
+seed snapshot as the schema example and the fixture two tests read
+— the reasoning survives, served by separating the histories rather
+than by exempting a writer from the rule. The same file also piped
+its pull through `tee` under a shell without `pipefail`, so a pull
+that refused on shape drift would have reported the exit code of
+`tee` and read as a green run (D46's 2026-08-21 amendment;
+[PR #346](https://github.com/fespino/resgraph/pull/346)).
+
 **And the decision now says git is the store.** That buys what a
 bucket does not — a pull request shows which prices moved,
 provenance rides the commit history, the record deletes in one

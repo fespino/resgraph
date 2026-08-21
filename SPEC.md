@@ -2597,19 +2597,44 @@ shape drift rather than ingesting garbage, and it prints its own
 field-set drift against the previous snapshot into the run summary,
 so an undeclared upstream field is announced the day it appears.
 
-The workflow is also the one place in this repository that commits to
-the default branch without review, against the standing rule that
-changes arrive by pull request. The exception is recorded rather than
-taken quietly. What the scoping buys, stated precisely: the commit
-step stages `evals/market/` and nothing else, so the job **as
+**Amendment (2026-08-21, second): the direct-commit exception is
+withdrawn — it was never available.** As first written this workflow
+committed to the default branch without review, recorded as a
+deliberate exception to the standing pull-request rule. The first
+scheduled firing was rejected outright: `main` requires four status
+checks with `enforce_admins: true`, so no direct push to it can
+succeed from anyone, and the exception was prose the repository's own
+protection had already refused. The pull worked; only the push
+failed.
+
+Snapshots now land on the **`market-data` branch**, an orphan branch
+holding the corpus and nothing else, while `main` keeps one seed
+snapshot as the schema example and test fixture. The reasoning that
+motivated the exception survives intact — data collection and code
+changes are different acts, and a collection needing a reviewer every
+morning is the manual cadence this replaces — but it is served by
+separating the histories rather than by exempting one writer from the
+rule. Reading the corpus costs one `git fetch origin market-data`.
+
+**Rejected:** weakening branch protection for this path (the
+`enforce_admins` setting is a posture claim the Scorecard badge
+reports; trading it for a cron's convenience inverts the priority);
+a daily auto-merged pull request, which needs a long-lived
+fine-grained token as a repository secret, because a pull request
+opened with `GITHUB_TOKEN` does not trigger the required checks and
+would wait on them forever — a standing write credential on a public
+repository, bought to avoid one `git fetch`; and dropping the commit
+for a run-summary report only, which reopens the collection gap this
+workflow exists to close.
+
+What the scoping buys, stated precisely: the commit step stages
+`evals/market/` on the data branch and nothing else, so the job **as
 written** adds observations and does not touch code — a bound on what
 it does, not a boundary a compromised runner would respect. That risk
 is carried by the pinned action digests, by `contents: write` scoped
-to this one job while the workflow defaults to read-all, and by the
-workflow-security lint that audits this file. The reasoning for the
-exception itself is that data collection and code changes are
-different acts, and a collection that needs a reviewer every morning
-is the manual cadence this replaces.
+to this one job while the workflow defaults to read-all, by the code
+checkout dropping its credentials entirely, and by the
+workflow-security lint that audits this file.
 
 **The store is git, which is a laptop-scale choice with a stated
 ceiling.** Snapshots are files in the repository, and that buys four
@@ -3132,5 +3157,6 @@ Two rules:
 | 2026-08-03 | "Narrative judge pinned (model, temperature=0, seed, template)" — D24 as first written | The API rejects `temperature` outright on this model generation (400: "deprecated for this model") and has never exposed a seed — two of the four pinned knobs were not ours to pin. Caught on the first real judge call of the baseline run, which is exactly when untested prose gets tested | D24 amended: the pin is model + template, the only knobs the API accepts; the judge call and its test updated. Same failure class as the revision-pin row above — a pin written before the API contradicts it |
 | 2026-08-03 | "Token-weighted cache hit ≥ 0.9 on multi-turn runs" as the discipline gate — D23 and the discovery memo's quality bar | The floor is unreachable on short runs even with zero waste: after iteration 2 eliminated transcript re-billing entirely (uncached input 250,754 → 234 tokens per run), 0/30 rows reached 0.9 because the residue is `cache_creation` — the one-time write every new token owes before it can be read. The metric penalized unavoidable cost, not waste | D23 amended (second amendment) and the memo bar updated in place with a dated note: the gate is uncached re-read fraction ≤ 0.1 — the re-billing the metric was built to catch — with cache-hit still reported. An eval bug by the phase's own taxonomy: ours, recorded loudly per the memo's no-quiet-bar-bending rule |
 | 2026-08-15 | "the `MCP-Method`/`MCP-Name` headers and `ttlMs`/`cacheScope` list-caching hints matter the day it speaks HTTP" — #166 item 5, the second-read watchlist | Half right: the headers are transport-level, but `ttlMs`/`cacheScope` are required fields on list/read *results* (`CacheableResult`) on every transport, stdio included — the SDK had been filling them `0`/`"private"`, serving a deploy-static catalog "immediately stale" | Caught fact-checking a blog draft against the spec changelog, not by either read of the release post. `cache_hints` adopted (1 h, `"public"`) with the protocol test asserting both fields; D19 addendum records the discharge; #166 corrected by comment |
+| 2026-08-21 | "the one place in this repository that commits to the default branch without review" — the D46 collection amendment, written and defended when the scoping was questioned | The exception was never available: `main` requires four status checks with `enforce_admins: true`, so the push is rejected (GH006) for every writer including an admin. The rule had been written from intent, and the workflow had never run — the first scheduled firing was the first test of it, and it failed at the push, not the pull | D46 amended a second time: the exception is withdrawn and snapshots land on the `market-data` orphan branch, with the alternatives (weakening protection, a PAT-backed auto-merged PR, summary-only) rejected in the entry. Same class as the D19 revision pin and the D24 judge pin: a rule that named a mechanism nothing had exercised |
 
 

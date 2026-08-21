@@ -8,7 +8,7 @@ rules:
     ignore:
       - ci.yml
       # market-snapshot.yml commits the snapshot it just fetched, so the
-      # checkout token must persist. The job's write scope is the whole
-      # repo by necessity and its commit step stages evals/market/ only:
-      # it collects data and never touches code.
+      # data checkout's token must persist. That checkout holds the
+      # market-data branch alone — no code runs from it, main is never
+      # written, and the commit step stages evals/market/ only.
       - market-snapshot.yml

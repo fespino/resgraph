@@ -6,6 +6,10 @@ name: market-snapshot
 # D46 rejected polling inside the gateway PROCESS, to keep the serving path
 # network-free; a scheduled job outside it is the cadence that decision
 # called honest. One request per day, under the connector's own User-Agent.
+#
+# Snapshots land on the `market-data` branch, not on main: main requires
+# four status checks with enforce_admins, so the first scheduled firing was
+# rejected (GH006). D46 amended — the direct-commit exception is withdrawn.
 on:
   schedule:
     - cron: '0 9 * * *'   # daily 09:00 UTC, after the 06-08:00 security scans
@@ -17,23 +21,32 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
-      contents: write   # commits the day's snapshot; scoped to evals/market/ below
+      contents: write   # commits to market-data only; main is never written
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
           # Documented exception (zizmor artipacked, .github/zizmor.yml):
-          # this job commits the snapshot it fetched and needs the token to
-          # persist. Nothing else in the job touches the network.
+          # this checkout commits the snapshot it fetched and needs the token
+          # to persist. It holds data only — no code runs from it.
           persist-credentials: true
+          ref: market-data
+          path: _data
       - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d  # v10.0.1
       - run: uv sync --dev
       - id: pull
         name: pull the catalog
         # market-pull refuses on shape drift and prints DRIFT lines against
         # the previous snapshot, so an undeclared upstream field is announced
-        # on the day it appears rather than at the next manual look.
-        run: uv run resgraph-gateway market-pull | tee "$RUNNER_TEMP/pull.log"
+        # on the day it appears rather than at the next manual look. `shell:
+        # bash` for pipefail: the default shell would report tee's exit code
+        # and a refused pull would read as a green run.
+        shell: bash
+        run: uv run resgraph-gateway market-pull --out-dir _data/evals/market | tee "$RUNNER_TEMP/pull.log"
       - name: commit the snapshot
+        working-directory: _data
         run: |
           if [ -z "$(git status --porcelain evals/market/)" ]; then
             echo "no new snapshot (same day, or the catalog is byte-identical)"
@@ -44,7 +57,7 @@ jobs:
           # only ever this directory: the job collects data, never code
           git add evals/market/
           git commit -m "data: market catalog snapshot $(date -u +%F)"
-          git push
+          git push origin market-data
       - name: surface drift in the run summary
         run: |
           {

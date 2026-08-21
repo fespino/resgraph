@@ -9,7 +9,15 @@ from fastapi.testclient import TestClient
 from typer.testing import CliRunner
 
 from resgraph.gateway import server
-from resgraph.gateway.quality import dominates, eligible, frontier, load_quality, stale
+from resgraph.gateway.quality import (
+    AXES,
+    dominates,
+    eligible,
+    fabricating,
+    frontier,
+    load_quality,
+    stale,
+)
 from resgraph.gateway.router import ClassRoute
 
 TABLE = {
@@ -18,12 +26,14 @@ TABLE = {
             "good": {
                 "passk": 0.9,
                 "cost_per_passed": 0.111,
+                "fabrication_count": 0,
                 "run": "evals/runs/a.jsonl",
                 "date": "2026-08-19",
             },
             "cheapbad": {
                 "passk": 0.05,
                 "cost_per_passed": 0.02,
+                "fabrication_count": 0,
                 "run": "evals/runs/b.jsonl",
                 "date": "2026-08-19",
             },
@@ -33,7 +43,7 @@ TABLE = {
 
 SETUPS = {
     name: {"provider": "ollama", "base_url": f"http://{name}", "model": f"m-{name}"}
-    for name in ("good", "cheapbad", "static")
+    for name in ("good", "cheapbad", "honest", "static")
 }
 
 
@@ -83,13 +93,26 @@ def _gen(client, **fields):
     )
 
 
+def _entry(*, passk: float, **fields):
+    """The provenance the loader requires, around a score the test
+    states itself. passk has no default: a table fixture that hid the
+    number the assertion turns on would document nothing."""
+    return {"passk": passk, "fabrication_count": 0, "run": "r", "date": "2026-08-19"} | fields
+
+
 def test_the_loader_refuses_scores_without_provenance():
     with pytest.raises(SystemExit, match="opinion"):
         load_quality(yaml.safe_dump({"scores": {"judgment": {"a": {"passk": 0.9}}}}))
     with pytest.raises(SystemExit, match="not in"):
-        load_quality(
-            yaml.safe_dump({"scores": {"judgment": {"a": {"passk": 1.9, "run": "r", "date": "d"}}}})
-        )
+        load_quality(yaml.safe_dump({"scores": {"judgment": {"a": _entry(passk=1.9)}}}))
+
+
+def test_a_score_that_never_counted_fabrications_is_not_a_clean_score():
+    """Absence is not zero here: an entry generated before the count
+    was carried would otherwise route as if the dimension had passed."""
+    silent = {k: v for k, v in _entry(passk=0.9).items() if k != "fabrication_count"}
+    with pytest.raises(SystemExit, match="fabrication_count"):
+        load_quality(yaml.safe_dump({"scores": {"judgment": {"a": silent}}}))
 
 
 def test_the_floor_excludes_and_unmeasured_is_ineligible():
@@ -127,12 +150,7 @@ def test_a_free_arm_above_the_floor_preempts_the_lottery(tmp_path):
         "scores": {
             "judgment": {
                 "good": TABLE["scores"]["judgment"]["good"],
-                "cheapbad": {
-                    "passk": 0.8,
-                    "cost_per_passed": 0,
-                    "run": "r",
-                    "date": "d",
-                },
+                "cheapbad": _entry(passk=0.8, cost_per_passed=0),
             }
         }
     }
@@ -244,20 +262,8 @@ def test_the_router_refuses_to_spend_on_a_dominated_arm(tmp_path, caplog):
     table = {
         "scores": {
             "judgment": {
-                "good": {
-                    "passk": 0.9,
-                    "cost_per_passed": 0.10,
-                    "latency_p50_s": 4.0,
-                    "run": "r",
-                    "date": "2026-08-19",
-                },
-                "cheapbad": {
-                    "passk": 0.75,
-                    "cost_per_passed": 0.15,
-                    "latency_p50_s": 9.0,
-                    "run": "r",
-                    "date": "2026-08-19",
-                },
+                "good": _entry(passk=0.9, cost_per_passed=0.10, latency_p50_s=4.0),
+                "cheapbad": _entry(passk=0.75, cost_per_passed=0.15, latency_p50_s=9.0),
             }
         }
     }
@@ -284,21 +290,72 @@ def test_the_router_refuses_to_spend_on_a_dominated_arm(tmp_path, caplog):
     assert 200 * scores["good"]["passk"] == 180.0  # excluding it buys ~9 solved runs per 200
 
 
+def test_an_arm_that_fabricated_is_disqualified_not_merely_ranked(tmp_path, caplog):
+    """The eval gate blocks a merge on a fabrication unconditionally,
+    so the router cannot treat one as a weaker arm and buy it anyway —
+    even when it is the only candidate above the floor."""
+    table = {
+        "scores": {
+            "judgment": {
+                "good": _entry(passk=0.95, cost_per_passed=0.01, fabrication_count=1),
+                "honest": _entry(passk=0.8, cost_per_passed=0.50),
+            }
+        }
+    }
+    registry = {
+        "judgment": ClassRoute("static", "test", candidates=("good", "honest"), min_passk=0.7)
+    }
+    loaded = load_quality(yaml.safe_dump(table))
+    assert fabricating(loaded, "judgment", ["good", "honest"]) == ["good"]
+    assert eligible(loaded, "judgment", ["good", "honest"], 0.7) == ["honest"]
+    app = _app(tmp_path, table=table, registry=registry)
+    with caplog.at_level("WARNING", logger="resgraph.gateway"):
+        out = _gen(TestClient(app), task_class="judgment")
+    assert out.json()["model"] == "honest"  # cheaper and higher pass^k, and still not served
+    assert any("the measured run fabricated" in r.getMessage() for r in caplog.records)
+
+
+def test_the_tail_is_an_axis_because_the_median_hides_a_bimodal_backend():
+    """p50 alone admitted an arm whose deadline behaviour is worse:
+    TTFT on the local backend is bimodal (docs/capacity.md), so the
+    median and the tail can disagree about which arm a caller wants."""
+    steady = {"passk": 0.9, "cost_per_passed": 0.1, "latency_p50_s": 2.0, "latency_p95_s": 2.4}
+    spiky = {"passk": 0.9, "cost_per_passed": 0.1, "latency_p50_s": 1.5, "latency_p95_s": 30.0}
+    assert not dominates(steady, spiky) and not dominates(spiky, steady)
+    assert frontier({"steady": steady, "spiky": spiky}, ["steady", "spiky"]) == ["steady", "spiky"]
+    # on p50 alone the spiky arm dominated outright, and the tail never argued
+    p50_only = [(k, low) for k, low in AXES if k != "latency_p95_s"]
+    assert dominates({k: spiky[k] for k, _ in p50_only}, {k: steady[k] for k, _ in p50_only})
+
+
+def test_the_builder_carries_every_declared_input_from_a_real_run(tmp_path):
+    from resgraph.evals import cli as evals_cli
+
+    out = tmp_path / "quality.yaml"
+    r = CliRunner().invoke(
+        evals_cli.app,
+        [
+            "routing-table",
+            "haiku=evals/runs/20260803T121152Z.jsonl",
+            "--task-class",
+            "judgment",
+            "--out",
+            str(out),
+        ],
+    )
+    assert r.exit_code == 0, r.output
+    entry = load_quality(out.read_text())["judgment"]["haiku"]
+    assert entry["fabrication_count"] == 0  # the run's own count, not an assumption
+    assert entry["workers"], "the score names the worker that earned it"
+    assert entry["latency_p95_s"] is not None and entry["latency_p95_s"] >= entry["latency_p50_s"]
+
+
 def test_old_evidence_asks_to_be_re_measured_not_re_routed(tmp_path, caplog):
     """Staleness is announced once at load, as a request to re-run the
     arms — never as a share of traffic, because a served request
     produces no pass^k to refresh the score with."""
     table = {
-        "scores": {
-            "judgment": {
-                "good": {
-                    "passk": 0.9,
-                    "cost_per_passed": 0.10,
-                    "run": "r",
-                    "date": "2020-01-01",
-                }
-            }
-        }
+        "scores": {"judgment": {"good": _entry(passk=0.9, cost_per_passed=0.10, date="2020-01-01")}}
     }
     with caplog.at_level("WARNING", logger="resgraph.gateway"):
         _app(tmp_path, table=table)

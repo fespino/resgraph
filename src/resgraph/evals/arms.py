@@ -8,7 +8,7 @@ the skill on/off). The money metric is worker cost divided by the
 triages that actually passed at k; latency rides alongside it, because a
 cheaper worker that is far slower is a different trade, not a free win.
 
-Decisions: D29c (SPEC.md).
+Decisions: D29c, D52 (SPEC.md).
 """
 
 from collections import defaultdict
@@ -16,6 +16,61 @@ from typing import Any
 
 from .report import aggregate, item_passed
 from .runner import estimate_cost
+
+# D52: a measured metric crosses a boundary as a named input or stays
+# behind as a recorded exclusion. Both manifests are read back by
+# tests/test_metric_boundaries.py, which discovers what the producers
+# actually return — so a metric added upstream fails here until it is
+# classified, rather than disappearing the way latency did (#328).
+
+# aggregate() -> arm_summary: what a run reports about itself but does
+# not describe the arm as a servable worker.
+NOT_SUMMARISED: dict[str, str] = {
+    "rows": "trials x items; `trials` and `items` carry it apart",
+    "model": "single-model guard for the gate's baseline matching; `models` carries the set",
+    "dims": "per-dimension pass rates are the gate's regression surface, not an arm ranking",
+    "failing_items": "a reviewer's worklist for one run, meaningless once aggregated",
+    "fabrications": "the offending items; `fabrication_count` is the comparable quantity",
+    "degraded_rows": (
+        "counts reports that admitted degradation, which is required to pass a planted "
+        "store_degraded item and suspect on a clean one — the raw count sums a virtue and "
+        "a vice. Becomes a metric when the harness splits it by whether a fault fired"
+    ),
+    "cache_hit_mean": "a property of the harness's prompt reuse, not of the worker",
+    "tokens_mean": "priced already inside cost_per_passed; unpriced it ranks nothing",
+    "fingerprints": "cache identity, used to prove two arms ran the same prompt shape",
+}
+
+# arm_summary -> the router's quality table (summary key -> table field).
+# The builder writes exactly these, so the declaration and the file
+# cannot drift.
+ROUTING_INPUTS: dict[str, tuple[str, int | None]] = {
+    "pass_all_trials": ("passk", 4),
+    "cost_per_passed": ("cost_per_passed", 6),
+    "latency_p50_s": ("latency_p50_s", 3),
+    "latency_p95_s": ("latency_p95_s", 3),
+    "fabrication_count": ("fabrication_count", None),
+    "models": ("workers", None),
+}
+
+NOT_ROUTING_INPUTS: dict[str, str] = {
+    "label": "the alias itself — the table keys by it",
+    "items": "the size of the measurement, not a property of the arm",
+    "item_ids": "comparability between arms, enforced in compare() before any ranking",
+    "trials": "k belongs to the measurement; the router serves one request, not k",
+    "pass_any_trial": (  # nosec B105 - a metric name, not a credential
+        "pass^1 is the arm's best case out of k attempts. The floor is a guarantee to a "
+        "caller who gets one attempt, so scoring it on an experiment nobody will re-run "
+        "would promise something the serving path cannot deliver"
+    ),
+    "slices": (
+        "per-slice rates rank arms per scenario type; the router classifies requests by "
+        "task class and has no slice to match them against. Becomes a routing input the "
+        "day a task class maps to a slice"
+    ),
+    "worker_cost": "absolute spend of one run — scales with item count, not with quality",
+    "passed_items": "numerator of cost_per_passed; alone it is run size again",
+}
 
 
 def arm_summary(label: str, rows: list[dict[str, Any]]) -> dict[str, Any]:

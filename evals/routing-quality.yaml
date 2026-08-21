@@ -7,12 +7,9 @@
 # aliases that clear the floor (unmeasured = ineligible: no eval, no
 # route), weighted by measured cost per passed triage.
 #
-# The fields are ROUTING_INPUTS in resgraph.evals.arms (D52), not a
-# list written into the builder: a metric the harness starts producing
-# is classified as a routing input or an exclusion with a reason, and
-# a guard test fails on anything unclassified. An entry generated
-# before a required field existed no longer loads — regenerate it
-# rather than hand-adding the field.
+# The fields are ROUTING_INPUTS in resgraph.evals.arms (D52). An entry
+# generated before a required field existed no longer loads: regenerate
+# it, never hand-add the field.
 #
 # No multi-arm run files are committed yet, so no scores are either;
 # the schema, once `resgraph-evals routing-table` generates it:

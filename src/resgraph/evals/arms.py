@@ -17,14 +17,8 @@ from typing import Any
 from .report import aggregate, item_passed
 from .runner import estimate_cost
 
-# D52: a measured metric crosses a boundary as a named input or stays
-# behind as a recorded exclusion. Both manifests are read back by
-# tests/test_metric_boundaries.py, which discovers what the producers
-# actually return — so a metric added upstream fails here until it is
-# classified, rather than disappearing the way latency did (#328).
-
-# aggregate() -> arm_summary: what a run reports about itself but does
-# not describe the arm as a servable worker.
+# D52. tests/test_metric_boundaries.py reads these back against what the
+# producers actually return, so an unclassified metric fails there.
 NOT_SUMMARISED: dict[str, str] = {
     "rows": "trials x items; `trials` and `items` carry it apart",
     "model": "single-model guard for the gate's baseline matching; `models` carries the set",
@@ -41,9 +35,7 @@ NOT_SUMMARISED: dict[str, str] = {
     "fingerprints": "cache identity, used to prove two arms ran the same prompt shape",
 }
 
-# arm_summary -> the router's quality table (summary key -> table field).
-# The builder writes exactly these, so the declaration and the file
-# cannot drift.
+# summary key -> (quality-table field, decimal places)
 ROUTING_INPUTS: dict[str, tuple[str, int | None]] = {
     "pass_all_trials": ("passk", 4),
     "cost_per_passed": ("cost_per_passed", 6),

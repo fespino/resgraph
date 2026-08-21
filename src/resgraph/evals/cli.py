@@ -302,11 +302,8 @@ def routing_table(
 ) -> None:
     """Derive the router's quality table from run files (alias=run_file
     per arm). Every entry carries the run it came from and the run's
-    own date; the gateway's loader refuses entries without them.
-
-    The fields are ROUTING_INPUTS (D52) rather than a list written out
-    here — a metric the harness starts producing cannot reach the
-    router by accident, and cannot be dropped from it silently."""
+    own date; the gateway's loader refuses entries without them. The
+    fields are ROUTING_INPUTS (D52), not a list written out here."""
     from .arms import ROUTING_INPUTS, arm_summary
 
     scores: dict[str, dict[str, Any]] = {}

@@ -63,23 +63,20 @@ def test_no_arm_metric_reaches_the_router_by_being_forgotten(summary):
 def test_every_exclusion_names_something_that_exists_and_says_why(rows, summary):
     stale_summary = set(NOT_SUMMARISED) - set(aggregate(rows))
     stale_routing = set(NOT_ROUTING_INPUTS) - set(summary)
-    assert not stale_summary and not stale_routing  # an exclusion outliving its metric
+    assert not stale_summary and not stale_routing
     reasons = list(NOT_SUMMARISED.values()) + list(NOT_ROUTING_INPUTS.values())
-    assert all(len(reason) > 20 for reason in reasons)  # a reason, not a shrug
+    assert all(len(reason) > 20 for reason in reasons)
 
 
 def test_the_router_reads_every_field_the_builder_writes(summary, tmp_path):
     """The far side of the same boundary: a field the builder emits and
     the loader silently drops is the identical failure, mirrored."""
-    from resgraph.evals import cli as evals_cli
-
     written = {field for field, _ in ROUTING_INPUTS.values()}
     entry = {field: 0 for field in written} | {"run": "r", "date": "2026-08-21"}
     loaded = load_quality(
         json.dumps({"scores": {"judgment": {"a": entry}}})  # JSON is a subset of YAML
     )["judgment"]["a"]
     assert written <= set(loaded), f"the loader drops {sorted(written - set(loaded))}"
-    assert evals_cli.routing_table  # the builder under test is the one shipped
 
 
 def test_every_dominance_axis_is_a_field_the_builder_actually_emits():
@@ -89,12 +86,9 @@ def test_every_dominance_axis_is_a_field_the_builder_actually_emits():
 
 
 def test_the_enrichment_worker_projects_every_field_its_producer_emits():
-    """The same boundary at the ingest layer, over the shape this
-    platform's own producer writes — the spool itself accepts any dict,
-    so this covers what we emit, not what an arbitrary feed might.
-    Softer by design: `payload` is stored whole and raw is
-    authoritative, so a missed field is a replay away rather than lost.
-    """
+    """The same boundary at the ingest layer. The spool accepts any
+    dict, so this covers the shape our own producer writes, not an
+    arbitrary feed's."""
     event = synth_batch("run-boundary", 1)[0]
     row = enrich(event)
     unprojected = set(event) - set(row) - set(NOT_PROJECTED)

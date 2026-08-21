@@ -323,7 +323,7 @@ def test_the_tail_is_an_axis_because_the_median_hides_a_bimodal_backend():
     spiky = {"passk": 0.9, "cost_per_passed": 0.1, "latency_p50_s": 1.5, "latency_p95_s": 30.0}
     assert not dominates(steady, spiky) and not dominates(spiky, steady)
     assert frontier({"steady": steady, "spiky": spiky}, ["steady", "spiky"]) == ["steady", "spiky"]
-    # on p50 alone the spiky arm dominated outright, and the tail never argued
+    # p50 alone: the spiky arm dominated outright
     p50_only = [(k, low) for k, low in AXES if k != "latency_p95_s"]
     assert dominates({k: spiky[k] for k, _ in p50_only}, {k: steady[k] for k, _ in p50_only})
 
@@ -345,7 +345,7 @@ def test_the_builder_carries_every_declared_input_from_a_real_run(tmp_path):
     )
     assert r.exit_code == 0, r.output
     entry = load_quality(out.read_text())["judgment"]["haiku"]
-    assert entry["fabrication_count"] == 0  # the run's own count, not an assumption
+    assert entry["fabrication_count"] == 0
     assert entry["workers"], "the score names the worker that earned it"
     assert entry["latency_p95_s"] is not None and entry["latency_p95_s"] >= entry["latency_p50_s"]
 

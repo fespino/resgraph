@@ -30,6 +30,7 @@ maps each phase to its events.
 | 12 — gateway | D40–D46 | D45 (`announced` rejection recorded at the phase audit) |
 | 13 — Langfuse | D47–D50 | D46 (shape fingerprint + the Iceberg rejection, from the L9 review) |
 | 13.5 — frontier routing (mini) | D51 | D44 (dominated arms excluded; the table carries latency) |
+| post-13.5 (2026-08-21) | D52 | D44 (a fabrication disqualifies; the table requires the count), D51 (p95 as a fourth dominance axis) |
 
 ## D0 — Toolchain: typed Python, with the types enforced (phase 0)
 
@@ -2907,7 +2908,7 @@ requests. That would make a pull informative and put the exploration
 argument back on the table, at which point Pareto-UCB's confidence
 pruning becomes the right policy rather than plain dominance.
 
-## D52 — A measured metric crosses a boundary named, or stays behind with a reason (#328)
+## D52 — A measured metric crosses a boundary named, or stays behind with a reason (post-13.5, #328)
 
 D51 found the router blind to latency for months. The axis was
 measured the whole time; the table builder simply never copied the

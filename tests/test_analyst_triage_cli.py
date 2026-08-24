@@ -297,7 +297,9 @@ def _plain(text: str) -> str:
 def test_remediation_without_an_approver_is_refused_before_any_io():
     """Argument guards live in the command, and reject before the
     journey — so this needs no stores and no stubs."""
-    result = runner.invoke(app, ["triage", VM, "--remediate", "set_attrs:state=drained"])
+    result = runner.invoke(
+        app, ["triage", VM, "--fired-at", FIRED, "--remediate", "set_attrs:state=drained"]
+    )
     assert result.exit_code != 0
     plain = _plain(result.output)
     assert "--approver" in plain and "--remediate" in plain
@@ -307,6 +309,14 @@ def test_a_naive_fired_at_is_refused_before_any_io():
     result = runner.invoke(app, ["triage", VM, "--fired-at", "2026-01-02T03:04:05"])
     assert result.exit_code != 0
     assert "offset" in _plain(result.output)
+
+
+def test_an_omitted_fired_at_is_refused_not_defaulted_to_wall_clock():
+    """A wall-clock default in a seeded world would place the alert
+    months ahead of every event in the store."""
+    result = runner.invoke(app, ["triage", VM])
+    assert result.exit_code != 0
+    assert "--fired-at" in _plain(result.output)
 
 
 @pytest.mark.parametrize(
@@ -424,7 +434,18 @@ def test_the_command_hands_the_journey_what_it_built(wiring):
     session, sink, captured, db = wiring
     result = runner.invoke(
         app,
-        ["triage", VM, "--db", db, "--approver", "fran", "--remediate", "set_attrs:state=x"],
+        [
+            "triage",
+            VM,
+            "--fired-at",
+            FIRED,
+            "--db",
+            db,
+            "--approver",
+            "fran",
+            "--remediate",
+            "set_attrs:state=x",
+        ],
     )
     assert result.exit_code == 0, result.output
     io = captured["io"]
@@ -436,7 +457,7 @@ def test_the_command_hands_the_journey_what_it_built(wiring):
 
 def test_a_report_only_run_opens_no_stream_at_all(wiring):
     session, sink, captured, db = wiring
-    result = runner.invoke(app, ["triage", VM, "--db", db])
+    result = runner.invoke(app, ["triage", VM, "--fired-at", FIRED, "--db", db])
     assert result.exit_code == 0, result.output
     assert captured["io"].emit is None
     assert not sink.closed  # never constructed, so nothing to close
@@ -452,7 +473,18 @@ def test_the_journeys_exit_code_reaches_the_shell_and_nothing_leaks(wiring, monk
     monkeypatch.setattr("resgraph.analyst.cli.triage_journey", failing_journey)
     result = runner.invoke(
         app,
-        ["triage", VM, "--db", db, "--approver", "fran", "--remediate", "set_attrs:state=x"],
+        [
+            "triage",
+            VM,
+            "--fired-at",
+            FIRED,
+            "--db",
+            db,
+            "--approver",
+            "fran",
+            "--remediate",
+            "set_attrs:state=x",
+        ],
     )
     assert result.exit_code != 0
     assert session.closed and sink.closed, "an exception must still close the session and the sink"
@@ -463,7 +495,18 @@ def test_a_nonzero_journey_becomes_a_nonzero_exit(wiring):
     captured["code"] = 1
     result = runner.invoke(
         app,
-        ["triage", VM, "--db", db, "--approver", "fran", "--remediate", "set_attrs:state=x"],
+        [
+            "triage",
+            VM,
+            "--fired-at",
+            FIRED,
+            "--db",
+            db,
+            "--approver",
+            "fran",
+            "--remediate",
+            "set_attrs:state=x",
+        ],
     )
     assert result.exit_code == 1
     assert session.closed and sink.closed
@@ -497,7 +540,18 @@ def test_dry_run_wiring_builds_no_sink_and_passes_no_emit(wiring):
     """The flag changes what the composition root constructs (#159)."""
     session, sink, captured, db = wiring
     result = runner.invoke(
-        app, ["triage", VM, "--db", db, "--dry-run", "--remediate", "set_attrs:state=x"]
+        app,
+        [
+            "triage",
+            VM,
+            "--fired-at",
+            FIRED,
+            "--db",
+            db,
+            "--dry-run",
+            "--remediate",
+            "set_attrs:state=x",
+        ],
     )
     assert result.exit_code == 0, result.output
     assert captured["dry_run"] is True

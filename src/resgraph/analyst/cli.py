@@ -279,7 +279,9 @@ def triage_journey(
         # must precede the emit guard: a preview has no write channel
         io.echo(render_plan_text(plan))
         io.echo("\ndry run — these messages would be emitted, and were not:")
-        for msg in preview_remediation(plan, read=capture_pre_state(io.session)):
+        for msg in preview_remediation(
+            plan, read=capture_pre_state(io.session), world_time=fired_at
+        ):
             io.echo(f"  {msg.model_dump_json()}")
         return 0
     if io.emit is None:
@@ -293,7 +295,11 @@ def triage_journey(
     subplan = [plan[i] for i in decision.applied]
     out = apply_remediation(
         ApplyRemediationIn(
-            run_id=run_id, owner=approver, steps=subplan, expires_at=decision.expires_at
+            run_id=run_id,
+            owner=approver,
+            steps=subplan,
+            world_time=fired_at,
+            expires_at=decision.expires_at,
         ),
         ctx=CallerContext(
             caller="operator",
@@ -317,7 +323,9 @@ def triage_journey(
 def triage_cmd(
     resource_id: str = typer.Argument(..., help="The alerting resource."),
     symptom: str = typer.Option("crash_loop", "--symptom", help="What fired."),
-    fired_at: str | None = typer.Option(None, "--fired-at", help="ISO-8601 UTC [now]."),
+    fired_at: str = typer.Option(
+        ..., "--fired-at", help="The alert's world time, ISO-8601 with offset."
+    ),
     remediate: Annotated[
         list[str] | None,
         typer.Option("--remediate", help="Propose a step: action[@target][:k=v]. Repeatable."),
@@ -356,7 +364,7 @@ def triage_cmd(
         raise typer.BadParameter("--dry-run needs --remediate: there is nothing to preview")
     if steps_requested and not approver and not dry_run:
         raise typer.BadParameter("--remediate needs --approver: execution is attributable")
-    fired = datetime.fromisoformat(fired_at) if fired_at else datetime.now(UTC)
+    fired = datetime.fromisoformat(fired_at)
     if fired.tzinfo is None:
         raise typer.BadParameter("--fired-at needs an offset; ambiguous time is not accepted (D2)")
 

@@ -31,6 +31,7 @@ maps each phase to its events.
 | 13 — Langfuse | D47–D50 | D46 (shape fingerprint + the Iceberg rejection, from the L9 review) |
 | 13.5 — frontier routing (mini) | D51 | D44 (dominated arms excluded; the table carries latency) |
 | post-13.5 (2026-08-21) | D52 | D44 (a fabrication disqualifies; the table requires the count), D51 (p95 as a fourth dominance axis) |
+| post-13.5 (2026-08-24) | — | D13 (the clock belongs to the world — remediation is a world event, from the cross-layer review) |
 
 ## D0 — Toolchain: typed Python, with the types enforced (phase 0)
 
@@ -501,6 +502,31 @@ first time history is replayed.
 **Reversal condition:** none foreseen for the semantics; if the
 checkpoint-plus-log implementation misses the D4 as-of budget, tune
 snapshot cadence or add partition pruning before touching semantics.
+
+**Amendment (2026-08-24): the clock belongs to the world, not the
+producer (#348, from the cross-layer review).** This decision was
+written with one producer in mind. When remediation became a second
+producer on the same stream (D28), its executor defaulted
+`event_time` to wall clock while the generator advances a simulated
+world clock — two incompatible timelines in the one column `state_at`
+sorts by, which is this decision's own rejection reason (commit time
+drifting from event time) re-entering through a producer instead of
+through Iceberg. The rule, made explicit: a remediation is a **world
+event** — an autoscaler, an operator, and this agent all mutate the
+same infrastructure, and production systems record *who caused it* as
+a dimension, never as a second timeline — so any producer writing
+into a world stamps the **world's** clock. The executor anchors to
+the alert's `fired_at` (its `now` is injectable and has no default),
+and the triage CLI requires `--fired-at` rather than defaulting to
+wall clock. In production the world's clock *is* wall clock, so every
+producer agrees without ceremony; the rule costs something only where
+it matters — a simulated world. The wall-clock moment of a
+remediation is observation time and rides the audit trail (D27),
+which #349 extends to the ingest sink.
+**Rejected:** a separate timeline or column for interventions — an
+as-of query would omit a fix that had already taken effect, and
+"did the remediation precede the second alert" becomes unanswerable,
+which is the exact question this store exists to answer.
 
 **D12/D13 addendum (reviewed against Kreps' "The Log"):** this design
 splits what Kafka unifies — the *subscribable* log (Redis stream,

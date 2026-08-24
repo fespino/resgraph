@@ -20,7 +20,7 @@ own chapter, so reading in order watches it fill in.
 
 ```mermaid
 flowchart TD
-    loop["<b>the dev loop</b><br/>CI gates, review, the decision log<br/>#00 #01 #30 #33 #36"]
+    loop["<b>the dev loop</b><br/>CI gates, review, the decision log<br/>#00 #01 #30 #33 #36 #39"]
     gen["<b>generator</b><br/>a deterministic synthetic cloud, seeded<br/>#02"]
     hot["<b>hot graph</b><br/>current state, benchmarked<br/>#03"]
     ing["<b>ingest</b><br/>one watermark, three guarantees<br/>#04"]

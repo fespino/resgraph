@@ -66,7 +66,7 @@ services:
     # API on 11434; models.yaml's qwen-local-* setups point here.
     #   docker compose --profile local up -d
     profiles: ["local"]
-    image: ollama/ollama:0.32.13@sha256:77f1a2a54460f0380f2611e1464233d9b82cb6e58afc8f60abec0061049d2d82
+    image: ollama/ollama:0.32.15@sha256:57d60e686821ea81a7748a3ec8141308c8b8f95b27105713954abf7a6529e700
     # matches the context_window the qwen-local-* setups declare; the
     # server default is the knob Ollama's OpenAI endpoint cannot set per-call
     environment: {OLLAMA_CONTEXT_LENGTH: "8192"}
@@ -82,7 +82,7 @@ services:
     # up leaves a ready worker instead of a manual pull step. Override the size
     # for a RAM-tight host: OLLAMA_MODEL=qwen2.5:1.5b docker compose --profile local up
     profiles: ["local"]
-    image: ollama/ollama:0.32.13@sha256:77f1a2a54460f0380f2611e1464233d9b82cb6e58afc8f60abec0061049d2d82
+    image: ollama/ollama:0.32.15@sha256:57d60e686821ea81a7748a3ec8141308c8b8f95b27105713954abf7a6529e700
     depends_on:
       ollama: {condition: service_healthy}
     environment: {OLLAMA_HOST: "ollama:11434"}

@@ -78,6 +78,46 @@ def test_snapshot_accelerated_equals_pure_replay(catalog, i):
     assert accel == pure
 
 
+def test_a_remediation_is_a_world_event_and_state_at_sees_it_in_order(tmp_path):
+    """Two producers, one timeline: the remediation anchors to the
+    alert's world time, so state_at just after the alert sees the fix."""
+    from resgraph.analyst.executor import Remediator
+    from resgraph.analyst.remediation import PlannedStep
+
+    cat = store.get_catalog(tmp_path)
+    store.ensure_tables(cat)
+    store.append_events(cat, MSGS)
+
+    fired = MSGS[-1].event_time  # the alert's world time: the anchor
+    live = queries.state_at(cat, fired)
+    row = live[0]  # any resource alive at the alert
+    victim = row["resource_id"]
+
+    emitted: list[UpdateMessage] = []
+    remediator = Remediator(
+        read=lambda _t: {"applied_seq": row["sequence"], "attrs": row["attrs"], "rels": []},
+        emit=emitted.extend,
+        now=lambda: fired,
+        confirm_attempts=1,
+    )
+    msg = remediator.plan_message(
+        PlannedStep(action="set_attrs", target=victim, patch={"state": "drained"}, pre_state=None)
+    )
+    assert msg.event_time == fired  # the world's clock, not this machine's
+    store.append_events(cat, [msg])
+
+    after = {r["resource_id"]: r for r in queries.state_at(cat, fired)}
+    assert after[victim]["attrs"]["state"] == "drained"  # the fix is visible at its world time
+    just_before = {
+        r["resource_id"]: r
+        for r in queries.state_at(cat, MSGS[-2].event_time)
+        if r["resource_id"] == victim
+    }
+    if victim in just_before:  # and invisible before it fired
+        assert just_before[victim]["attrs"].get("state") != "drained"
+    assert len(after) == len(live)  # a remediation edits the world; it does not grow it
+
+
 def test_duplicate_append_changes_no_answer(tmp_path):
     cat = store.get_catalog(tmp_path)
     store.ensure_tables(cat)

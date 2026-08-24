@@ -7,6 +7,7 @@ regression in either shows up here rather than only against a store.
 """
 
 import copy
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
@@ -23,6 +24,8 @@ from resgraph.tools.context import CallerContext
 
 VM = "vm-000001"
 HOST = "host-000001"
+# the world's clock: the alert's fired_at
+ANCHOR = datetime(2026, 1, 2, 3, 4, 5, tzinfo=UTC)
 
 
 def node(resource_id: str, seq: int, attrs: dict[str, Any], rels: list[tuple[str, str]]):
@@ -72,7 +75,7 @@ class FakeWorld:
 
 
 def remediator(world: FakeWorld) -> Remediator:
-    return Remediator(read=world.read, emit=world.emit, sleep=lambda _s: None)
+    return Remediator(read=world.read, emit=world.emit, now=lambda: ANCHOR, sleep=lambda _s: None)
 
 
 def step(action: str, target: str, patch: dict[str, Any], pre: dict[str, Any] | None):
@@ -200,7 +203,10 @@ def _ctx(caller: str, world: FakeWorld, *, scopes: frozenset[str], emit: bool = 
 def test_the_agents_identity_can_never_execute():
     world = FakeWorld({VM: node(VM, 7, {}, [])})
     args = ApplyRemediationIn(
-        run_id="r1", owner="ops", steps=[step("set_attrs", VM, {"a": "b"}, world.read(VM))]
+        run_id="r1",
+        owner="ops",
+        steps=[step("set_attrs", VM, {"a": "b"}, world.read(VM))],
+        world_time=ANCHOR,
     )
     with pytest.raises(PermissionError, match="operator-only"):
         apply_remediation(args, ctx=_ctx("analyst", world, scopes=frozenset({"resgraph:write"})))
@@ -209,7 +215,10 @@ def test_the_agents_identity_can_never_execute():
 def test_an_operator_without_a_write_channel_cannot_execute():
     world = FakeWorld({VM: node(VM, 7, {}, [])})
     args = ApplyRemediationIn(
-        run_id="r1", owner="ops", steps=[step("set_attrs", VM, {"a": "b"}, world.read(VM))]
+        run_id="r1",
+        owner="ops",
+        steps=[step("set_attrs", VM, {"a": "b"}, world.read(VM))],
+        world_time=ANCHOR,
     )
     with pytest.raises(PermissionError, match="no write channel"):
         apply_remediation(
@@ -220,7 +229,10 @@ def test_an_operator_without_a_write_channel_cannot_execute():
 def test_an_operator_without_the_write_scope_cannot_execute():
     world = FakeWorld({VM: node(VM, 7, {}, [])})
     args = ApplyRemediationIn(
-        run_id="r1", owner="ops", steps=[step("set_attrs", VM, {"a": "b"}, world.read(VM))]
+        run_id="r1",
+        owner="ops",
+        steps=[step("set_attrs", VM, {"a": "b"}, world.read(VM))],
+        world_time=ANCHOR,
     )
     with pytest.raises(PermissionError, match="resgraph:write"):
         apply_remediation(args, ctx=_ctx("operator", world, scopes=frozenset({"resgraph:read"})))
@@ -242,12 +254,21 @@ def test_rollback_of_a_revived_resource_puts_the_tombstone_back():
     assert world.nodes[VM]["deleted"] is True
 
 
+def test_a_resource_at_sequence_zero_is_not_treated_as_never_applied():
+    """`or -1` read applied_seq 0 as never-applied and minted a message the watermark drops."""
+    world = FakeWorld({VM: node(VM, 0, {"role": "web"}, [])})
+    msg = remediator(world).plan_message(step("set_attrs", VM, {"role": "drained"}, None))
+    assert msg.sequence == 1  # ahead of the watermark, not equal to it
+
+
 def test_dry_run_shows_the_message_it_would_send_and_sends_nothing():
     world = FakeWorld({VM: node(VM, 7, {"role": "web", "az": "a"}, [("RUNS_ON", HOST)])})
     from resgraph.analyst.executor import preview_remediation
 
     msgs = preview_remediation(
-        [step("set_attrs", VM, {"role": "drained"}, world.read(VM))], read=world.read
+        [step("set_attrs", VM, {"role": "drained"}, world.read(VM))],
+        read=world.read,
+        world_time=ANCHOR,
     )
 
     assert world.emitted == [], "a preview that writes is not a preview"
@@ -265,11 +286,11 @@ def test_the_preview_and_the_apply_agree_by_construction():
 
     world = FakeWorld({VM: node(VM, 7, {"role": "web"}, [])})
     s = step("set_attrs", VM, {"role": "drained"}, world.read(VM))
-    previewed = preview_remediation([s], read=world.read)[0]
+    previewed = preview_remediation([s], read=world.read, world_time=ANCHOR)[0]
 
     remediator(world).apply_step(s)
     sent = world.emitted[0]
-    assert sent.model_dump(exclude={"event_time"}) == previewed.model_dump(exclude={"event_time"})
+    assert sent.model_dump() == previewed.model_dump()  # event_time included
 
 
 def test_an_expired_grant_is_refused():
@@ -280,6 +301,7 @@ def test_an_expired_grant_is_refused():
         run_id="r1",
         owner="ops",
         steps=[step("set_attrs", VM, {"a": "b"}, world.read(VM))],
+        world_time=ANCHOR,
         expires_at=datetime.now(UTC) - timedelta(seconds=1),
     )
     with pytest.raises(PermissionError, match="expired"):
@@ -299,6 +321,7 @@ def test_a_live_grant_executes(monkeypatch):
         run_id="r1",
         owner="ops",
         steps=[step("set_attrs", VM, {"role": "drained"}, world.read(VM))],
+        world_time=ANCHOR,
         expires_at=datetime.now(UTC) + timedelta(minutes=15),
     )
     out = apply_remediation(args, ctx=_ctx("operator", world, scopes=frozenset({"resgraph:write"})))

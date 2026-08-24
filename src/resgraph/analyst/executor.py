@@ -18,7 +18,7 @@ Two properties fall out of D2 and matter more than they look:
   longer restores anything and the step reports itself irreversible
   rather than clobbering a third party's write.
 
-Decisions: D28 (SPEC.md).
+Decisions: D13, D28 (SPEC.md).
 """
 
 import signal
@@ -50,6 +50,8 @@ class ApplyRemediationIn(BaseModel):
     run_id: str = Field(min_length=1)
     owner: str = Field(min_length=1)
     steps: list[PlannedStep] = Field(min_length=1)
+    # the world's clock — the alert's fired_at, never this machine's
+    world_time: AwareDatetime
     # the authority contract's missing field (#152): an approval is a
     # grant, and a grant without a lifetime never expires
     expires_at: AwareDatetime | None = None
@@ -85,11 +87,12 @@ def _rel_models(rels: list[tuple[str, str]]) -> list[Relationship]:
 @dataclass
 class Remediator:
     """The apply/rollback pair the step machine drives. Injectable end
-    to end so the contract is testable without a store or a stream."""
+    to end so the contract is testable without a store or a stream.
+    `now` is the world's clock and has no default."""
 
     read: Callable[[str], dict[str, Any] | None]
     emit: Callable[[list[UpdateMessage]], None]
-    now: Callable[[], datetime] = lambda: datetime.now(UTC)
+    now: Callable[[], datetime]
     sleep: Callable[[float], None] = time.sleep
     confirm_attempts: int = 40
     confirm_delay_s: float = 0.05
@@ -142,7 +145,9 @@ class Remediator:
         live = self._state(step.target)
         if live is None:
             raise RuntimeError(f"{step.target}: not in the graph; nothing to remediate")
-        sequence = (live.get("applied_seq") or -1) + 1
+        # absence is None; zero is a live sequence `or` would misread
+        applied = live.get("applied_seq")
+        sequence = (applied if applied is not None else -1) + 1
         if step.action == DELETE:
             return self._message(target=step.target, sequence=sequence, op=Op.DELETE)
         # upsert replaces the bag: merge onto live state, not onto the
@@ -203,15 +208,20 @@ def _revocable(machine: StepMachine, owner: str) -> Generator[None]:
 
 
 def preview_remediation(
-    steps: list[PlannedStep], *, read: Callable[[str], dict[str, Any] | None]
+    steps: list[PlannedStep],
+    *,
+    read: Callable[[str], dict[str, Any] | None],
+    world_time: datetime,
 ) -> list[UpdateMessage]:
     """--dry-run: the messages the plan would emit, computed by the
-    same code that would send them, written nowhere."""
+    same code that would send them, written nowhere. The preview takes
+    the same world anchor as the apply, so the two agree to the byte —
+    event_time included."""
 
     def refuse(_msgs: list[UpdateMessage]) -> None:
         raise RuntimeError("dry-run must not emit")
 
-    remediator = Remediator(read=read, emit=refuse)
+    remediator = Remediator(read=read, emit=refuse, now=lambda: world_time)
     return [remediator.plan_message(step) for step in steps]
 
 
@@ -224,7 +234,11 @@ def apply_remediation(args: ApplyRemediationIn, *, ctx: CallerContext) -> ApplyR
             f"the approval expired at {args.expires_at.isoformat()}; "
             "re-approve rather than executing a stale grant"
         )
-    remediator = Remediator(read=capture_pre_state(ctx.query.require("hot")), emit=emit)
+    remediator = Remediator(
+        read=capture_pre_state(ctx.query.require("hot")),
+        emit=emit,
+        now=lambda: args.world_time,
+    )
     machine = StepMachine(
         args.steps,
         run_id=args.run_id,

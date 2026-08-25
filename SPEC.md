@@ -518,15 +518,42 @@ a dimension, never as a second timeline — so any producer writing
 into a world stamps the **world's** clock. The executor anchors to
 the alert's `fired_at` (its `now` is injectable and has no default),
 and the triage CLI requires `--fired-at` rather than defaulting to
-wall clock. In production the world's clock *is* wall clock, so every
-producer agrees without ceremony; the rule costs something only where
-it matters — a simulated world. The wall-clock moment of a
-remediation is observation time and rides the audit trail (D27),
-which #349 extends to the ingest sink.
+wall clock.
+
+Stated precisely — this sharpening is the adversarial pass on the fix
+itself, which found the first draft claiming more than the code does:
+what the anchor stamps is the intervention's **placement**, the
+earliest world time at which it can be said to exist. In a frozen
+world — nothing arrives during triage, which is every seeded world
+this repo can construct — placement and effect coincide and the stamp
+is exact. In a live world they diverge by the triage duration: the
+stamp is a lower bound, the fix reads as landing at its alert, and
+the audit trail (D27), which records the apply moment on observation
+time, is the authority for when the act actually happened. The two
+candidate stamps partition the deployments between them — wall clock
+at apply is exact live and wrong in every simulation; the anchor is
+exact in simulation and a lower bound live — and when the old and new
+answers split the world that way, the fix owed a sentence, not just
+code. This is that sentence. Residuals, named rather than
+discovered: the anchor is an operator input with no plausibility
+check against the store (the world's current time is unobservable
+from the triage path — the hot store carries no clock by design), and
+per-resource order then rests entirely on sequences minted by
+producers that never coordinate (#370).
 **Rejected:** a separate timeline or column for interventions — an
 as-of query would omit a fix that had already taken effect, and
 "did the remediation precede the second alert" becomes unanswerable,
-which is the exact question this store exists to answer.
+which is the exact question this store exists to answer. Also
+rejected: keeping the wall-clock-at-apply stamp (the pre-amendment
+behaviour) — exact in a live deployment and wrong in every simulated
+one, and a default cannot serve both; the divergence it would have
+hidden is bounded by the triage duration, which the audit trail
+records exactly.
+**Reversal condition (for the placement semantics):** a triage path
+that can observe the world's current clock — e.g. the executor
+reading `max(event_time)` at apply — would let the stamp be the
+effect time in both deployment shapes, and the placement caveat
+dissolves.
 
 **D12/D13 addendum (reviewed against Kreps' "The Log"):** this design
 splits what Kafka unifies — the *subscribable* log (Redis stream,

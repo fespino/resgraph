@@ -8,8 +8,8 @@
 | src/resgraph/analyst/\_\_init\_\_.py         |        0 |        0 |    100% |           |
 | src/resgraph/analyst/approval.py             |       56 |        1 |     98% |       122 |
 | src/resgraph/analyst/audit.py                |       94 |        1 |     99% |       261 |
-| src/resgraph/analyst/cli.py                  |      203 |        1 |     99% |       356 |
-| src/resgraph/analyst/executor.py             |      111 |        1 |     99% |       212 |
+| src/resgraph/analyst/cli.py                  |      203 |        0 |    100% |           |
+| src/resgraph/analyst/executor.py             |      111 |        1 |     99% |       222 |
 | src/resgraph/analyst/harness.py              |      190 |        2 |     99% |    59, 63 |
 | src/resgraph/analyst/models.py               |       16 |        0 |    100% |           |
 | src/resgraph/analyst/prompts.py              |       35 |        0 |    100% |           |
@@ -106,7 +106,7 @@
 | src/resgraph/tools/context.py                |        9 |        0 |    100% |           |
 | src/resgraph/tools/http.py                   |       21 |        0 |    100% |           |
 | src/resgraph/tools/registry.py               |       24 |        0 |    100% |           |
-| **TOTAL**                                    | **6427** |  **131** | **98%** |           |
+| **TOTAL**                                    | **6427** |  **130** | **98%** |           |
 
 
 ## Setup coverage badge

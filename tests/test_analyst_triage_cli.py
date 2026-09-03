@@ -294,6 +294,12 @@ def _plain(text: str) -> str:
     return re.sub(r"[^\w\s.:=@-]", " ", re.sub(r"\x1b\[[0-9;]*m", "", text))
 
 
+def test_a_dry_run_without_steps_is_refused_before_any_io():
+    result = runner.invoke(app, ["triage", VM, "--fired-at", FIRED, "--dry-run"])
+    assert result.exit_code != 0
+    assert "nothing to preview" in _plain(result.output)
+
+
 def test_remediation_without_an_approver_is_refused_before_any_io():
     """Argument guards live in the command, and reject before the
     journey — so this needs no stores and no stubs."""

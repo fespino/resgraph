@@ -32,6 +32,7 @@ maps each phase to its events.
 | 13.5 — frontier routing (mini) | D51 | D44 (dominated arms excluded; the table carries latency) |
 | post-13.5 (2026-08-21) | D52 | D44 (a fabrication disqualifies; the table requires the count), D51 (p95 as a fourth dominance axis) |
 | post-13.5 (2026-08-24) | — | D13 (the clock belongs to the world — remediation is a world event, from the cross-layer review) |
+| post-13.5 (2026-09-03) | — | D12 (a divergent sequence tie is refused, never arbitrated — two producers, one counter each) |
 
 ## D0 — Toolchain: typed Python, with the types enforced (phase 0)
 
@@ -450,6 +451,37 @@ Two tables:
 At-least-once delivery means duplicate appends are allowed; readers
 dedupe on `(resource_id, sequence)` — duplicate rows are identical by
 D2, so any survivor is correct. The writer stays dumb and fast.
+
+**Amendment (2026-09-03): a divergent tie is refused, never
+arbitrated (#370, from the adversarial pass on the #348 fix).** The
+paragraph above holds only while duplicates are identical, and the
+platform now has two producers minting sequences that never
+coordinate: the generator's global counter and the remediation
+executor's per-resource `applied_seq + 1`. If they ever mint one
+`(resource_id, sequence)` for two *different* events, the hot store's
+watermark drops the second loudly (the confirm loop reports it), but
+the cold store keeps both rows — and the reader's `row_number()`
+tie-break picked a winner arbitrarily, nondeterministically across
+runs (the cross-layer review's F11). Every cold read now probes its
+own scan for a sequence carried by two different rows and raises,
+naming the resource and sequence, instead of answering. The probe is
+scoped to the columns the query reads — a divergence invisible to
+the projection cannot change that query's answer — except `op`,
+which is always probed, because an upsert/delete tie is a dispute
+about the resource's *existence*. Cost: one aggregation over the
+already-registered scan, never a second Iceberg read. This also makes
+the stated key honest: `(resource_id, sequence)` now genuinely is the
+reader's key — identical duplicates collapse, divergent claimants
+refuse — where before the implemented key was the whole row and the
+safety was a convention's side effect.
+**Rejected (for #370):** coordinating the mints — the executor
+allocating from the world's counter needs a global high-water mark
+only the cold store holds, coupling the executor to a store it
+deliberately does not read; and namespacing the sequence space per
+producer changes what `sequence` means in D2/D3 for every consumer.
+Detection turns the silent wrong answer into a named refusal at the
+only layer that retains both claimants, which is the cheaper honest
+control until a collision is ever actually observed.
 **Rejected:** merge-on-write current-state table — destroys history,
 which is the entire point of the cold half.
 **Rejected:** dedupe-at-write (equality deletes) — write amplification

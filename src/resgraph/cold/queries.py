@@ -4,9 +4,11 @@ state_at(T) = nearest snapshot at or before T, plus a replay of the
 events between the snapshot's watermark and T — highest sequence per
 resource wins, deletes mean absent. All reads dedupe on
 (resource_id, sequence): at-least-once appends make duplicate rows
-legal and identical (D12).
+legal and identical (D12). Two rows sharing a sequence with different
+content are not redelivery — they are two producers colliding, and
+every read refuses them rather than arbitrating a winner.
 
-Decisions: D13 (SPEC.md).
+Decisions: D12, D13 (SPEC.md).
 """
 
 import json
@@ -51,6 +53,35 @@ def _state_sql(data_cols: tuple[str, ...]) -> str:
     # (D16) with all values as bound parameters.
     cols = ", ".join(("resource_id", *data_cols, "sequence"))
     return _STATE_TEMPLATE.format(cols=cols)  # nosec B608
+
+
+def _refuse_divergent_ties(
+    con: duckdb.DuckDBPyConnection,
+    cols: tuple[str, ...],
+    where: str,
+    params: dict[str, Any],
+) -> None:
+    """Probe the already-registered scan for one (resource_id, sequence)
+    carried by two different rows. Scoped to the columns this query
+    reads: a divergence invisible to the projection cannot change the
+    answer, and the probe costs one aggregation, never a second scan."""
+    listed = ", ".join(("resource_id", "sequence", "op", *cols))
+    ties = con.execute(
+        f"""
+        SELECT resource_id, sequence
+        FROM (SELECT DISTINCT {listed} FROM events WHERE {where})
+        GROUP BY resource_id, sequence HAVING count(*) > 1
+        ORDER BY resource_id LIMIT 5
+        """,  # nosec B608 - identifiers from _DATA_COLS, values bound
+        params,
+    ).fetchall()
+    if ties:
+        named = ", ".join(f"{rid}@{seq}" for rid, seq in ties)
+        raise ValueError(
+            f"same sequence, different content: {named} — two producers minted one "
+            "sequence; the watermark absorbs redelivery, not collision, so any "
+            "winner here would be arbitrary"
+        )
 
 
 _EMPTY_BASE = pa.table(
@@ -137,6 +168,9 @@ def state_at(
             fields=("resource_id", "sequence", "op", "event_time", *inner_cols),
         ),
     )
+    _refuse_divergent_ties(
+        con, inner_cols, "event_time <= $t AND sequence > $wm", {"t": t, "wm": wm}
+    )
     sql = _state_sql(inner_cols)
     out_sel = ", ".join(("resource_id", *out_cols, "sequence"))
     if where and annotate:
@@ -160,6 +194,9 @@ def history(catalog: Catalog, resource_id: str, limit: int = 100) -> list[dict[s
     """A resource's message history, oldest first, deduped."""
     con = duckdb.connect()
     con.register("events", _events_arrow(catalog))
+    _refuse_divergent_ties(
+        con, ("event_time", "attrs", "relationships"), "resource_id = $rid", {"rid": resource_id}
+    )
     rows = (
         con.execute(
             """
@@ -203,6 +240,7 @@ def tombstones_at(catalog: Catalog, t: datetime) -> list[dict[str, Any]]:
     alive rows, so a delete below the snapshot watermark would hide."""
     con = duckdb.connect()
     con.register("events", _events_arrow(catalog))
+    _refuse_divergent_ties(con, ("resource_type", "event_time"), "event_time <= $t", {"t": t})
     return (
         con.execute(
             """

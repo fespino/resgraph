@@ -30,7 +30,7 @@ services:
     # Observability profile (D17): opt-in so default runs stay lean —
     # the observer must not distort the benchmarks it observes.
     profiles: ["obs"]
-    image: prom/prometheus:v3.13.2@sha256:508729e0e2d18e11fd742a5a5ca70e557b940a93948c3c95fd0123a6fd538b69
+    image: prom/prometheus:v3.14.0@sha256:5ce7540c3c00ef4ab0c9d2c995c6a5b9c421f44b4a115d97a2c7af3b1c21cbb0
     ports: ["127.0.0.1:9090:9090"]
     volumes:
       - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
@@ -38,7 +38,7 @@ services:
     extra_hosts: ["host.docker.internal:host-gateway"]
   grafana:
     profiles: ["obs"]
-    image: grafana/grafana:13.1.3@sha256:ab5cb380e3ff3172d6c8bd2e7cfd31cce977d2881b260e1f5bc089bf0b759b43
+    image: grafana/grafana:13.2.0@sha256:3fd54ae1214669f8355f065ec9f6445d5279a3d77095ab048ca045685272429b
     ports: ["127.0.0.1:3000:3000"]
     # anonymous admin: a local-only dashboard behind no network boundary;
     # auth here would be theater
@@ -66,7 +66,7 @@ services:
     # API on 11434; models.yaml's qwen-local-* setups point here.
     #   docker compose --profile local up -d
     profiles: ["local"]
-    image: ollama/ollama:0.32.13@sha256:77f1a2a54460f0380f2611e1464233d9b82cb6e58afc8f60abec0061049d2d82
+    image: ollama/ollama:0.32.15@sha256:57d60e686821ea81a7748a3ec8141308c8b8f95b27105713954abf7a6529e700
     # matches the context_window the qwen-local-* setups declare; the
     # server default is the knob Ollama's OpenAI endpoint cannot set per-call
     environment: {OLLAMA_CONTEXT_LENGTH: "8192"}
@@ -82,7 +82,7 @@ services:
     # up leaves a ready worker instead of a manual pull step. Override the size
     # for a RAM-tight host: OLLAMA_MODEL=qwen2.5:1.5b docker compose --profile local up
     profiles: ["local"]
-    image: ollama/ollama:0.32.13@sha256:77f1a2a54460f0380f2611e1464233d9b82cb6e58afc8f60abec0061049d2d82
+    image: ollama/ollama:0.32.15@sha256:57d60e686821ea81a7748a3ec8141308c8b8f95b27105713954abf7a6529e700
     depends_on:
       ollama: {condition: service_healthy}
     environment: {OLLAMA_HOST: "ollama:11434"}
@@ -148,7 +148,7 @@ services:
     environment: *langfuse-env
   langfuse-postgres:
     profiles: ["langfuse"]
-    image: postgres:17@sha256:e38411452a464af89e5adadb8d223bf53b898d47d6ef918b2d58c08707350449
+    image: postgres:18@sha256:06cad38a5d9f5d24b4d83d86def30795d5e4b757fedbf5281172b576dedcd941
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -163,7 +163,7 @@ services:
       retries: 10
   langfuse-clickhouse:
     profiles: ["langfuse"]
-    image: clickhouse/clickhouse-server:25.12@sha256:8a790dd3468db22b1d4e7b18a176f378ff5ff6053b9c48dd4ea1fa71a24c5ba6
+    image: clickhouse/clickhouse-server:26.7@sha256:800e82865530eb2f1c4bc1b960e43b435fd9b2d83b4bd04a2564a5cfd88fdb6e
     user: "101:101"
     environment:
       CLICKHOUSE_DB: default

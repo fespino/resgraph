@@ -118,6 +118,48 @@ def test_a_remediation_is_a_world_event_and_state_at_sees_it_in_order(tmp_path):
     assert len(after) == len(live)  # a remediation edits the world; it does not grow it
 
 
+def test_a_divergent_sequence_tie_is_refused_not_arbitrated(tmp_path):
+    """Byte-identical duplicates are redelivery and stay legal; one
+    (resource_id, sequence) carried by two different rows is two
+    producers colliding, and the old reader picked a winner
+    arbitrarily. Every read now refuses it, naming the resource."""
+    cat = store.get_catalog(tmp_path)
+    store.ensure_tables(cat)
+    store.append_events(cat, MSGS)
+    victim = next(m for m in reversed(MSGS) if m.op is Op.UPSERT)
+    forged = victim.model_copy(update={"attrs": {**victim.attrs, "state": "forged"}})
+    store.append_events(cat, [forged])
+    t = MSGS[-1].event_time
+
+    with pytest.raises(ValueError, match=victim.resource_id):
+        queries.state_at(cat, t)
+    with pytest.raises(ValueError, match="different content"):
+        queries.history(cat, victim.resource_id)
+    # a divergence the projection cannot see cannot change the answer,
+    # so a query that never reads attrs still serves
+    rows = queries.state_at(cat, t, projection=("resource_type",))
+    assert any(r["resource_id"] == victim.resource_id for r in rows)
+
+
+def test_an_upsert_delete_tie_is_a_presence_dispute_and_always_refused(tmp_path):
+    """When the two claimants disagree on op, the resource's existence
+    is what the arbitrary pick would decide — caught under any
+    projection, because op is always part of the probe."""
+    cat = store.get_catalog(tmp_path)
+    store.ensure_tables(cat)
+    store.append_events(cat, MSGS)
+    victim = next(m for m in reversed(MSGS) if m.op is Op.UPSERT)
+    t = MSGS[-1].event_time
+    tombstones_before = queries.tombstones_at(cat, t)
+    flipped = victim.model_copy(update={"op": Op.DELETE, "attrs": {}, "relationships": []})
+    store.append_events(cat, [flipped])
+    with pytest.raises(ValueError, match="different content"):
+        queries.state_at(cat, t, projection=("resource_type",))
+    with pytest.raises(ValueError, match=victim.resource_id):
+        queries.tombstones_at(cat, t)
+    assert victim.resource_id not in {r["resource_id"] for r in tombstones_before}
+
+
 def test_duplicate_append_changes_no_answer(tmp_path):
     cat = store.get_catalog(tmp_path)
     store.ensure_tables(cat)

@@ -36,7 +36,8 @@ per-layer review that came before.
     browse the repository as it stood when this was written at
     [`ffa83b4`](https://github.com/fespino/resgraph/tree/ffa83b4).
     Every snippet below is copied from that commit, trimmed only for
-    length.
+    length. The clock fix described mid-post landed just after, in
+    [PR #356](https://github.com/fespino/resgraph/pull/356).
 
 In this phase: the review itself
 ([#329](https://github.com/fespino/resgraph/issues/329) →
@@ -46,7 +47,9 @@ full record is committed as
 — every finding with its `file:line` citations, so this post can
 excerpt where the record already carries the detail. The findings
 worth acting on are filed as
-[#348](https://github.com/fespino/resgraph/issues/348),
+[#348](https://github.com/fespino/resgraph/issues/348) — already
+fixed in [PR #356](https://github.com/fespino/resgraph/pull/356),
+whose story is below —
 [#349](https://github.com/fespino/resgraph/issues/349),
 [#350](https://github.com/fespino/resgraph/issues/350) and
 [#351](https://github.com/fespino/resgraph/issues/351), with
@@ -216,11 +219,101 @@ clock is injectable and every test injects it, and live remediation
 is an operator path the eval harness does not exercise. Neither is a
 defence of the default — it is the reason the default survived.
 
-The fix is deliberately not in this post, because it is not a
-one-line patch. The issue records it as a question about what a
-remediation *is*: an event in the world, which needs a world clock,
-or an intervention from outside it, which must not share a column
-with world time. That decision deserves its own record.
+The fix ([PR #356](https://github.com/fespino/resgraph/pull/356))
+hinges on what a remediation *is*, and the option that *sounds*
+more honest — an intervention from outside the world, kept on its
+own timeline — is the one that dies on contact with production. An
+autoscaler resizing a pool, an operator rotating a credential and
+this agent restarting a container are all the same kind of thing:
+mutations of one infrastructure by different actors. Real systems
+record *who caused a change* as a dimension and keep *when it took
+effect* on the one shared clock, because the moment interventions
+live on a separate timeline, every as-of query omits a fix that had
+already taken effect and "did the remediation precede the second
+alert" — the question the store exists to answer — becomes
+unanswerable. What genuinely lives outside the world is the
+*decision* to remediate (intent, approval, attribution), and that
+already rides the audit trail on observation time. The executor
+emitting into the same stream as the generator was correct
+architecture; only the clock source was wrong.
+
+So the rule is that the clock belongs to the world, not the
+producer. The executor now anchors to the alert's `fired_at`; its
+clock is still injectable but no longer has a default, because a
+silent wall-clock read *is* the bug. The CLI requires `--fired-at`
+instead of defaulting an omitted flag to wall clock — the sibling
+mistake one step earlier. And one existing test dissolved in a
+satisfying way. The preview-vs-apply test had always compared the
+two messages like this:
+
+```python
+# tests/test_analyst_executor.py
+    assert sent.model_dump(exclude={"event_time"}) == previewed.model_dump(exclude={"event_time"})
+```
+
+That exclusion existed *because* two wall-clock reads can never
+agree — the suite carried the finding's fingerprint before the
+review named it. Both sides now stamp the same anchor and the
+comparison includes `event_time`.
+
+The receipt test caught two more bugs on its way in. Writing the
+as-of receipt flushed out a latent one: the executor computed the
+next sequence with `(applied_seq or -1) + 1`, so a resource at
+sequence **0** read as never-applied and was assigned a message the
+watermark silently drops — zero is a sequence, absence is `None`,
+the same absence-vs-zero confusion this review's concern list keeps
+finding. And the receipt's first draft failed *nondeterministically*
+on exactly that collision, via the cold reader's arbitrary
+equal-sequence tie-break — the review's F11 finding demonstrating
+itself inside the test written for F5.
+
+## The fix itself needed the same review
+
+That version passed CI. An adversarial pass then found it claiming
+more than it does, and the hole is invisible to every test in the
+repository.
+
+The anchor is not "the world's clock" — it is the world's clock
+*when the alert fired*, and the remediation takes effect after
+investigation and approval. The two coincide only in a **frozen**
+world, where nothing arrives during triage. Which is every seeded
+world this repository can construct — so no receipt in the suite
+can falsify the anchor, because the flaw lives in a deployment
+shape the tests cannot instantiate. Run it against a live
+deployment, where wall clock *is* the world clock: alert at 14:00,
+fix applied at 14:45. The discarded wall-clock default stamped
+14:45 — correct there — and the anchor stamps 14:00, backdating
+the fix by the whole triage duration, while the audit trail records
+the true apply time. Two committed records disagreeing about when
+one act happened, by a measurable margin: the fix had manufactured
+a fresh instance of the exact cross-layer shape the review exists
+to catch.
+
+The resolution is a sentence, not code. What the implementation
+actually stamps is the intervention's **placement** — the earliest
+world time at which it can be said to exist: exact in a frozen
+world, a lower bound in a live one, with the audit trail
+authoritative for when the act was applied. That is a legitimate
+design; it is also a *different claim* than "the world's clock,"
+and the difference is precisely the kind this post says must be
+written down rather than discovered. The D13 amendment now states
+the placement semantics, rejects wall-clock-at-apply explicitly —
+*despite* it being exact in a live deployment, because one default
+cannot serve both shapes — and carries the reversal condition: a
+triage path that can observe the world's current clock would make
+the stamp the effect time everywhere and dissolve the caveat. The
+pass's third hit — per-resource order now rests entirely on
+sequences minted by two producers that never coordinate — is filed
+as [#370](https://github.com/fespino/resgraph/issues/370).
+
+Two tells from the arc, worth more than the fix. When the old
+answer and the new answer *partition the deployments between them* —
+wall clock right live and wrong simulated, the anchor exact
+simulated and a lower bound live — the semantics are
+under-specified, and the real fix is a sentence. And a fix
+validated only in worlds where its approximation is exact is
+unvalidated; the countermeasure here was social, not technical —
+attack your own merged-in argument before someone else has to.
 
 ## The recurring shape: a strict consumer above a lax producer
 
@@ -376,14 +469,22 @@ tests and dropped metrics, one level up.
   a document; the code is the territory. The correction here changed
   a content-leak claim into a metering bug, which is a different fix
   with a different urgency.
+- **Attack the fix against the deployments your tests cannot
+  build.** The clock fix's hole was invisible to every world the
+  suite can construct, and the tell was cheap to spot in review:
+  the discarded solution was *right somewhere*. When old and new
+  answers split the deployment shapes between them, write the
+  semantics down before merging the code.
 
 The full record, with every finding cited to `file:line`, is
 [`docs/reviews/cross-layer-2026-08.md`](https://github.com/fespino/resgraph/blob/main/docs/reviews/cross-layer-2026-08.md);
 the follow-ups worth acting on now are
-[#348](https://github.com/fespino/resgraph/issues/348),
 [#349](https://github.com/fespino/resgraph/issues/349),
 [#350](https://github.com/fespino/resgraph/issues/350) and
-[#351](https://github.com/fespino/resgraph/issues/351), with the
+[#351](https://github.com/fespino/resgraph/issues/351) —
+[#348](https://github.com/fespino/resgraph/issues/348) is closed by
+the fix above, which spawned
+[#370](https://github.com/fespino/resgraph/issues/370) — with the
 tail collected in
 [#352](https://github.com/fespino/resgraph/issues/352) rather than
 scattered across sixteen tickets nobody reads.

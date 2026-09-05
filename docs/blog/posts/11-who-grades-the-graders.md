@@ -486,3 +486,55 @@ which is the only kind of answer this phase has learned to trust.
 Next phase: the analyst gets a safe runtime — permission tiers,
 budgets with enforcement, audit-at-rest, and another chaos drill,
 this time with the agent inside it.
+
+## Addendum, one month later: the inventory was missing a member
+
+This section was added after publication, when an external benchmark
+named a trust dependency this post's Layer 4 did not. The post's
+central claim is that everything resting on judgment is named —
+*trust that is named has a boundary; trust that is implicit has
+none* — and it named three things: the LLM judge, the scenario
+taxonomy, one open grader question. There is a fourth, and I did not
+see it from inside: **the development signal itself**.
+
+The certified configuration came out of eight pre-registered
+iterations, every one measured against the same thirty committed
+scenarios. The gate compares identical item sets by design — the
+right rule for regression detection, and silent on transfer. The
+mitigation sentence above, "re-skins mitigate memorization," covers
+the *agent* memorizing surface forms; it does not cover the *author*
+overfitting prompt rules to thirty specific items across eight
+rounds. Optimizing against a fixed set is itself a grader, and
+nothing in this post's four layers audits it.
+
+[HarnessDev](https://arxiv.org/abs/2609.01437) (ByteDance Seed et
+al., September 2026) put a number on the exposure: across 64
+revisions by six frontier models each iterating its own harness
+against a visible feedback set, the feedback score and the held-out
+score moved in the same direction **34 times out of 64** — 53.1%, a
+coin flip — and only 2 of 9 declared-final versions were the
+held-out optimum. Their phrasing: "repeatedly optimizing a noisy
+score can favor a lucky run and amplify overfitting." Nothing about
+this platform's discipline — pre-registration, fixed baselines, the
+fabrication halt — measures the one thing that finding is about,
+because every number the discipline produces comes from the set the
+tuning saw.
+
+The registered answer is
+[#377](https://github.com/fespino/resgraph/issues/377): the
+generator is seeded and deterministic, so a held-out world set —
+fresh seeds, planted ground truth, never used in any tuning loop —
+costs nothing to construct and one cheap arm to grade. The decision
+rule is written in the issue before any spend, per the discipline
+this post describes. Until that runs, the honest statement of the
+eight iterations' result is: *better on the thirty scenarios they
+were tuned against* — which is a narrower claim than this post made,
+and the gap between the two claims is exactly one measurement wide.
+
+One more thing belongs on the record, because this post's own
+checklist says to audit the auditor's mistakes with costs: this gap
+was named by reading someone else's benchmark, not by the audit
+above. The post that graded the graders did not grade the signal its
+author optimized against. Cost of the finding: one paper. Cost of
+having found it myself: the four layers were a checklist, and the
+development loop was not on it.

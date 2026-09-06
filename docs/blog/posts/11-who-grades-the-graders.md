@@ -538,3 +538,22 @@ above. The post that graded the graders did not grade the signal its
 author optimized against. Cost of the finding: one paper. Cost of
 having found it myself: the four layers were a checklist, and the
 development loop was not on it.
+
+## Grounding, added 2026-09-06
+
+The judge-side complement of the addendum's paper: [The Lifecycle of
+LLM-as-a-Judge for Large-Scale Recommendation
+Explanations](https://arxiv.org/abs/2608.18300) (Netflix; Kong et
+al., COLM 2026 workshops). Layer 4 above says this judge "has a
+boundary test but not yet a human-agreement baseline" — that paper
+supplies the mechanism at industrial scale (a weekly human panel with
+a self-calibrating band: the judge must score within two standard
+deviations of the average rater, the band widening where humans
+themselves disagree), and the laptop-scale version is now filed as
+[#380](https://github.com/fespino/resgraph/issues/380), with the
+degeneration honest: the band needs three raters, this project has
+one, so the measurement is a raw agreement rate with
+right-verdict-wrong-reason counted separately. Between that paper
+(the judge) and HarnessDev (the development signal), both ends of
+this post's Layer 4 now have industrial instrumentation to compare
+against.

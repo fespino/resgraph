@@ -519,3 +519,17 @@ satisfied a new rule's letter within a single run by inflating
 exactly the label the rule had priced. That arc — when prompt rules
 stop working, how to tell, and what finally fixed it — is the next
 post.
+
+## Grounding, added 2026-09-06
+
+[The Lifecycle of LLM-as-a-Judge for Large-Scale Recommendation
+Explanations](https://arxiv.org/abs/2608.18300) (Netflix; Kong et
+al., COLM 2026 workshops) is this post's thesis measured from the
+other side. Netflix cannot plant ground truth for free-form
+explanations, and the paper is an honest account of what the
+judge-first path then costs: a rationale-annotated human benchmark, a
+rubric-tuning loop with a meta-judge, two deployment roles, and a
+standing weekly human panel to keep the judge aligned — an entire
+lifecycle buying what a seeded generator provides by construction.
+Their first takeaway states this post's title backwards: "invest in
+the benchmark before the judge."

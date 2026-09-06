@@ -321,3 +321,17 @@ the worker-aware gate is
 [PR #195](https://github.com/fespino/resgraph/pull/195), and the seam
 and pilots landed under
 [#192](https://github.com/fespino/resgraph/issues/192).
+
+## Grounding, added 2026-09-06
+
+[HarnessDev](https://arxiv.org/abs/2609.01437) (ByteDance Seed et
+al., 2026) supplies this post's thesis measured from someone else's
+data: a harness is not portable across the models that run it. Their
+strongest creator's coding harness scores 69.3 running under its own
+model and 33.0 under a different one, and a search harness's
+duplicate-query rate jumps from 10.1% to 88.2% when the executor
+changes — "capability transfers only when prompts, tool protocol,
+budgets, and stopping rules remain compatible." That is the reason
+this platform's eval prices a *model inside a harness* as one unit,
+records the worker on every row, and refuses to compare runs across
+workers — decided here before that evidence existed.

@@ -457,3 +457,18 @@ being gamed — but the graders were written by an AI too, inside the
 same project. Why trust the instrument? That question got its own audit, with a methodology
 designed to fail loudly, a running cost ledger, and a list of the
 author's own mistakes. It is the next and final post of this trio.
+
+## Grounding, added 2026-09-06
+
+[HarnessDev](https://arxiv.org/abs/2609.01437) (ByteDance Seed et
+al., 2026) measured this post's failure mode one level up: not the
+model gaming a rule inside the prompt, but the *author* — there, six
+LLMs iterating their own harnesses — overfitting the item set the
+score is computed on. Across 64 harness revisions, the visible
+feedback score and a held-out score moved in the same direction only
+34 times (53.1%). The iterations this post describes were measured
+against one committed scenario set; whether their gains transfer to
+unseen seeds is the registered experiment in
+[#377](https://github.com/fespino/resgraph/issues/377), and the
+fuller accounting is in
+[post 11's addendum](11-who-grades-the-graders.md).

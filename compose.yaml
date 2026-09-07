@@ -143,7 +143,7 @@ services:
       LANGFUSE_INIT_USER_PASSWORD: resgraph-local-dev
   langfuse-worker:
     profiles: ["langfuse"]
-    image: langfuse/langfuse-worker:4@sha256:37a7c4251b602e60fd39451e6c252195908bf61837d4e252adbd752c0809e835
+    image: langfuse/langfuse-worker:4@sha256:00bc13c8da68fb77c55bcba0c1c16377f1f360ffb17206dbc708912ce4e3afb5
     depends_on: *langfuse-deps
     environment: *langfuse-env
   langfuse-postgres:

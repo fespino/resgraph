@@ -190,7 +190,7 @@ services:
       retries: 10
   langfuse-minio:
     profiles: ["langfuse"]
-    image: cgr.dev/chainguard/minio:latest@sha256:ef7c127fd0d380cca429c7aa44000d0c9b73044872451ead5084e155fbe00437
+    image: cgr.dev/chainguard/minio:latest@sha256:2a30e1a6d9e024631e9fed795773c40de5f819db80875f23dc00f7a4ca4f2246
     entrypoint: sh
     command: -c 'mkdir -p /data/langfuse && minio server --address ":9000" --console-address ":9001" /data'
     environment:

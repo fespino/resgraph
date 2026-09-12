@@ -46,6 +46,52 @@ openai:
   base_url: https://api.openai.com/v1
   api_key_env: OPENAI_API_KEY
 
+# Gemini's OpenAI-compatible endpoint lets the shared chat-completions
+# adapter exercise the same tool loop. Pin the documented default thinking
+# level explicitly so a provider default change cannot move a measured arm.
+gemini-3.8-flash:
+  provider: gemini
+  capabilities:
+    tools: true
+  model: gemini-3.8-flash
+  base_url: https://generativelanguage.googleapis.com/v1beta/openai
+  api_key_env: GEMINI_API_KEY
+  temperature: 0
+  context_window: 1048576
+  tool_choice: auto
+  extra_args:
+    reasoning_effort: medium
+
+# GPT-5.6 runs through the Responses API so function calls retain medium
+# reasoning and opaque reasoning items are replayed between tool turns.
+gpt-5.6-luna:
+  provider: openai-responses
+  capabilities:
+    tools: true
+  model: gpt-5.6-luna
+  base_url: https://api.openai.com/v1
+  api_key_env: OPENAI_API_KEY
+  context_window: 1050000
+  extra_args:
+    store: false
+    reasoning:
+      effort: medium
+      context: all_turns
+
+gpt-5.6-sol:
+  provider: openai-responses
+  capabilities:
+    tools: true
+  model: gpt-5.6-sol
+  base_url: https://api.openai.com/v1
+  api_key_env: OPENAI_API_KEY
+  context_window: 1050000
+  extra_args:
+    store: false
+    reasoning:
+      effort: medium
+      context: all_turns
+
 # An alias MAY declare `endpoints:` — one model, many serving locations —
 # and the gateway selects among them per request (health, then latency);
 # a pin must then name one (`alias@name`): serving location is part of
@@ -82,6 +128,7 @@ openai:
 # when the wire name doesn't normalize onto the listing id's tail — the
 # declared, never fuzzy, side of the match. `resgraph-gateway
 # market-baseline` then prints local-vs-market price for the same weights.
+
 qwen-local-7b:
   provider: ollama
   capabilities:

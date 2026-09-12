@@ -90,9 +90,9 @@ def test_classify_cmd_spends_once_and_deferred_only_finishes_the_queue(monkeypat
     r1 = CliRunner().invoke(cli.app, ["classify", "--out", str(out), "--cap", "10"])
     assert r1.exit_code == 0, r1.output
     rows = [json.loads(line) for line in out.read_text().splitlines()]
-    assert len(rows) == 29
+    assert len(rows) == 35
     deferred = [r for r in rows if r["deferred"]]
-    assert len(deferred) == 19 and client.calls == 10
+    assert len(deferred) == 25 and client.calls == 10
 
     calls_before = client.calls
     kept = {r["run_key"]: r for r in rows if not r["deferred"]}

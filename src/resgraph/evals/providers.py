@@ -32,6 +32,7 @@ LineTransport = Callable[[str, dict[str, Any], dict[str, str]], Iterator[str]]
 @dataclass
 class TextBlock:
     text: str
+    extra_content: dict[str, Any] | None = None
     type: str = "text"
 
 
@@ -40,6 +41,7 @@ class ToolUseBlock:
     id: str
     name: str
     input: dict[str, Any]
+    extra_content: dict[str, Any] | None = None
     type: str = "tool_use"
 
 
@@ -54,6 +56,7 @@ class Usage:
 @dataclass
 class ThinkingBlock:
     thinking: str
+    extra_content: dict[str, Any] | None = None
     type: str = "thinking"
 
 
@@ -93,6 +96,81 @@ def to_chat_tools(tools: list[dict[str, Any]]) -> list[dict[str, Any]]:
     ]
 
 
+def to_responses_tools(tools: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Anthropic tool declarations to OpenAI Responses function tools."""
+    return [
+        {
+            "type": "function",
+            "name": tool["name"],
+            "description": tool.get("description", ""),
+            "parameters": tool.get("input_schema", {}),
+        }
+        for tool in tools
+    ]
+
+
+def _openai_response_item(block: Any) -> dict[str, Any] | None:
+    extra = _field(block, "extra_content")
+    if not isinstance(extra, dict):
+        return None
+    item = extra.get("openai_response_item")
+    return item if isinstance(item, dict) else None
+
+
+def to_responses_input(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Replay the full Anthropic-shaped transcript as Responses API input."""
+    out: list[dict[str, Any]] = []
+    for message in messages:
+        content = message["content"]
+        if message["role"] == "assistant":
+            if isinstance(content, str):
+                out.append({"role": "assistant", "content": content})
+                continue
+            fallback_text: list[str] = []
+            for block in content:
+                if item := _openai_response_item(block):
+                    out.append(item)
+                elif _field(block, "type") == "text":
+                    fallback_text.append(_field(block, "text") or "")
+                elif _field(block, "type") == "tool_use":
+                    out.append(
+                        {
+                            "type": "function_call",
+                            "call_id": _field(block, "id"),
+                            "name": _field(block, "name"),
+                            "arguments": json.dumps(_field(block, "input") or {}),
+                        }
+                    )
+            if fallback_text:
+                out.append({"role": "assistant", "content": "".join(fallback_text)})
+            continue
+
+        if isinstance(content, str):
+            out.append({"role": "user", "content": content})
+            continue
+        text: list[str] = []
+        for part in content:
+            kind = _field(part, "type")
+            if kind == "text":
+                text.append(_field(part, "text") or "")
+            elif kind == "tool_result":
+                payload = _field(part, "content")
+                if _field(part, "is_error"):
+                    payload = f"[tool error] {payload}"
+                if not isinstance(payload, str):
+                    payload = json.dumps(payload)
+                out.append(
+                    {
+                        "type": "function_call_output",
+                        "call_id": _field(part, "tool_use_id"),
+                        "output": payload,
+                    }
+                )
+        if text:
+            out.append({"role": "user", "content": "".join(text)})
+    return out
+
+
 def _assistant_message(content: Any) -> dict[str, Any]:
     if isinstance(content, str):
         return {"role": "assistant", "content": content}
@@ -103,16 +181,20 @@ def _assistant_message(content: Any) -> dict[str, Any]:
         if kind == "text":
             texts.append(_field(block, "text") or "")
         elif kind == "tool_use":
-            tool_calls.append(
-                {
-                    "id": _field(block, "id"),
-                    "type": "function",
-                    "function": {
-                        "name": _field(block, "name"),
-                        "arguments": json.dumps(_field(block, "input") or {}),
-                    },
-                }
-            )
+            call = {
+                "id": _field(block, "id"),
+                "type": "function",
+                "function": {
+                    "name": _field(block, "name"),
+                    "arguments": json.dumps(_field(block, "input") or {}),
+                },
+            }
+            extra_content = _field(block, "extra_content")
+            if extra_content is not None:
+                # Gemini 3 returns an encrypted thought signature here and
+                # requires the exact opaque value on the next tool turn.
+                call["extra_content"] = extra_content
+            tool_calls.append(call)
         # thinking blocks are dropped: the chat-completions shape has no equivalent and a
         # local model does not replay them.
     msg: dict[str, Any] = {"role": "assistant", "content": "".join(texts) or None}
@@ -179,15 +261,72 @@ def from_chat_response(data: dict[str, Any]) -> Response:
                 id=tc["id"],
                 name=fn["name"],
                 input=json.loads(fn.get("arguments") or "{}"),
+                extra_content=tc.get("extra_content"),
             )
         )
     u = data.get("usage") or {}
+    cached = (u.get("prompt_tokens_details") or {}).get("cached_tokens", 0) or 0
+    prompt = u.get("prompt_tokens", 0) or 0
     usage = Usage(
-        input_tokens=u.get("prompt_tokens", 0) or 0,
+        input_tokens=max(0, prompt - cached),
         output_tokens=u.get("completion_tokens", 0) or 0,
+        cache_read_input_tokens=cached,
     )
     finish = (data["choices"][0].get("finish_reason") or "stop") if data.get("choices") else "stop"
     return Response(content=blocks, usage=usage, stop_reason=_STOP.get(finish, finish))
+
+
+def from_responses_response(data: dict[str, Any]) -> Response:
+    blocks: list[Any] = []
+    for item in data.get("output") or []:
+        extra = {"openai_response_item": item}
+        kind = item.get("type")
+        if kind == "reasoning":
+            summary = "\n".join(
+                part.get("text", "")
+                for part in item.get("summary") or []
+                if part.get("type") == "summary_text"
+            )
+            blocks.append(ThinkingBlock(thinking=summary, extra_content=extra))
+        elif kind == "function_call":
+            blocks.append(
+                ToolUseBlock(
+                    id=item["call_id"],
+                    name=item["name"],
+                    input=json.loads(item.get("arguments") or "{}"),
+                    extra_content=extra,
+                )
+            )
+        elif kind == "message":
+            text = "".join(
+                part.get("text") or part.get("refusal") or ""
+                for part in item.get("content") or []
+                if part.get("type") in {"output_text", "refusal"}
+            )
+            if text:
+                blocks.append(TextBlock(text=text, extra_content=extra))
+
+    usage_data = data.get("usage") or {}
+    details = usage_data.get("input_tokens_details") or {}
+    cached = details.get("cached_tokens", 0) or 0
+    cache_write = details.get("cache_write_tokens", 0) or 0
+    total_input = usage_data.get("input_tokens", 0) or 0
+    usage = Usage(
+        input_tokens=max(0, total_input - cached - cache_write),
+        output_tokens=usage_data.get("output_tokens", 0) or 0,
+        cache_read_input_tokens=cached,
+        cache_creation_input_tokens=cache_write,
+    )
+    has_tools = any(block.type == "tool_use" for block in blocks)
+    incomplete = (data.get("incomplete_details") or {}).get("reason")
+    stop_reason = (
+        "tool_use"
+        if has_tools
+        else "max_tokens"
+        if incomplete == "max_output_tokens"
+        else "end_turn"
+    )
+    return Response(content=blocks, usage=usage, stop_reason=stop_reason)
 
 
 def _httpx_transport(url: str, payload: dict[str, Any], headers: dict[str, str]) -> dict[str, Any]:
@@ -255,13 +394,14 @@ class _Messages:
         *,
         url: str,
         api_key: str,
-        temperature: float,
+        temperature: float | None,
         seed: int | None,
         tool_choice: str,
         extra_args: dict[str, Any],
         transport: Transport,
         line_transport: LineTransport,
         context_window: int | None = None,
+        max_tokens_field: str = "max_tokens",
     ) -> None:
         self._url = url
         self._api_key = api_key
@@ -272,6 +412,7 @@ class _Messages:
         self._transport = transport
         self._line_transport = line_transport
         self._context_window = context_window
+        self._max_tokens_field = max_tokens_field
 
     def _payload(
         self,
@@ -287,10 +428,11 @@ class _Messages:
         # override request fields.
         payload: dict[str, Any] = {
             "model": model,
-            "max_tokens": max_tokens,
-            "temperature": self._temperature,
+            self._max_tokens_field: max_tokens,
             "messages": to_chat_messages(system, messages),
         }
+        if self._temperature is not None:
+            payload["temperature"] = self._temperature
         if self._seed is not None:
             payload["seed"] = self._seed
         if tools:
@@ -319,9 +461,14 @@ class _Messages:
         )
         resp = from_chat_response(self._transport(self._url, payload, self._headers()))
         window = self._context_window
-        if window and resp.usage.input_tokens >= window:
+        prompt_tokens = (
+            resp.usage.input_tokens
+            + resp.usage.cache_read_input_tokens
+            + resp.usage.cache_creation_input_tokens
+        )
+        if window and prompt_tokens >= window:
             raise RuntimeError(
-                f"prompt ({resp.usage.input_tokens} tokens) filled the declared "
+                f"prompt ({prompt_tokens} tokens) filled the declared "
                 f"context window ({window}); the server may have truncated silently"
             )
         return resp
@@ -355,13 +502,14 @@ class ChatCompletionsClient:
         *,
         base_url: str,
         api_key: str | None = None,
-        temperature: float = 0.0,
+        temperature: float | None = 0.0,
         seed: int | None = None,
         tool_choice: str = "auto",
         extra_args: dict[str, Any] | None = None,
         transport: Transport | None = None,
         line_transport: LineTransport | None = None,
         context_window: int | None = None,
+        max_tokens_field: str = "max_tokens",
     ) -> None:
         self.messages = _Messages(
             url=base_url.rstrip("/") + "/chat/completions",
@@ -372,6 +520,86 @@ class ChatCompletionsClient:
             extra_args=extra_args or {},
             transport=transport or _httpx_transport,
             line_transport=line_transport or _httpx_line_transport,
+            context_window=context_window,
+            max_tokens_field=max_tokens_field,
+        )
+
+
+class _ResponsesMessages:
+    def __init__(
+        self,
+        *,
+        url: str,
+        api_key: str,
+        extra_args: dict[str, Any],
+        transport: Transport,
+        context_window: int | None = None,
+    ) -> None:
+        self._url = url
+        self._api_key = api_key
+        self._extra_args = extra_args
+        self._transport = transport
+        self._context_window = context_window
+
+    def create(
+        self,
+        *,
+        model: str,
+        max_tokens: int,
+        messages: list[dict[str, Any]],
+        system: str | list[Any] | None = None,
+        tools: list[dict[str, Any]] | None = None,
+        **_ignored: Any,
+    ) -> Response:
+        payload: dict[str, Any] = {
+            "model": model,
+            "input": to_responses_input(messages),
+            "max_output_tokens": max_tokens,
+        }
+        if system is not None:
+            payload["instructions"] = (
+                "".join(_field(block, "text") or "" for block in system)
+                if isinstance(system, list)
+                else system
+            )
+        if tools:
+            payload["tools"] = to_responses_tools(tools)
+            payload["tool_choice"] = "auto"
+        payload.update(self._extra_args)
+        response = from_responses_response(self._transport(self._url, payload, self._headers()))
+        prompt_tokens = (
+            response.usage.input_tokens
+            + response.usage.cache_read_input_tokens
+            + response.usage.cache_creation_input_tokens
+        )
+        if self._context_window and prompt_tokens >= self._context_window:
+            raise RuntimeError(
+                f"prompt ({prompt_tokens} tokens) filled the declared "
+                f"context window ({self._context_window}); the server may have truncated silently"
+            )
+        return response
+
+    def _headers(self) -> dict[str, str]:
+        return {"Authorization": f"Bearer {self._api_key}"} if self._api_key else {}
+
+
+class ResponsesClient:
+    """An Anthropic-shaped client backed by OpenAI's Responses API."""
+
+    def __init__(
+        self,
+        *,
+        base_url: str,
+        api_key: str | None = None,
+        extra_args: dict[str, Any] | None = None,
+        transport: Transport | None = None,
+        context_window: int | None = None,
+    ) -> None:
+        self.messages = _ResponsesMessages(
+            url=base_url.rstrip("/") + "/responses",
+            api_key=api_key or os.environ.get("RESGRAPH_LOCAL_API_KEY", ""),
+            extra_args=extra_args or {},
+            transport=transport or _httpx_transport,
             context_window=context_window,
         )
 
@@ -419,7 +647,9 @@ class GatewayClient:
             {
                 **m,
                 "content": [
-                    asdict(b) if is_dataclass(b) and not isinstance(b, type) else b
+                    {k: v for k, v in asdict(b).items() if v is not None}
+                    if is_dataclass(b) and not isinstance(b, type)
+                    else b
                     for b in m["content"]
                 ],
             }
@@ -504,6 +734,21 @@ def _build_anthropic(setup: dict[str, Any]) -> Any:
     return Anthropic()
 
 
+def _build_responses(setup: dict[str, Any]) -> Any:
+    base_url = setup.get("base_url")
+    if not base_url:
+        raise SystemExit(
+            f"setup {setup.get('name')!r} (provider openai-responses) needs a base_url"
+        )
+    key_env = setup.get("api_key_env")
+    return ResponsesClient(
+        base_url=base_url,
+        api_key=os.environ.get(key_env) if key_env else None,
+        extra_args=setup.get("extra_args"),
+        context_window=setup.get("context_window"),
+    )
+
+
 def _build_chat_completions(setup: dict[str, Any]) -> Any:
     base_url = setup.get("base_url")
     if not base_url:
@@ -519,14 +764,14 @@ def _build_chat_completions(setup: dict[str, Any]) -> Any:
         tool_choice=setup.get("tool_choice", "auto"),
         extra_args=setup.get("extra_args"),
         context_window=setup.get("context_window"),
+        max_tokens_field=setup.get("max_tokens_field", "max_tokens"),
     )
 
 
-# Only Anthropic needs its own entry — its messages API carries caching and
-# thinking the harness uses; every other provider falls through to chat-completions.
 CLIENTS: dict[str, Callable[[dict[str, Any]], Any]] = {
     "anthropic": _build_anthropic,
     "gateway": _build_gateway,
+    "openai-responses": _build_responses,
 }
 
 

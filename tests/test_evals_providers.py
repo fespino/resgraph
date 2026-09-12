@@ -8,14 +8,18 @@ from resgraph.analyst.harness import Usage as HarnessUsage
 from resgraph.evals.providers import (
     ChatCompletionsClient,
     GatewayClient,
+    ResponsesClient,
     TextBlock,
     ToolUseBlock,
     build_client,
     from_chat_response,
+    from_responses_response,
     load_setup,
     pin_ollama_weights,
     to_chat_messages,
     to_chat_tools,
+    to_responses_input,
+    to_responses_tools,
 )
 
 
@@ -31,6 +35,20 @@ def test_tools_map_to_function_tool_shape():
                 "description": "downstream",
                 "parameters": {"type": "object"},
             },
+        }
+    ]
+
+
+def test_tools_map_to_responses_function_shape():
+    anthropic = [
+        {"name": "blast_radius", "description": "downstream", "input_schema": {"type": "object"}}
+    ]
+    assert to_responses_tools(anthropic) == [
+        {
+            "type": "function",
+            "name": "blast_radius",
+            "description": "downstream",
+            "parameters": {"type": "object"},
         }
     ]
 
@@ -131,6 +149,7 @@ def test_from_chat_response_tool_calls_parse_arguments():
                                 "name": "blast_radius",
                                 "arguments": '{"resource": "db-07"}',
                             },
+                            "extra_content": {"google": {"thought_signature": "opaque-signature"}},
                         }
                     ],
                 },
@@ -144,7 +163,22 @@ def test_from_chat_response_tool_calls_parse_arguments():
     assert isinstance(block, ToolUseBlock)
     assert block.name == "blast_radius"
     assert block.input == {"resource": "db-07"}
+    assert block.extra_content == {"google": {"thought_signature": "opaque-signature"}}
     assert resp.stop_reason == "tool_use"
+
+
+def test_provider_extra_content_round_trips_on_the_next_tool_turn():
+    signature = {"google": {"thought_signature": "opaque-signature"}}
+    content = [
+        ToolUseBlock(
+            id="call_1",
+            name="blast_radius",
+            input={"resource": "db-07"},
+            extra_content=signature,
+        )
+    ]
+    (message,) = to_chat_messages(None, [{"role": "assistant", "content": content}])
+    assert message["tool_calls"][0]["extra_content"] == signature
 
 
 def test_response_usage_plugs_into_harness_accounting():
@@ -158,6 +192,77 @@ def test_response_usage_plugs_into_harness_accounting():
     assert acc.input_tokens == 40
     assert acc.output_tokens == 8
     assert acc.cache_read_tokens == 0
+
+
+def test_openai_cached_prompt_tokens_are_not_double_counted():
+    data = {
+        "choices": [{"message": {"content": "x"}, "finish_reason": "stop"}],
+        "usage": {
+            "prompt_tokens": 40,
+            "completion_tokens": 8,
+            "prompt_tokens_details": {"cached_tokens": 30},
+        },
+    }
+    resp = from_chat_response(data)
+    assert resp.usage.input_tokens == 10
+    assert resp.usage.cache_read_input_tokens == 30
+
+
+def test_responses_output_and_reasoning_replay_without_double_counting_cache():
+    reasoning = {
+        "id": "rs_1",
+        "type": "reasoning",
+        "summary": [],
+        "encrypted_content": "opaque",
+    }
+    call = {
+        "id": "fc_1",
+        "type": "function_call",
+        "call_id": "call_1",
+        "name": "blast_radius",
+        "arguments": '{"resource":"db-07"}',
+        "status": "completed",
+    }
+    resp = from_responses_response(
+        {
+            "output": [reasoning, call],
+            "usage": {
+                "input_tokens": 50,
+                "output_tokens": 8,
+                "input_tokens_details": {
+                    "cached_tokens": 30,
+                    "cache_write_tokens": 5,
+                },
+            },
+        }
+    )
+    assert [block.type for block in resp.content] == ["thinking", "tool_use"]
+    assert resp.stop_reason == "tool_use"
+    assert resp.usage.input_tokens == 15
+    assert resp.usage.cache_read_input_tokens == 30
+    assert resp.usage.cache_creation_input_tokens == 5
+
+    replay = to_responses_input(
+        [
+            {"role": "assistant", "content": resp.content},
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "tool_result",
+                        "tool_use_id": "call_1",
+                        "content": "result",
+                        "is_error": False,
+                    }
+                ],
+            },
+        ]
+    )
+    assert replay == [
+        reasoning,
+        call,
+        {"type": "function_call_output", "call_id": "call_1", "output": "result"},
+    ]
 
 
 def test_client_full_roundtrip_through_a_fake_transport():
@@ -231,6 +336,79 @@ def test_client_omits_tools_and_seed_when_unset():
     assert payload["messages"] == [{"role": "user", "content": "hi"}]
 
 
+def test_client_can_omit_temperature_and_use_max_completion_tokens():
+    captured: dict[str, object] = {}
+
+    def fake_transport(url, payload, headers):
+        captured["payload"] = payload
+        return {
+            "choices": [{"message": {"content": "done"}, "finish_reason": "stop"}],
+            "usage": {"prompt_tokens": 1, "completion_tokens": 1},
+        }
+
+    client = ChatCompletionsClient(
+        base_url="http://x/v1",
+        temperature=None,
+        max_tokens_field="max_completion_tokens",
+        transport=fake_transport,
+    )
+    client.messages.create(model="m", max_tokens=10, messages=[{"role": "user", "content": "hi"}])
+    payload = captured["payload"]
+    assert "temperature" not in payload
+    assert "max_tokens" not in payload
+    assert payload["max_completion_tokens"] == 10
+
+
+def test_responses_client_builds_stateless_tool_request():
+    captured: dict[str, object] = {}
+
+    def fake_transport(url, payload, headers):
+        captured.update(url=url, payload=payload, headers=headers)
+        return {
+            "output": [
+                {
+                    "id": "msg_1",
+                    "type": "message",
+                    "role": "assistant",
+                    "status": "completed",
+                    "content": [{"type": "output_text", "text": "done"}],
+                }
+            ],
+            "usage": {
+                "input_tokens": 4,
+                "output_tokens": 2,
+                "input_tokens_details": {"cached_tokens": 0},
+            },
+        }
+
+    client = ResponsesClient(
+        base_url="https://api.openai.com/v1",
+        api_key="k",
+        extra_args={"store": False, "reasoning": {"effort": "medium"}},
+        transport=fake_transport,
+    )
+    resp = client.messages.create(
+        model="gpt-5.6-luna",
+        max_tokens=512,
+        system=[
+            {"type": "text", "text": "cached ", "cache_control": {"type": "ephemeral"}},
+            {"type": "text", "text": "instructions"},
+        ],
+        tools=[{"name": "blast_radius", "description": "d", "input_schema": {}}],
+        messages=[{"role": "user", "content": "investigate"}],
+    )
+    assert captured["url"] == "https://api.openai.com/v1/responses"
+    payload = captured["payload"]
+    assert payload["input"] == [{"role": "user", "content": "investigate"}]
+    assert payload["instructions"] == "cached instructions"
+    assert payload["max_output_tokens"] == 512
+    assert payload["tools"][0]["name"] == "blast_radius"
+    assert payload["reasoning"] == {"effort": "medium"}
+    assert payload["store"] is False
+    assert captured["headers"]["Authorization"] == "Bearer k"
+    assert resp.content[0].text == "done"
+
+
 def test_extra_args_merge_into_the_payload():
     captured: dict[str, object] = {}
 
@@ -274,6 +452,17 @@ def test_build_client_anthropic_provider_uses_the_sdk(monkeypatch):
 def test_unknown_provider_falls_back_to_chat_completions():
     client = build_client({"provider": "together", "model": "x", "base_url": "http://x/v1"})
     assert isinstance(client, ChatCompletionsClient)
+
+
+def test_build_client_openai_responses_provider_uses_responses_client():
+    client = build_client(
+        {
+            "provider": "openai-responses",
+            "model": "gpt-5.6-luna",
+            "base_url": "https://api.openai.com/v1",
+        }
+    )
+    assert isinstance(client, ResponsesClient)
 
 
 def test_chat_provider_without_a_base_url_is_rejected():

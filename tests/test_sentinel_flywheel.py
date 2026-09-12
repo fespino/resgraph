@@ -93,7 +93,7 @@ def test_queue_cli_fill_list_decide_on_patched_paths(monkeypatch, tmp_path):
 
     fill = runner.invoke(cli.app, ["queue", "fill"])
     assert fill.exit_code == 0, fill.output
-    assert "29 runs in the queue" in fill.output
+    assert "35 runs in the queue" in fill.output
 
     listed = runner.invoke(cli.app, ["queue", "list"])
     assert listed.exit_code == 0

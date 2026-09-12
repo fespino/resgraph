@@ -390,14 +390,17 @@ def test_responses_client_builds_stateless_tool_request():
     resp = client.messages.create(
         model="gpt-5.6-luna",
         max_tokens=512,
-        system="sys",
+        system=[
+            {"type": "text", "text": "cached ", "cache_control": {"type": "ephemeral"}},
+            {"type": "text", "text": "instructions"},
+        ],
         tools=[{"name": "blast_radius", "description": "d", "input_schema": {}}],
         messages=[{"role": "user", "content": "investigate"}],
     )
     assert captured["url"] == "https://api.openai.com/v1/responses"
     payload = captured["payload"]
     assert payload["input"] == [{"role": "user", "content": "investigate"}]
-    assert payload["instructions"] == "sys"
+    assert payload["instructions"] == "cached instructions"
     assert payload["max_output_tokens"] == 512
     assert payload["tools"][0]["name"] == "blast_radius"
     assert payload["reasoning"] == {"effort": "medium"}

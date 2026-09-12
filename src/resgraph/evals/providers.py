@@ -547,7 +547,7 @@ class _ResponsesMessages:
         model: str,
         max_tokens: int,
         messages: list[dict[str, Any]],
-        system: str | None = None,
+        system: str | list[Any] | None = None,
         tools: list[dict[str, Any]] | None = None,
         **_ignored: Any,
     ) -> Response:
@@ -557,7 +557,11 @@ class _ResponsesMessages:
             "max_output_tokens": max_tokens,
         }
         if system is not None:
-            payload["instructions"] = system
+            payload["instructions"] = (
+                "".join(_field(block, "text") or "" for block in system)
+                if isinstance(system, list)
+                else system
+            )
         if tools:
             payload["tools"] = to_responses_tools(tools)
             payload["tool_choice"] = "auto"

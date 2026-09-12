@@ -57,6 +57,17 @@ def test_estimate_cost_math_and_unknown_model():
     assert estimate_cost(tokens, "claude-2") == 0.0
 
 
+def test_gpt_56_pricing():
+    tokens = {
+        "input": 1_000_000,
+        "output": 1_000_000,
+        "cache_read": 1_000_000,
+        "cache_creation": 1_000_000,
+    }
+    assert estimate_cost(tokens, "gpt-5.6-luna") == pytest.approx(1.67)
+    assert estimate_cost(tokens, "gpt-5.6-sol") == pytest.approx(29.4)
+
+
 def test_row_scan_refuses_secret_shaped_content_without_echoing_it():
     token = "sk-ant-abcdef1234567890"
     with pytest.raises(SystemExit) as exc:

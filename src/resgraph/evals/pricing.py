@@ -8,6 +8,12 @@ PRICES_PER_MTOK: dict[str, tuple[float, float]] = {
     "claude-sonnet-4-6": (3.0, 15.0),
     "claude-haiku-4-5": (1.0, 5.0),
     "gpt-4o": (2.5, 10.0),
+    # Introductory Google AI Studio rate through 2026-12-31; the published
+    # arm must name this validity window. Standard pricing doubles in 2027.
+    "gemini-3.8-flash": (0.75, 3.75),
+    "gpt-5.6-luna": (0.2, 1.2),
+    # Promotional input/output pricing available through at least 2026-11-21.
+    "gpt-5.6-sol": (4.0, 20.0),
 }
 
 

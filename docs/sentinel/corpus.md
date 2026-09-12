@@ -24,10 +24,9 @@ not benign traffic. A test asserts the committed manifest equals a
 fresh selection, so a new companion run cannot silently enter the
 benign pool.
 
-Today: 18 run files, 361 benign rows, spanning the phase-8 base runs
-and the phase-10 model arms (Haiku/Opus/Sonnet) — benign traffic
-across workers, which W3 must treat as a behavior-profile
-consideration (per-worker baselines, not one global one).
+Today: 22 run files and 721 benign rows. The worker set now covers
+Haiku, Opus, Sonnet, Gemini 3.8 Flash, and GPT-5.6 Luna and Sol, so
+behavior profiles must stay per-worker rather than global.
 
 ## Attacks: the generator plants the malice
 
@@ -80,3 +79,7 @@ admits 29/381 runs to layer 3. The division of labor is measured, not
 designed: text/insert attacks are invisible to features (layer 1's
 job), volume is invisible to signatures (layer 2's). Decision record:
 D37; floors asserted in tests/test_sentinel_layers.py.
+
+After adding the September model arms, the same scan catches 20/20
+attacks with zero layer-1 false positives. Layer 2 catches 11/20
+attacks and flags 15/721 benign rows; 35/741 runs reach the funnel.
